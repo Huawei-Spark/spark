@@ -45,6 +45,7 @@ private[spark] class Executor(
   // Each map holds the master's timestamp for the version of that file or JAR we got.
   private val currentFiles: HashMap[String, Long] = new HashMap[String, Long]()
   private val currentJars: HashMap[String, Long] = new HashMap[String, Long]()
+  private val currentResources: HashMap[ExtResource, Long] = new HashMap[ExtResource, Long]()
 
   private val EMPTY_BYTE_BUFFER = ByteBuffer.wrap(new Array[Byte](0))
 
@@ -122,6 +123,8 @@ private[spark] class Executor(
     env.metricsSystem.report()
     isStopped = true
     threadPool.shutdown()
+    // terminate live external resources
+    extResources.foreach(_.term)
   }
 
   class TaskRunner(
@@ -154,8 +157,8 @@ private[spark] class Executor(
       try {
         SparkEnv.set(env)
         Accumulators.clear()
-        val (taskFiles, taskJars, taskBytes) = Task.deserializeWithDependencies(serializedTask)
-        updateDependencies(taskFiles, taskJars)
+        val (taskFiles, taskJars, taskResources, taskBytes) = Task.deserializeWithDependencies(serializedTask)
+        updateDependencies(taskFiles, taskJars, taskResources)
         task = ser.deserialize[Task[Any]](taskBytes, Thread.currentThread.getContextClassLoader)
 
         // If this task has been killed before we deserialized it, let's quit now. Otherwise,
@@ -171,6 +174,7 @@ private[spark] class Executor(
         attemptedTask = Some(task)
         logDebug("Task " + taskId + "'s epoch is " + task.epoch)
         env.mapOutputTracker.updateEpoch(task.epoch)
+        task.availableResources = currentResources
 
         // Run the actual task and measure its runtime.
         taskStart = System.currentTimeMillis()
@@ -312,7 +316,7 @@ private[spark] class Executor(
    * Download any missing dependencies if we receive a new set of files and JARs from the
    * SparkContext. Also adds any new JARs we fetched to the class loader.
    */
-  private def updateDependencies(newFiles: HashMap[String, Long], newJars: HashMap[String, Long]) {
+  private def updateDependencies(newFiles: HashMap[String, Long], newJars: HashMap[String, Long], newResources: HashMap[ExtResource, Long]) {
     synchronized {
       // Fetch missing dependencies
       for ((name, timestamp) <- newFiles if currentFiles.getOrElse(name, -1L) < timestamp) {
@@ -331,6 +335,11 @@ private[spark] class Executor(
           logInfo("Adding " + url + " to class loader")
           urlClassLoader.addURL(url)
         }
+      }
+      for ((resource, timestamp) <- newResources if currentResources.getOrElse(name, -1L) < timestamp) {
+        logInfo("Initializing " + resource.name + " with timestamp " + timestamp)
+        resource.init()
+        currentResources(resource) = timestamp
       }
     }
   }

@@ -40,7 +40,8 @@ class TaskContext(
     val partitionId: Int,
     val attemptId: Long,
     val runningLocally: Boolean = false,
-    private[spark] val taskMetrics: TaskMetrics = TaskMetrics.empty)
+    private[spark] val taskMetrics: TaskMetrics = TaskMetrics.empty,
+    val availableResources : HashMap[ExtResource, Long])
   extends Serializable {
 
   @deprecated("use partitionId", "0.8.1")
