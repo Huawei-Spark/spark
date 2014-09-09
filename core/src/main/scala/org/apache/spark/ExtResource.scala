@@ -21,6 +21,10 @@ import java.util.{ArrayQueue, HashMap}
 
 case class ExtResourceInstance(handle : Any, partition : Int)
 {
+  
+  override def hashCode : Int = partition
+
+  override def equals(other : ExtResourceInstance) :Boolean = name.equals(other.name)
 }
 
 /**
@@ -35,9 +39,7 @@ case class ExtResource(
     partitionAffined: Boolean, // partition speficication preferred 
     expiration: Int = -1       // optional expiration time, default to none; 
                                // 0 for one-time use
-  )
-
-  extends Serializable {
+  ) extends Serializable {
 
   @transient private lazy instances : Option[Any] = {
     if (shared)
