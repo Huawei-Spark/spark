@@ -17,7 +17,7 @@
 
 package org.apache.spark
 
-import java.util.{ArrayQueue, HashMap}
+import java.util.{ArrayQueue, HashSet}
 
 case class ExtResourceInstance(handle : Any, partition : Int)
 {
@@ -34,8 +34,8 @@ case class ExtResource(
     name: String,
     shared: Boolean = false,
     params: Seq[Serializable],
-    init: (Seq[Serializable]) => Any,  // Initialization function
-    term: (Seq[Serializable]) => Unit,  // Termination function
+    init: (Seq[Serializable]) => ExtResourceInstance,  // Initialization function
+    term: (ExtResourceInstance, Seq[Serializable]) => Unit,  // Termination function
     partitionAffined: Boolean, // partition speficication preferred 
     expiration: Int = -1       // optional expiration time, default to none; 
                                // 0 for one-time use
@@ -43,11 +43,11 @@ case class ExtResource(
 
   @transient private lazy instances : Option[Any] = {
     if (shared)
-      ExtResourceInstance(init(params), -1, -1)
+      ExtResourceInstance(init(params), -1)
     else if (partitionAffined) 
-      new HashMap[Int, Any]
+      new HashSet[ExtResourceInstance]
     else 
-      new ArrayQueue[Any] 
+      new ArrayQueue[ExtResourceInstance] 
   }
 
   @transient private lazy usedInstances : Option[Any] = {
