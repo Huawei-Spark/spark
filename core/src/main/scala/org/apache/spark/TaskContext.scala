@@ -17,7 +17,7 @@
 
 package org.apache.spark
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.executor.TaskMetrics
@@ -41,7 +41,9 @@ class TaskContext(
     val attemptId: Long,
     val runningLocally: Boolean = false,
     private[spark] val taskMetrics: TaskMetrics = TaskMetrics.empty,
-    val availableResources : HashMap[ExtResource, Long])
+    val resources: Option[HashMap[String, Pair[ExtResource, Long]]] = None,
+    val executorId: Option[String] = None,
+    val slaveHostname: Option[String] = None)
   extends Serializable {
 
   @deprecated("use partitionId", "0.8.1")
@@ -111,5 +113,37 @@ class TaskContext(
   /** Marks the task for interruption, i.e. cancellation. */
   private[spark] def markInterrupted(): Unit = {
     interrupted = true
+  }
+
+  def getExtResourceUsageInfo() : Iterator[ExtResourceInfo] = {
+    synchronized {
+      if (resources.isDefined && slaveHostname.isDefined
+        && executorId.isDefined)
+      resources.get.map(r=>r._2._1.getResourceInfo(slaveHostname.get,
+                    executorId.get, r._2._2)).toIterator
+      else
+        ArrayBuffer[ExtResourceInfo]().toIterator
+    }
+  }
+
+  def cleanupResources(resourceName: Option[String]) : Iterator[String] = {
+    synchronized {
+      if (!resources.isDefined)
+        ArrayBuffer[String]("No external resources available to tasks for Executor %s at %s"
+          .format(executorId, slaveHostname)).toIterator
+      else if (resources.get.isEmpty) {
+        ArrayBuffer[String]("No external resources registered for Executor %s at %s"
+          .format(executorId, slaveHostname)).toIterator
+      } else if (resourceName.isDefined) {
+        if (resources.get.contains(resourceName.get))
+          ArrayBuffer[String](resources.get.get(resourceName.get).get
+            ._1.cleanup(slaveHostname.get, executorId.get)).toIterator
+        else
+          ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
+           .format(resourceName.get, executorId.get, slaveHostname.get)).toIterator
+      } else {
+        resources.get.map(_._2._1.cleanup(slaveHostname.get, executorId.get)).toIterator
+      }
+    }
   }
 }

@@ -45,7 +45,7 @@ private[spark] class Executor(
   // Each map holds the master's timestamp for the version of that file or JAR we got.
   private val currentFiles: HashMap[String, Long] = new HashMap[String, Long]()
   private val currentJars: HashMap[String, Long] = new HashMap[String, Long]()
-  private val currentResources: HashMap[ExtResource, Long] = new HashMap[ExtResource, Long]()
+  private val currentResources: HashMap[String, Pair[ExtResource, Long]] = new HashMap[String, Pair[ExtResource, Long]]()
 
   private val EMPTY_BYTE_BUFFER = ByteBuffer.wrap(new Array[Byte](0))
 
@@ -124,7 +124,7 @@ private[spark] class Executor(
     isStopped = true
     threadPool.shutdown()
     // terminate live external resources
-    extResources.foreach(_.term)
+    currentResources.foreach(_._2._1.cleanup(slaveHostname, executorId))
   }
 
   class TaskRunner(
@@ -174,7 +174,7 @@ private[spark] class Executor(
         attemptedTask = Some(task)
         logDebug("Task " + taskId + "'s epoch is " + task.epoch)
         env.mapOutputTracker.updateEpoch(task.epoch)
-        task.availableResources = currentResources
+        task.resources = Some(currentResources)
 
         // Run the actual task and measure its runtime.
         taskStart = System.currentTimeMillis()
@@ -257,6 +257,8 @@ private[spark] class Executor(
           }
         }
       } finally {
+        // Release all external resources used
+        ExternalResourceManager.cleanupResourcesPerTask(taskId)
         // Release memory used by this thread for shuffles
         env.shuffleMemoryManager.releaseMemoryForThisThread()
         // Release memory used by this thread for unrolling blocks
@@ -336,10 +338,10 @@ private[spark] class Executor(
           urlClassLoader.addURL(url)
         }
       }
-      for ((resource, timestamp) <- newResources if currentResources.getOrElse(name, -1L) < timestamp) {
+      for ((resource, timestamp) <- newResources
+           if currentResources.getOrElse(resource.name, (null, -1L))._2 < timestamp) {
         logInfo("Initializing " + resource.name + " with timestamp " + timestamp)
-        resource.init()
-        currentResources(resource) = timestamp
+        currentResources(resource.name) = (resource, timestamp)
       }
     }
   }

@@ -93,7 +93,7 @@ private[spark] class TaskSchedulerImpl(
 
   protected val hostsByRack = new HashMap[String, HashSet[String]]
 
-  protected val executorIdToHost = new HashMap[String, String]
+  protected val executorIdToHosts = new HashMap[String, String]
 
   // Listener object to pass upcalls into
   var dagScheduler: DAGScheduler = null
@@ -222,7 +222,7 @@ private[spark] class TaskSchedulerImpl(
     // Also track if new executor is added
     var newExecAvail = false
     for (o <- offers) {
-      executorIdToHost(o.executorId) = o.host
+      executorIdToHosts(o.executorId) = o.host
       if (!executorsByHost.contains(o.host)) {
         executorsByHost(o.host) = new HashSet[String]()
         executorAdded(o.executorId, o.host)
@@ -420,7 +420,7 @@ private[spark] class TaskSchedulerImpl(
 
     synchronized {
       if (activeExecutorIds.contains(executorId)) {
-        val hostPort = executorIdToHost(executorId)
+        val hostPort = executorIdToHosts(executorId)
         logError("Lost executor %s on %s: %s".format(executorId, hostPort, reason))
         removeExecutor(executorId)
         failedExecutor = Some(executorId)
@@ -442,7 +442,7 @@ private[spark] class TaskSchedulerImpl(
   /** Remove an executor from all our data structures and mark it as lost */
   private def removeExecutor(executorId: String) {
     activeExecutorIds -= executorId
-    val host = executorIdToHost(executorId)
+    val host = executorIdToHosts(executorId)
     val execs = executorsByHost.getOrElse(host, new HashSet)
     execs -= executorId
     if (execs.isEmpty) {
@@ -454,7 +454,7 @@ private[spark] class TaskSchedulerImpl(
         }
       }
     }
-    executorIdToHost -= executorId
+    executorIdToHosts -= executorId
     rootPool.executorLost(executorId, host)
   }
 
@@ -490,6 +490,10 @@ private[spark] class TaskSchedulerImpl(
         this.wait(100)
       }
     }
+  }
+
+  def getExecutorIdsAndLocations() : Seq[TaskLocation] = {
+    executorIdToHosts.map(e=>TaskLocation(e._1, e._2)).toSeq
   }
 }
 

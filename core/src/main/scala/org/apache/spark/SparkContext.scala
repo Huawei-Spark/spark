@@ -841,7 +841,7 @@ class SparkContext(config: SparkConf) extends Logging {
    * overwrite if the resource already exists
    */
   def addOrReplaceResource(res: ExtResource) {
-    Long ts = System.currentTimeMillis
+    val ts = System.currentTimeMillis
     addedExtResources(res) = ts
 
     logInfo("Added resource " + res.name + " with timestamp " + ts)
@@ -849,13 +849,19 @@ class SparkContext(config: SparkConf) extends Logging {
     postEnvironmentUpdate()
   }
 
+  def listResourceRDD() : RDD[ExtResourceInfo] = new ExtResourceListRDD(this)
+  // cleanup all outstanding resources
+  def cleanupAllResourceRDD() : RDD[String] = new ExtResourceCleanupRDD(this)
+  def cleanupResourceRDD(resourceName: String) : RDD[String] 
+    = new ExtResourceCleanupRDD(this, Some(resourceName))
+
   /**
    * Add an (external) resource to be used with this Spark job on every node.
    */
   def addResource(res: ExtResource) {
-    Long ts = System.currentTimeMillis
+    val ts: Long= System.currentTimeMillis
     if (addedExtResources.containsKey(res)) {
-      logError("Error adding jar (" + e + "), was the --addJars option used?")
+      logError("Error adding resource (" + res.name + "): already added ")
     } else {
       addedExtResources(res) = ts
 
@@ -1325,7 +1331,7 @@ class SparkContext(config: SparkConf) extends Logging {
       val schedulingMode = getSchedulingMode.toString
       val addedJarPaths = addedJars.keys.toSeq
       val addedFilePaths = addedFiles.keys.toSeq
-      val addedExtResourceNames = addedExtResources.map(_.name).toSeq
+      val addedExtResourceNames = addedExtResources.keys.map(_.name).toSeq
       val environmentDetails =
         SparkEnv.environmentDetails(conf, schedulingMode, addedJarPaths, addedFilePaths, addedExtResourceNames)
       val environmentUpdate = SparkListenerEnvironmentUpdate(environmentDetails)
@@ -1336,6 +1342,11 @@ class SparkContext(config: SparkConf) extends Logging {
   /** Called by MetadataCleaner to clean up the persistentRdds map periodically */
   private[spark] def cleanup(cleanupTime: Long) {
     persistentRdds.clearOldValues(cleanupTime)
+  }
+
+  def getExecutorsAndLocations(): Seq[TaskLocation] = {
+    // all supported task schedulers are actually TaskSchedulerImpl ?
+    taskScheduler.asInstanceOf[TaskSchedulerImpl].getExecutorIdsAndLocations()
   }
 }
 
