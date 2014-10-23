@@ -34,7 +34,7 @@ import org.apache.spark.sql.hbase.HBaseCatalog._
 class HBaseSQLContext(@transient val sc: SparkContext)
   extends SQLContext(sc) with Serializable {
   self =>
-
+  // Todo: add analyzer (add a rule from LoadDataIntoTable to BulkLoadIntoTable)
   override protected[sql] lazy val catalog: HBaseCatalog = new HBaseCatalog(this)
 
   @transient val hBasePlanner = new SparkPlanner with HBaseStrategies {

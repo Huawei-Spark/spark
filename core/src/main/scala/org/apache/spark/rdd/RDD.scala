@@ -342,7 +342,7 @@ abstract class RDD[T: ClassTag](
       // include a shuffle step so that our upstream tasks are still distributed
       new CoalescedRDD(
         new ShuffledRDD[Int, T, T](mapPartitionsWithIndex(distributePartition),
-        new HashPartitioner(numPartitions)),
+        new HashPartitioner(numPartitions)),// here we can not set the Partitioner
         numPartitions).values
     } else {
       new CoalescedRDD(this, numPartitions)
