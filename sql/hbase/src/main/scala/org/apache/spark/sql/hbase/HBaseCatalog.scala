@@ -89,6 +89,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
         }
     }
 
+    // TODO: suggest to create this before hand, like in constructor?
     val admin = new HBaseAdmin(configuration)
     val avail = admin.isTableAvailable(MetaData)
 
@@ -274,25 +275,30 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     relationMapCache.remove(processTableName(tableName))
   }
 
-  def createMetadataTable(admin: HBaseAdmin) = {
+  private def createMetadataTable(admin: HBaseAdmin) = {
     val descriptor = new HTableDescriptor(TableName.valueOf(MetaData))
     val columnDescriptor = new HColumnDescriptor(ColumnFamily)
     descriptor.addFamily(columnDescriptor)
     admin.createTable(descriptor)
   }
 
-  def checkHBaseTableExists(hbaseTableName: String): Boolean = {
+  private def checkHBaseTableExists(hbaseTableName: String): Boolean = {
     val admin = new HBaseAdmin(configuration)
     admin.tableExists(hbaseTableName)
   }
 
-  def checkLogicalTableExist(tableName: String): Boolean = {
+  private def checkLogicalTableExist(tableName: String): Boolean = {
     val admin = new HBaseAdmin(configuration)
+
+    /*  TODO: suggest to move the creation of MetadataTable to constructor,
+    otherwise need to check this every time create/delete table */
     if (!checkHBaseTableExists(MetaData)) {
       // create table
       createMetadataTable(admin)
     }
 
+    // TODO: suggest to cache this table as member in the class instead of creating it everytime
+    // TODO: HTable seems deprecated, should use  Connection.getTable(TableName) instead
     val table = new HTable(configuration, MetaData)
     val get = new Get(Bytes.toBytes(tableName))
     val result = table.get(get)
@@ -300,7 +306,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     result.size() > 0
   }
 
-  def checkFamilyExists(hbaseTableName: String, family: String): Boolean = {
+  private def checkFamilyExists(hbaseTableName: String, family: String): Boolean = {
     val admin = new HBaseAdmin(configuration)
     val tableDescriptor = admin.getTableDescriptor(TableName.valueOf(hbaseTableName))
     tableDescriptor.hasFamily(Bytes.toBytes(family))
