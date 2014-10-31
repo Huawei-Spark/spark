@@ -269,6 +269,7 @@
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
+<<<<<<< HEAD
   <dependencies>
     <!--
       This is a dummy dependency that is used along with the shading plug-in
@@ -300,6 +301,8 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+=======
+>>>>>>> poc for Gaussian sim
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -1053,13 +1056,13 @@
                 <goal>testCompile</goal>
               </goals>
             </execution>
-            <execution>
+<!--            <execution>
               <id>attach-scaladocs</id>
               <phase>verify</phase>
               <goals>
                 <goal>doc-jar</goal>
               </goals>
-            </execution>
+            </execution>  -->
           </executions>
           <configuration>
             <scalaVersion>${scala.version}</scalaVersion>
