@@ -28,6 +28,8 @@ class HBaseSQLParser extends SqlParser {
   protected val LOAD = Keyword("LOAD")
   protected val LOCAL = Keyword("LOCAL")
   protected val INPATH = Keyword("INPATH")
+  protected val FIELDS = Keyword("FIELDS")
+  protected val TERMINATED = Keyword("TERMINATED")
 
   protected val BULK = Keyword("BULK")
   protected val CREATE = Keyword("CREATE")
@@ -144,15 +146,18 @@ class HBaseSQLParser extends SqlParser {
       case tn ~ op ~ tc ~ cf => null
     }
 
+  // syntax: LOAD DATA [LOCAL] INPATH filepath [OVERWRITE] INTO TABLE tablename [FIELDS TERMINATED BY char]
   protected lazy val load: Parser[LogicalPlan] =
   (
     (LOAD ~> DATA ~> INPATH ~> stringLit) ~
-    (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ^^ {
-      case filePath ~ table => LoadDataIntoTable(filePath, table, false)
+    (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation ) ~
+    (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
+      case filePath ~ table ~ delimiter => LoadDataIntoTable(filePath, table, false, delimiter)
     }
   | (LOAD ~> DATA ~> LOCAL ~> INPATH ~> stringLit) ~
-      (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ^^ {
-      case filePath ~ table => LoadDataIntoTable(filePath, table, true)
+      (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ~
+      (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
+      case filePath ~ table ~ delimiter => LoadDataIntoTable(filePath, table, true, delimiter)
     }
   )
 

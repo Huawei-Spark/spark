@@ -70,10 +70,28 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     assert(r.tableName.equals("tb"))
   }
 
+  test("bulkload parser test, using delimiter") {
+
+    val parser = new HBaseSQLParser()
+    val sql = raw"LOAD DATA INPATH '/usr/hdfsfile.csv' INTO TABLE tb FIELDS TERMINATED BY '|' "
+
+    val plan: LogicalPlan = parser(sql)
+    assert(plan != null)
+    assert(plan.isInstanceOf[LoadDataIntoTable])
+
+    val l = plan.asInstanceOf[LoadDataIntoTable]
+    assert(l.path.equals(raw"/usr/hdfsfile.csv"))
+    assert(!l.isLocal)
+    assert(plan.children(0).isInstanceOf[UnresolvedRelation])
+    val r = plan.children(0).asInstanceOf[UnresolvedRelation]
+    assert(r.tableName.equals("tb"))
+    assert(l.delimiter.get.equals("|"))
+  }
+
   test("write data to HFile") {
     val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)
-    val bulkLoad = BulkLoadIntoTable("./sql/hbase/src/test/resources/test.csv", hbaseRelation, true)(hbc)
+    val bulkLoad = BulkLoadIntoTable("./sql/hbase/src/test/resources/test.csv", hbaseRelation, true, Option(","))(hbc)
     val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
       new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
     }

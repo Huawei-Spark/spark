@@ -136,7 +136,8 @@ case class InsertIntoHBaseTable(
 }
 
 @DeveloperApi
-case class BulkLoadIntoTable(path: String, relation: HBaseRelation, isLocal: Boolean)(
+case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
+                             isLocal: Boolean, delimiter: Option[String])(
   @transient hbContext: HBaseSQLContext) extends LeafNode {
 
   val conf = hbContext.sc.hadoopConfiguration

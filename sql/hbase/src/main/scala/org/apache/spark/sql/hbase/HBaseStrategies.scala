@@ -91,8 +91,8 @@ private[hbase] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
           tableName, nameSpace, hbaseTableName,
           colsSeq, keyCols, nonKeyCols)
           (hbaseSQLContext))
-      case logical.LoadDataIntoTable(path, table: HBaseRelation, isLocal) =>
-        execution.BulkLoadIntoTable(path, table, isLocal)(hbaseSQLContext) :: Nil
+      case logical.LoadDataIntoTable(path, table: HBaseRelation, isLocal, delimiter) =>
+        execution.BulkLoadIntoTable(path, table, isLocal, delimiter)(hbaseSQLContext) :: Nil
       case InsertIntoTable(table: HBaseRelation, partition, child, _) =>
         new InsertIntoHBaseTable(table, planLater(child))(hbaseSQLContext) :: Nil
       case logical.DropTablePlan(tableName) =>

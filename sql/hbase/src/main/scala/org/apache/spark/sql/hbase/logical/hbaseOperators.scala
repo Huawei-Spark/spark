@@ -33,8 +33,10 @@ case class DropTablePlan(tableName: String) extends Command
  * @param path input data file path
  * @param child target relation
  * @param isLocal using HDFS or local file
+ * @param delimiter character in terminated by
  */
-case class LoadDataIntoTable(path: String, child: LogicalPlan, isLocal: Boolean)
+case class LoadDataIntoTable(path: String, child: LogicalPlan,
+                             isLocal: Boolean, delimiter: Option[String])
   extends UnaryNode {
 
   override def output = Nil
