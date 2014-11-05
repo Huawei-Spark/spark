@@ -1,0 +1,13 @@
+    1  sudo apt-get install -y openjdk-7-jdk
+   14  ll /usr/lib/jvm/java-7-oracle/bin
+   18  git
+   19  git clone https://github.com/Huawei-spark/spark.git
+   22  cd spark
+   24  export MAVEN_OPTS="-XX:MaxPermSize=392m -Xmx1024m"
+   26  mvn -DskipTests -Phive -Phadoop-2.3 -Pyarn compile package install
+   27  git status
+   28  git checkout Spectral
+   29  git pull --rebase origin Spectral
+   30  mvn -Phive -Phive-0.12.0 -Phadoop-2.3 -Pyarn -DskipTests compile package install
+   30  mvn -pl mllib -DskipTests -Phive -Phadoop-2.3 -Pyarn compile package install
+   41  mvn -pl  mllib  -Phadoop-2.3 -Pyarn test -DwildcardSuites=org.apache.spark.mllib.clustering.SpectralClusteringSuite
