@@ -17,7 +17,11 @@
 
 package org.apache.spark.sql.hbase.execution
 
-import scala.collection.mutable.ArrayBuffer
+import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.TaskContext
+
+import scala.collection.mutable.{ListBuffer, ArrayBuffer}
 import org.apache.hadoop.mapreduce.Job
 import org.apache.hadoop.hbase.mapreduce.{LoadIncrementalHFiles, HFileOutputFormat}
 import org.apache.hadoop.hbase._
@@ -40,13 +44,13 @@ import scala.collection.JavaConversions._
  */
 @DeveloperApi
 case class HBaseSQLTableScan(
-    relation: HBaseRelation,
-    output: Seq[Attribute],
-    rowKeyPredicate: Option[Expression],
-    valuePredicate: Option[Expression],
-    partitionPredicate: Option[Expression],
-    coProcessorPlan: Option[SparkPlan])
-    (@transient context: HBaseSQLContext)
+                              relation: HBaseRelation,
+                              output: Seq[Attribute],
+                              rowKeyPredicate: Option[Expression],
+                              valuePredicate: Option[Expression],
+                              partitionPredicate: Option[Expression],
+                              coProcessorPlan: Option[SparkPlan])
+                            (@transient context: HBaseSQLContext)
   extends LeafNode {
 
   override def execute(): RDD[Row] = {
@@ -64,19 +68,71 @@ case class HBaseSQLTableScan(
 
 @DeveloperApi
 case class InsertIntoHBaseTable(
-    relation: HBaseRelation,
-    child: SparkPlan)
-    (@transient hbContext: HBaseSQLContext)
+                                 relation: HBaseRelation,
+                                 child: SparkPlan)
+                               (@transient hbContext: HBaseSQLContext)
   extends UnaryNode {
 
   override def execute() = {
     val childRdd = child.execute()
     assert(childRdd != null)
-    // YZ: to be implemented using sc.runJob() => SparkContext needed here
+    saveAsHbaseFile(childRdd, relation)
     childRdd
   }
 
   override def output = child.output
+
+  private def saveAsHbaseFile(rdd: RDD[Row], relation: HBaseRelation): Unit = {
+    //TODO:make the BatchMaxSize configurable
+    val BatchMaxSize = 100
+
+    hbContext.sparkContext.runJob(rdd, writeToHbase _)
+
+    def writeToHbase(context: TaskContext, iterator: Iterator[Row]) = {
+      val htable = relation.htable
+      val colWithIndex = relation.allColumns.zipWithIndex.toMap
+      val bu = Array.fill[BytesUtils](BatchMaxSize, relation.allColumns.length) {
+        new BytesUtils
+      }
+      var rowIndexInBatch = 0
+      var colIndexInBatch = 0
+
+      var puts = new ListBuffer[Put]()
+      while (iterator.hasNext) {
+        val row = iterator.next()
+        val rawKeyCol = relation.keyColumns.map {
+          case kc: KeyColumn => {
+            val rowColumn = DataTypeUtils.getRowColumnFromHBaseRawType(
+              row, colWithIndex(kc), kc.dataType, bu(rowIndexInBatch)(colIndexInBatch))
+            colIndexInBatch += 1
+            rowColumn
+          }
+        }
+        val key = relation.encodingRawKeyColumns(rawKeyCol)
+        val put = new Put(key)
+        relation.nonKeyColumns.foreach {
+          case nkc: NonKeyColumn => {
+            val rowVal = DataTypeUtils.getRowColumnFromHBaseRawType(
+              row, colWithIndex(nkc), nkc.dataType, bu(rowIndexInBatch)(colIndexInBatch))
+            colIndexInBatch += 1
+            put.add(Bytes.toBytes(nkc.family), Bytes.toBytes(nkc.qualifier), rowVal)
+          }
+        }
+
+        puts += put
+        colIndexInBatch = 0
+        rowIndexInBatch += 1
+        if (rowIndexInBatch >= BatchMaxSize) {
+          htable.put(puts.toList)
+          puts.clear()
+          rowIndexInBatch = 0
+        }
+      }
+      if (!puts.isEmpty) {
+        htable.put(puts.toList)
+      }
+    }
+  }
 }
 
 @DeveloperApi

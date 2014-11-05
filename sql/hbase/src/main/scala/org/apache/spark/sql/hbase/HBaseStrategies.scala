@@ -24,10 +24,6 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.hbase.execution.{DropHbaseTableCommand, HBaseSQLTableScan, InsertIntoHBaseTable}
 
-/**
- * HBaseStrategies
- * Created by sboesch on 8/22/14.
- */
 private[hbase] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
   self: SQLContext#SparkPlanner =>
 

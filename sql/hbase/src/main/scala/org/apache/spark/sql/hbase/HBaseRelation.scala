@@ -17,6 +17,8 @@
 package org.apache.spark.sql.hbase
 
 import java.util.ArrayList
+import org.apache.spark.sql.hbase.BytesUtils
+
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
@@ -32,10 +34,10 @@ import org.apache.spark.sql.catalyst.types._
 import scala.collection.JavaConverters._
 
 private[hbase] case class HBaseRelation(
-    tableName: String,
-    hbaseNamespace: String,
-    hbaseTableName: String,
-    allColumns: Seq[AbstractColumn])
+                                         tableName: String,
+                                         hbaseNamespace: String,
+                                         hbaseTableName: String,
+                                         allColumns: Seq[AbstractColumn])
   extends LeafNode {
 
   @transient lazy val htable: HTable = new HTable(getConf, hbaseTableName)
@@ -53,7 +55,7 @@ private[hbase] case class HBaseRelation(
   @transient var configuration: Configuration = null
 
   private def getConf: Configuration = if (configuration == null) HBaseConfiguration.create
-                               else configuration
+  else configuration
 
   lazy val attributes = nonKeyColumns.map(col =>
     AttributeReference(col.sqlName, col.dataType, nullable = true)())
@@ -99,9 +101,9 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildFilter(
-      projList: Seq[NamedExpression],
-      rowKeyPredicate: Option[Expression],
-      valuePredicate: Option[Expression]) = {
+                   projList: Seq[NamedExpression],
+                   rowKeyPredicate: Option[Expression],
+                   valuePredicate: Option[Expression]) = {
     val filters = new ArrayList[Filter]
     // TODO: add specific filters
     Option(new FilterList(filters))
@@ -114,9 +116,9 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildScan(
-      split: Partition,
-      filters: Option[FilterList],
-      projList: Seq[NamedExpression]): Scan = {
+                 split: Partition,
+                 filters: Option[FilterList],
+                 projList: Seq[NamedExpression]): Scan = {
     val hbPartition = split.asInstanceOf[HBasePartition]
     val scan = {
       (hbPartition.lowerBound, hbPartition.upperBound) match {
@@ -313,7 +315,10 @@ private[hbase] case class HBaseRelation(
   //
   //  }
 
-  def buildRow(projections: Seq[(Attribute, Int)], result: Result, row: MutableRow): Row = {
+  def buildRow(projections: Seq[(Attribute, Int)],
+               result: Result,
+               row: MutableRow,
+               bytesUtils: BytesUtils): Row = {
     assert(projections.size == row.length, "Projection size and row size mismatched")
     // TODO: replaced with the new Key method
     val rowKeys = decodingRawKeyColumns(result.getRow)
@@ -322,13 +327,13 @@ private[hbase] case class HBaseRelation(
         case column: NonKeyColumn => {
           val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
           DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, colValue,
-            column.dataType)
+            column.dataType, bytesUtils)
         }
         case ki => {
           val keyIndex = ki.asInstanceOf[Int]
           val rowKey = rowKeys(keyIndex)
           DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, rowKey,
-            keyColumns(keyIndex).dataType)
+            keyColumns(keyIndex).dataType, bytesUtils)
         }
       }
     }

@@ -17,21 +17,19 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.spark.SparkContext
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.mapreduce.Job
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.types._
+
 import scala.collection.mutable.ArrayBuffer
 
 /**
  * Helper class for scanning files stored in Hadoop - e.g., to read text file when bulk loading.
  */
 private[hbase]
-class HadoopReader(
-    @transient sc: SparkContext,
-    @transient job: Job,
-    path: String)(columns: Seq[AbstractColumn]) {
-
+class HadoopReader(@transient sc: SparkContext, @transient job: Job,
+                   path: String)(columns: Seq[AbstractColumn]) {
   // make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file
   private[hbase] def makeBulkLoadRDDFromTextFile = {
 
@@ -74,8 +72,8 @@ object HadoopReader {
   }
 
 
-  def string2KV(value: String, splitRegex: String, columns: Seq[AbstractColumn]): (Seq[(Array[Byte], DataType)],
-    Seq[(Array[Byte], Array[Byte], Array[Byte])]) = {
+  def string2KV(value: String, splitRegex: String, columns: Seq[AbstractColumn]):
+  (Seq[(Array[Byte], DataType)], Seq[(Array[Byte], Array[Byte], Array[Byte])]) = {
     val keyBytes = new ArrayBuffer[(Array[Byte], DataType)]()
     val valueBytes = new ArrayBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
     value.split(splitRegex).zip(columns).foreach { case (value, column) =>

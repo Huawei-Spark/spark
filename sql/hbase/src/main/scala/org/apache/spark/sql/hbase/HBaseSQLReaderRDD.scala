@@ -60,6 +60,7 @@ class HBaseSQLReaderRDD(
     var result: Result = null
     val row = new GenericMutableRow(output.size)
     val projections = output.zipWithIndex
+    val bytesUtils = new BytesUtils
     val iter = new Iterator[Row] {
       override def hasNext: Boolean = {
         if (!finished) {
@@ -78,7 +79,7 @@ class HBaseSQLReaderRDD(
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, row)
+          relation.buildRow(projections, result, row, bytesUtils)
         } else {
           null
         }

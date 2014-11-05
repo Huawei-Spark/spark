@@ -92,7 +92,7 @@ class RowKeyParserSuite extends FunSuite with ShouldMatchers {
         if (column.isInstanceOf[KeyColumn])
         key = column.asInstanceOf[KeyColumn]
       } yield (
-        DataTypeUtils.getRowColumnFromHBaseRawType(row, index, column.dataType),
+        DataTypeUtils.getRowColumnFromHBaseRawType(row, index, column.dataType, new BytesUtils),
         key.order)
     }
 
@@ -106,7 +106,7 @@ class RowKeyParserSuite extends FunSuite with ShouldMatchers {
         val key = keyColumns(keyIndex)
         val index = allColumns.indexOf(key)
         setRowColumnFromHBaseRawType(
-          mr, index, rawkey, key.dataType)
+          mr, index, rawkey, key.dataType, new BytesUtils)
       }
     }
 

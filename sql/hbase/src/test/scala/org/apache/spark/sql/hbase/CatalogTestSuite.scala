@@ -28,7 +28,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite}
  * Created by mengbo on 10/2/14.
  */
 //@Ignore
-class CatalogTest extends FunSuite with BeforeAndAfterAll with Logging {
+class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   var sparkConf: SparkConf = _
   var sparkContext: SparkContext = _
   var hbaseContext: HBaseSQLContext = _
@@ -128,6 +128,24 @@ class CatalogTest extends FunSuite with BeforeAndAfterAll with Logging {
     val keyColumns = Seq(KeyColumn("column1", StringType, 0), KeyColumn("column2", IntegerType, 1))
     assert(hbRelation.keyColumns.equals(keyColumns))
     assert(relation.childrenResolved)
+  }
+
+  test("Alter Table") {
+    val tableName = "testTable"
+
+    val family1 = "family1"
+    val column = NonKeyColumn("column5", BooleanType, family1, "qualifier3")
+
+    catalog.alterTableAddNonKey(tableName, column)
+
+    var result = catalog.getTable(tableName)
+    var table = result.get
+    assert(table.allColumns.size === 5)
+
+    catalog.alterTableDropNonKey(tableName, column.sqlName)
+    result = catalog.getTable(tableName)
+    table = result.get
+    assert(table.allColumns.size === 4)
   }
 
   test("Delete Table") {
