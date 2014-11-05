@@ -117,6 +117,20 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     new IndexedRowMatrix(createIndexedMatTestRdd(sc, NRows, NCols))
   }
 
+<<<<<<< HEAD
+=======
+  val NCols = 3
+  // 100
+  val NRows = 7 // 10000
+
+
+  def testGaussianSimilarity(@transient sc: SparkContext) = {
+    val Sigma = 1.0
+    val out = computeGaussianSimilarity(createTestRowMatrix(sc), Sigma)
+    println(printMatrix(out))
+  }
+
+>>>>>>> 211cbca... to make it compile
   test("main") {
     SpectralClusteringSuite.main(null)
   }

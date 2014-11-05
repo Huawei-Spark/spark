@@ -258,7 +258,7 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
     } else {
       var ret = 0
       val hconf = conf.asInstanceOf[HiveConf]
-      val proc: CommandProcessor = CommandProcessorFactory.get(tokens(0), hconf)
+      val proc: CommandProcessor = CommandProcessorFactory.get(Array(tokens(0)), hconf)
 
       if (proc != null) {
         if (proc.isInstanceOf[Driver] || proc.isInstanceOf[SetProcessor]) {
