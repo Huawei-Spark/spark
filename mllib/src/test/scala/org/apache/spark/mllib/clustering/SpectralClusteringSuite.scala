@@ -37,7 +37,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     import SpectralClustering._
     val Sigma = 1.0
     val outmat = SpectralClustering.computeGaussianSimilarity(sc, createTestRowMatrix(sc), Sigma)
-    println(s"GaussianSim: ${SpectralClustering.printMatrix(outmat)}")
+    println(s"GaussianSim: \n${SpectralClustering.printMatrix(outmat)}")
     val normmat = SpectralClustering.computeUnnormalizedDegreeMatrix(outmat.toBreeze)
     println(s"unnormalized degmat: \n${SpectralClustering.printMatrix(normmat)}")
     val degMat = SpectralClustering.computeDegreeMatrix(outmat.toBreeze)
@@ -99,19 +99,30 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       }
     }
     rdd
+
   }
   def createIndexedMatTestRdd(sc: SparkContext, nRows: Int, nCols: Int): RDD[IndexedRow] = {
     import org.apache.spark.mllib.linalg._
     println("CreateIndexedMatTestRDD")
+//    val rdd = sc.parallelize {
+//      Array.tabulate(nRows) { row =>
+//        IndexedRow(row, Vectors.dense(Array.tabulate[Double](nCols) { col =>
+//          Math.pow(row,1.1)*0.2 + Math.pow(col,1.1) * 0.11
+//        }))
+//      }
+//    }
     val rdd = sc.parallelize {
-      Array.tabulate(nRows) { row =>
-        IndexedRow(row, Vectors.dense(Array.tabulate[Double](nCols) { col =>
-          row * 0.5 + col * 0.21
-        }))
-      }
+      Array(
+        IndexedRow(0,Vectors.dense(Array(7.0,7.1,7.3))),
+        IndexedRow(1,Vectors.dense(Array(6.1,6.3,6.7))),
+        IndexedRow(2,Vectors.dense(Array(1.0,1.2,1.3))),
+        IndexedRow(3,Vectors.dense(Array(1.2,2.5,2.8))),
+        IndexedRow(4,Vectors.dense(Array(1.9,2.9,3.0)))
+      )
     }
     rdd
   }
+
   import org.apache.spark.mllib.linalg.distributed._
   def createTestRowMatrix(@transient sc: SparkContext) = {
     new IndexedRowMatrix(createIndexedMatTestRdd(sc, NRows, NCols))
