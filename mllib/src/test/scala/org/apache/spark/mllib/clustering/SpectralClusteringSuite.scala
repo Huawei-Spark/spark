@@ -34,9 +34,28 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
   val NCols = 3 // 100
   val NRows = 8 // 10000
   def testGaussianSimilarity(@transient sc: SparkContext) = {
+    import SpectralClustering._
     val Sigma = 1.0
-    val out = SpectralClustering.computeGaussianSimilarity(sc, createTestRowMatrix(sc), Sigma)
-    println(SpectralClustering.printMatrix(out))
+    val outmat = SpectralClustering.computeGaussianSimilarity(sc, createTestRowMatrix(sc), Sigma)
+    println(s"GaussianSim: ${SpectralClustering.printMatrix(outmat)}")
+    val normmat = SpectralClustering.computeUnnormalizedDegreeMatrix(outmat.toBreeze)
+    println(s"unnormalized degmat: \n${SpectralClustering.printMatrix(normmat)}")
+    val degMat = SpectralClustering.computeDegreeMatrix(outmat.toBreeze)
+    println(s"Degreematrix: \n${SpectralClustering.printMatrix(degMat)}")
+    val eigs = computeEigenVectors(degMat,2)
+    println(s"eigenvectors: \n${printMatrix(eigs._2)}")
+    val dm = eigs._2
+    val darr = eigs._2.toArray
+    val vecs = (0 until dm.rows).map { row =>
+      org.apache.spark.mllib.linalg.Vectors.dense( (0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
+        arr(colx) = darr(row + colx * dm.rows)
+          arr
+      })
+    }
+    val rddVecs = sc.parallelize(vecs)
+    val model = KMeans.train(rddVecs,2,10)
+    println(s"cluster centers BABY! ${model.clusterCenters.mkString(",")}")
+
   }
   import org.apache.spark._
   def testBroadcast = {
