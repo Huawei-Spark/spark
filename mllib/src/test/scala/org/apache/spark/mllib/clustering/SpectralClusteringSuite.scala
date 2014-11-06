@@ -40,23 +40,23 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     println(s"GaussianSim: \n${SpectralClustering.printMatrix(outmat)}")
     val normmat = SpectralClustering.computeUnnormalizedDegreeMatrix(outmat.toBreeze)
     println(s"unnormalized degmat: \n${SpectralClustering.printMatrix(normmat)}")
-    val degMat = SpectralClustering.computeDegreeMatrix(outmat.toBreeze)
-    println(s"Degreematrix: \n${SpectralClustering.printMatrix(degMat)}")
-    val eigs = computeEigenVectors(degMat,2)
-    println(s"eigenvectors: \n${printMatrix(eigs._2)}")
-    val dm = eigs._2
-    val darr = eigs._2.toArray
-    val vecs = (0 until dm.rows).map { row =>
-      org.apache.spark.mllib.linalg.Vectors.dense( (0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
-        arr(colx) = darr(row + colx * dm.rows)
-          arr
-      })
+    for (x <- 0 to 0) {
+      val degMat = if (x==0) {
+        SpectralClustering.computeDegreeMatrix(outmat.toBreeze)
+      } else {
+        SpectralClustering.computeDegreeMatrix(outmat.toBreeze, negative=true)
+      }
+      println(s"Degreematrix: \n${SpectralClustering.printMatrix(degMat)}")
+      val eigs = computeEigenVectors(degMat, 4)
+      println(s"eigenvalues: \n${SpectralClustering.printVector(eigs._1)}")
+      println(s"eigenvectors: \n${printMatrix(eigs._2)}")
+      val (rddVecs, model) = eigsToKmeans(sc, eigs)
+      println(s"cluster centers BABY! ${model.clusterCenters.mkString(",")}")
+      val predictions = model.predict(rddVecs)
+      println(s"Predictions=${predictions.collect.mkString(",")}")
     }
-    val rddVecs = sc.parallelize(vecs)
-    val model = KMeans.train(rddVecs,2,10)
-    println(s"cluster centers BABY! ${model.clusterCenters.mkString(",")}")
-
   }
+
   import org.apache.spark._
   def testBroadcast = {
     val NRows = 8
@@ -104,22 +104,22 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
   def createIndexedMatTestRdd(sc: SparkContext, nRows: Int, nCols: Int): RDD[IndexedRow] = {
     import org.apache.spark.mllib.linalg._
     println("CreateIndexedMatTestRDD")
-//    val rdd = sc.parallelize {
-//      Array.tabulate(nRows) { row =>
-//        IndexedRow(row, Vectors.dense(Array.tabulate[Double](nCols) { col =>
-//          Math.pow(row,1.1)*0.2 + Math.pow(col,1.1) * 0.11
-//        }))
-//      }
-//    }
     val rdd = sc.parallelize {
-      Array(
-        IndexedRow(0,Vectors.dense(Array(7.0,7.1,7.3))),
-        IndexedRow(1,Vectors.dense(Array(6.1,6.3,6.7))),
-        IndexedRow(2,Vectors.dense(Array(1.0,1.2,1.3))),
-        IndexedRow(3,Vectors.dense(Array(1.2,2.5,2.8))),
-        IndexedRow(4,Vectors.dense(Array(1.9,2.9,3.0)))
-      )
+      Array.tabulate(nRows) { row =>
+        IndexedRow(row, Vectors.dense(Array.tabulate[Double](nCols) { col =>
+          Math.pow(row,1.1)*0.2 + Math.pow(col,1.1) * 0.11
+        }))
+      }
     }
+//    val rdd = sc.parallelize {
+//      Array(
+//        IndexedRow(0,Vectors.dense(Array(7.0,7.1,7.3))),
+//        IndexedRow(1,Vectors.dense(Array(6.1,6.3,6.7))),
+//        IndexedRow(2,Vectors.dense(Array(1.0,1.2,1.3))),
+//        IndexedRow(3,Vectors.dense(Array(1.2,2.5,2.8))),
+//        IndexedRow(4,Vectors.dense(Array(1.9,2.9,3.0)))
+//      )
+//    }
     rdd
   }
 
