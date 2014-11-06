@@ -19,7 +19,7 @@ package org.apache.spark.mllib.clustering
 import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
-import org.apache.spark.mllib.linalg.{EigenValueDecomposition, DenseMatrix, Vectors}
+import org.apache.spark.mllib.linalg.{EigenValueDecomposition, Vectors}
 import org.apache.spark.mllib.linalg.distributed.{RowMatrix, IndexedRow, IndexedRowMatrix}
 
 /**
@@ -115,9 +115,10 @@ object SpectralClustering {
     new BDM(K, K, darr)
   }
 
-  def computeDegreeMatrix(inMat: BDM[Double]): BDM[Double] = {
+  def computeDegreeMatrix(inMat: BDM[Double], negative : Boolean = false): BDM[Double] = {
     val umat = computeUnnormalizedDegreeMatrix(inMat)
-    umat - inMat
+    val mult = if (negative) -1.0 else 1.0
+    (umat - inMat) * mult
   }
 
   def computeEigenVectors(mat: BDM[Double],
@@ -126,7 +127,30 @@ object SpectralClustering {
                           maxIterations: Int = 200): (BDV[Double], BDM[Double]) = {
     val eig = EigenValueDecomposition.symmetricEigs(
       v => mat * v, mat.cols, k, tol, maxIterations)
-    eig
+    val evectarr = (Seq(0.0) ++ eig._1.toArray.toSeq).toArray
+    val oneslen = eig._2.rows
+    val emarr = new Array[Double](oneslen+eig._2.size)
+    val arr1 = Array.fill(oneslen)(1.0)
+    System.arraycopy(arr1,0,emarr,0,oneslen)
+//    System.arraycopy(BDV.ones(oneslen).toArray,0,emarr,0,oneslen)
+    System.arraycopy(eig._2.toArray,0,emarr,oneslen,eig._2.size)
+//    val emarr = (Seq(BDV.ones(eig._1.length+1).toArray ++ eig._2.toArray)).toArray
+    (new BDV[Double](evectarr), new BDM[Double](eig._2.rows, eig._2.cols+1,emarr,0, eig._2.rows,false))
+  }
+
+  def eigsToKmeans(sc: SparkContext, eigs: (BDV[Double], BDM[Double])) = {
+        val dm = eigs._2
+    val darr = eigs._2.toArray
+    val vecs = (0 until dm.rows).map { row =>
+      org.apache.spark.mllib.linalg.Vectors.dense( (0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
+        arr(colx) = darr(row + colx * dm.rows)
+          arr
+      })
+    }
+    val rddVecs = sc.parallelize(vecs)
+//    val model = KMeans.train(rddVecs,2,10)
+    val model = KMeans.train(rddVecs,2,10)
+    (rddVecs,model)
   }
 
   import org.apache.spark.mllib.linalg.DenseMatrix
@@ -161,4 +185,17 @@ object SpectralClustering {
     printMatrix(outmat)
 
   }
+  def printVector(vect: BDV[Double]) = {
+    val sb = new StringBuilder
+    def leftJust(s: String, len: Int) = {
+      "         ".substring(0, len - s.length) + s
+    }
+
+    for (c <- 0 until vect.length) {
+      sb.append(leftJust(f"${vect(c)}%.6f", 9) + " ")
+    }
+    sb.toString
+
+  }
+
 }
