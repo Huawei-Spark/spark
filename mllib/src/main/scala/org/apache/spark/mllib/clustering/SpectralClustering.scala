@@ -15,6 +15,7 @@
 * limitations under the License.
 */
 package org.apache.spark.mllib.clustering
+
 import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkContext
@@ -27,11 +28,14 @@ import org.apache.spark.mllib.linalg.distributed.{RowMatrix, IndexedRow, Indexed
 class SpectralClustering {
   val logger = Logger.getLogger(getClass.getName)
 }
+
 object SpectralClustering {
   val log = Logger.getLogger(SpectralClustering.getClass)
-  def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix): IndexedRowMatrix ={
+
+  def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix): IndexedRowMatrix = {
     computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, 1.0)
   }
+
   def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, sigma: Double): IndexedRowMatrix = {
 
     def gaussianDist(c1arr: Array[Double], c2arr: Array[Double], sigma: Double) = {
@@ -52,15 +56,15 @@ object SpectralClustering {
 
       val nr = bcMatLocal.size
 
-      val output = new BDV[Double](new Array[Double](nr * nr))
       val out = rows.map { indexedRow =>
-        // println(s"inside mapPartitions.map: row=${indexedRow.toString}")
         val rx = indexedRow.index
         val vect = indexedRow.vector
         val rowOutput = new Array[Double](nr)
         for (ox <- 0 until nr) {
-          rowOutput(ox) = if (ox > rx) {
+          rowOutput(ox) = if (ox < rx) {
             Double.NaN
+          } else if (ox==rx) {
+            0.0
           } else {
             val otherRow = allRows(ox)
             val distVal = gaussianDist(vect.toArray, otherRow.vector.toArray, sigma)
@@ -78,7 +82,7 @@ object SpectralClustering {
       val veclen = irow.vector.size
       val varr = irow.vector.toArray
       val rx = irow.index.toInt
-      for (lowerColx <- rx until veclen) {
+      for (lowerColx <- 0 until rx) {
         varr(lowerColx) = if (lowerColx == rx) {
           0.0
         } else {
@@ -91,6 +95,7 @@ object SpectralClustering {
     val ret = new IndexedRowMatrix(outVects)
     ret
   }
+
   import org.apache.spark.mllib.linalg.DenseMatrix
 
   def computeUnnormalizedDegreeMatrix(inMat: BDM[Double]): BDM[Double] = {
@@ -131,8 +136,9 @@ object SpectralClustering {
     val stride = (darr.length / mat.numCols).toInt
     val sb = new StringBuilder
     def leftJust(s: String, len: Int) = {
-      " ".substring(0, len - s.length) + s
+      "         ".substring(0, len - s.length) + s
     }
+
     for (r <- 0 until mat.numRows) {
       for (c <- 0 until mat.numCols) {
         sb.append(leftJust(f"${darr(c * stride + r)}%.6f", 9) + " ")
@@ -141,6 +147,7 @@ object SpectralClustering {
     }
     sb.toString
   }
+
   def printMatrix(mat: IndexedRowMatrix): String = {
     println(s"outmat rows=${mat.rows.count}")
     val outmat = new DenseMatrix(mat.numRows.toInt, mat.numCols.toInt, mat.toBreeze.toArray)
