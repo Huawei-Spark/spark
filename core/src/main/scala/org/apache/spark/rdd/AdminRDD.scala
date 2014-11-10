@@ -27,7 +27,7 @@ import scala.reflect.ClassTag
 /**
  * A Spark split class that is per executor
  */
-private[spark] class ExecutorPartition(idx: Int, @transient val taskLocation: TaskLocation)
+private[spark] class ExecutorPartition(idx: Int, val taskLocation: TaskLocation)
   extends Partition {
 
   override val index: Int = idx
@@ -42,11 +42,12 @@ private[spark] class ExecutorPartition(idx: Int, @transient val taskLocation: Ta
  */
 @DeveloperApi
 abstract class AdminRDD[T: ClassTag](
-    sc: SparkContext)
+  @transient sc: SparkContext)
   extends RDD[T](sc, Nil) with Logging {
 
   override def getPartitions: Array[Partition] = {
     val executors : Seq[TaskLocation] = sc.getExecutorsAndLocations
+    print(s"value of executors : $executors")
     val array = new Array[Partition](executors.size)
     for (i <- 0 until executors.size) {
       array(i) = new ExecutorPartition(i, executors(i))
@@ -58,4 +59,13 @@ abstract class AdminRDD[T: ClassTag](
     val adminSplit = split.asInstanceOf[ExecutorPartition]
     ArrayBuffer[String](adminSplit.taskLocation.host)
   }
+}
+
+
+class AdminTestRDD(
+                          sc: SparkContext)
+  extends AdminRDD[Char](sc) {
+  override def compute(split: Partition, context: TaskContext): Iterator[Char] =
+//    context.getExtResourceUsageInfo
+    "ABC".toCharArray.toIterator
 }

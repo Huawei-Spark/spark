@@ -746,6 +746,8 @@ class DAGScheduler(
         listenerBus.post(SparkListenerJobStart(job.jobId, Array[Int](), properties))
         runLocally(job)
       } else {
+        //sma : debug
+        println("++++ DAGScheduler.handleJobSubmitted : nonlocal")
         jobIdToActiveJob(jobId) = job
         activeJobs += job
         finalStage.resultOfJob = Some(job)

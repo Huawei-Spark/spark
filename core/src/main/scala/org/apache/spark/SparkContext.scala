@@ -215,7 +215,7 @@ class SparkContext(config: SparkConf) extends Logging {
   private[spark] val addedJars = HashMap[String, Long]()
 
   private val nextExtResourceId = new AtomicInteger(0)
-  private[spark] val addedExtResources = HashMap[ExtResource, Long]()
+  private[spark] val addedExtResources = HashMap[ExtResource[_], Long]()
 
   // Keeps track of all persisted RDDs
   private[spark] val persistentRdds = new TimeStampedWeakValueHashMap[Int, RDD[_]]
@@ -840,7 +840,7 @@ class SparkContext(config: SparkConf) extends Logging {
    * Add an (external) resource to be used with this Spark job on every node;
    * overwrite if the resource already exists
    */
-  def addOrReplaceResource(res: ExtResource) {
+  def addOrReplaceResource(res: ExtResource[_]) {
     val ts = System.currentTimeMillis
     addedExtResources(res) = ts
 
@@ -858,7 +858,7 @@ class SparkContext(config: SparkConf) extends Logging {
   /**
    * Add an (external) resource to be used with this Spark job on every node.
    */
-  def addResource(res: ExtResource) {
+  def addResource(res: ExtResource[_]) {
     val ts: Long= System.currentTimeMillis
     if (addedExtResources.containsKey(res)) {
       logError("Error adding resource (" + res.name + "): already added ")
@@ -1170,6 +1170,9 @@ class SparkContext(config: SparkConf) extends Logging {
    * Run a job on all partitions in an RDD and return the results in an array.
    */
   def runJob[T, U: ClassTag](rdd: RDD[T], func: Iterator[T] => U): Array[U] = {
+    //sma : test
+    getExecutorsAndLocations
+    print("++++ sma : getExecutorsAndLocations")
     runJob(rdd, func, 0 until rdd.partitions.size, false)
   }
 
@@ -1347,6 +1350,7 @@ class SparkContext(config: SparkConf) extends Logging {
   def getExecutorsAndLocations(): Seq[TaskLocation] = {
     // all supported task schedulers are actually TaskSchedulerImpl ?
     taskScheduler.asInstanceOf[TaskSchedulerImpl].getExecutorIdsAndLocations()
+//    Nil
   }
 }
 

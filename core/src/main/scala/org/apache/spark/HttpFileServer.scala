@@ -57,7 +57,10 @@ private[spark] class HttpFileServer(
   }
 
   def addJar(file: File) : String = {
-    addFileToDir(file, jarDir)
+//    addFileToDir(file, jarDir)
+    //++++ sma : debug
+    val f = addFileToDir(file, jarDir)
+    println(s"++++sma HttpFileServer addJar: $f")
     serverUri + "/jars/" + file.getName
   }
 

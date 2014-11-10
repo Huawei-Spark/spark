@@ -177,6 +177,7 @@ private[spark] class TaskSchedulerImpl(
       }
       hasReceivedTask = true
     }
+    println("++++ TaskSchedulerImpl.backend : $backend")
     backend.reviveOffers()
   }
 
@@ -493,6 +494,9 @@ private[spark] class TaskSchedulerImpl(
   }
 
   def getExecutorIdsAndLocations() : Seq[TaskLocation] = {
+    executorIdToHosts.foreach(str => println(s"+++++ getExecutorIdsAndLocations : $str._1 and $str._2" ))
+    val eSize = executorIdToHosts.size
+    println(s"++++ sma: executorIdToHosts size : $eSize")
     executorIdToHosts.map(e=>TaskLocation(e._1, e._2)).toSeq
   }
 }

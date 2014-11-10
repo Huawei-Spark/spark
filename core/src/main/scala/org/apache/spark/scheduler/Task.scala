@@ -20,6 +20,7 @@ package org.apache.spark.scheduler
 import java.io.{ByteArrayOutputStream, DataInputStream, DataOutputStream,
                 ObjectOutputStream, ObjectInputStream}
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.mutable.HashMap
 
@@ -47,7 +48,12 @@ import org.apache.spark.util.Utils
 private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) extends Serializable {
 
   final def run(attemptId: Long): T = {
-    context = new TaskContext(stageId, partitionId, attemptId, runningLocally = false)
+    //sma : debug
+    println(s"++++ Task instance : $this")
+    val rs = this.resources.getOrElse(new ConcurrentHashMap[String, Pair[ExtResource[_], Long]]()).size
+    println(s"++++ # resources in task is $rs")
+    context = new TaskContext(stageId, partitionId, attemptId,
+      false, this.resources, this.executorId, this.slaveHostname)
     context.taskMetrics.hostname = Utils.localHostName()
     taskThread = Thread.currentThread()
     if (_killed) {
@@ -75,7 +81,9 @@ private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) ex
   // initialized when kill() is invoked.
   @volatile @transient private var _killed = false
 
-  @transient var resources : Option[HashMap[String, Pair[ExtResource, Long]]] = None
+  @transient var resources : Option[ConcurrentHashMap[String, Pair[ExtResource[_], Long]]] = None
+  @transient var executorId : Option[String] = None
+  @transient var slaveHostname : Option[String] = None
 
   /**
    * Whether the task has been killed.
@@ -114,7 +122,7 @@ private[spark] object Task {
       task: Task[_],
       currentFiles: HashMap[String, Long],
       currentJars: HashMap[String, Long],
-      currentExtResources: HashMap[ExtResource, Long],
+      currentExtResources: HashMap[ExtResource[_], Long],
       serializer: SerializerInstance)
     : ByteBuffer = {
 
@@ -159,7 +167,7 @@ private[spark] object Task {
    */
   def deserializeWithDependencies(serializedTask: ByteBuffer)
     : (HashMap[String, Long], HashMap[String, Long], 
-       HashMap[ExtResource, Long], ByteBuffer) = {
+       HashMap[ExtResource[_], Long], ByteBuffer) = {
 
     val in = new ByteBufferInputStream(serializedTask)
     val dataIn = new ObjectInputStream(in)
@@ -180,10 +188,10 @@ private[spark] object Task {
 
     // Read task's external resources
     // If the init/term closures are big, serde per task won't be efficient
-    val taskResources = new HashMap[ExtResource, Long]()
+    val taskResources = new HashMap[ExtResource[_], Long]()
     val numResources = dataIn.readInt()
     for (i <- 0 until numResources) {
-      taskResources(dataIn.readObject().asInstanceOf[ExtResource]) = dataIn.readLong()
+      taskResources(dataIn.readObject().asInstanceOf[ExtResource[_]]) = dataIn.readLong()
     }
 
     // Create a sub-buffer for the rest of the data, which is the serialized Task object

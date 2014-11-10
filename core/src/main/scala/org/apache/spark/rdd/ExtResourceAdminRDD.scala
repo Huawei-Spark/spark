@@ -19,18 +19,22 @@ package org.apache.spark.rdd
 
 import org.apache.spark._
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.scheduler.TaskLocation
+import scala.collection.mutable.ArrayBuffer
+
+
 
 class ExtResourceListRDD(
     sc: SparkContext)
-  extends AdminRDD[ExtResourceInfo](sc) with Logging {
-  override def compute(split: Partition, context: TaskContext) = 
+  extends AdminRDD[ExtResourceInfo](sc) {
+  override def compute(split: Partition, context: TaskContext): Iterator[ExtResourceInfo] =
     context.getExtResourceUsageInfo
 }
 
 class ExtResourceCleanupRDD(
     sc: SparkContext,
     resourceName: Option[String] = None)
-  extends AdminRDD[String](sc) with Logging {
-  override def compute(split: Partition, context: TaskContext) = 
+  extends AdminRDD[String](sc) {
+  override def compute(split: Partition, context: TaskContext): Iterator[String]=
     context.cleanupResources(resourceName)
 }

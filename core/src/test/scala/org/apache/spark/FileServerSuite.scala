@@ -73,6 +73,7 @@ class FileServerSuite extends FunSuite with LocalSparkContext {
 
     tmpFile = textFile
     tmpJarUrl = jarFile.toURI.toURL.toString
+    println(tmpJarUrl)
   }
 
   override def afterAll() {
@@ -135,8 +136,11 @@ class FileServerSuite extends FunSuite with LocalSparkContext {
     sc.parallelize(testData).foreach { x =>
       if (Thread.currentThread.getContextClassLoader.getResource("FileServerSuite.txt") == null) {
         throw new SparkException("jar not added")
+      }else{
+        println(Thread.currentThread.getContextClassLoader.getResource("FileServerSuite.txt"))
       }
     }
+    println("done!")
   }
 
   test("Distributing files on a standalone cluster") {

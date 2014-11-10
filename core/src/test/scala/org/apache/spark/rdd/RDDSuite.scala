@@ -32,6 +32,18 @@ import org.apache.spark.rdd.RDDSuiteUtils._
 
 class RDDSuite extends FunSuite with SharedSparkContext {
 
+
+  test("test add jar") {
+
+    val driver = "com.mysql.jdbc.Driver"
+    sc.addJar("file:///usr/share/java/mysql-connector-java.jar")
+    sc.parallelize((1 to 40), 4).foreach { iter =>
+      val x = Thread.currentThread.getContextClassLoader.loadClass("com.mysql.jdbc.Driver")
+      println(x.toString)
+    }
+
+  }
+
   test("basic operations") {
     val nums = sc.makeRDD(Array(1, 2, 3, 4), 2)
     assert(nums.collect().toList === List(1, 2, 3, 4))
