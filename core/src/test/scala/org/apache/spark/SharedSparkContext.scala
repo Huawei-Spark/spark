@@ -31,8 +31,8 @@ trait SharedSparkContext extends BeforeAndAfterAll { self: Suite =>
 
   override def beforeAll() {
 //    _sc = new SparkContext("spark://127.0.0.1:7077", "test", conf)
-    _sc = new SparkContext("local-cluster[3, 1, 512]", "test", conf)
-//    _sc = new SparkContext("local", "test", conf)
+//    _sc = new SparkContext("local-cluster[3, 1, 512]", "test", conf)
+    _sc = new SparkContext("local", "test", conf)
     super.beforeAll()
   }
 

@@ -159,6 +159,7 @@ private[spark] class Executor(
       try {
         SparkEnv.set(env)
         Accumulators.clear()
+        println("########## before deserializeWithDependencies")
         val (taskFiles, taskJars, taskResources, taskBytes) = Task.deserializeWithDependencies(serializedTask)
         updateDependencies(taskFiles, taskJars, taskResources)
         task = ser.deserialize[Task[Any]](taskBytes, Thread.currentThread.getContextClassLoader)
@@ -286,10 +287,12 @@ private[spark] class Executor(
    */
   private def createClassLoader(): MutableURLClassLoader = {
     val currentLoader = Utils.getContextOrSparkClassLoader
+    println(s"#################")
 
     // For each of the jars in the jarSet, add them to the class loader.
     // We assume each of the files has already been fetched.
     val urls = currentJars.keySet.map { uri =>
+      println(s"################# $uri")
       new File(uri.split("/").last).toURI.toURL
     }.toArray
     val userClassPathFirst = conf.getBoolean("spark.files.userClassPathFirst", false)

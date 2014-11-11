@@ -191,6 +191,7 @@ private[spark] object Task {
     val taskResources = new HashMap[ExtResource[_], Long]()
     val numResources = dataIn.readInt()
     for (i <- 0 until numResources) {
+      val ob = dataIn.readObject()
       taskResources(dataIn.readObject().asInstanceOf[ExtResource[_]]) = dataIn.readLong()
     }
 
