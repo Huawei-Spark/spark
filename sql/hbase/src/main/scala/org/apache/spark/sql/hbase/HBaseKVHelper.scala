@@ -76,11 +76,13 @@ object HBaseKVHelper {
     listBuffer.toSeq
   }
 
-  def string2KV(values: Seq[String], columns: Seq[AbstractColumn]):
-  (Seq[(Array[Byte], DataType)], Seq[(Array[Byte], Array[Byte], Array[Byte])]) = {
+  def string2KV(values: Seq[String],
+                columns: Seq[AbstractColumn],
+                keyBytes: ArrayBuffer[(Array[Byte], DataType)],
+                valueBytes: ArrayBuffer[(Array[Byte], Array[Byte], Array[Byte])]) = {
     assert(values.length == columns.length)
-    val keyBytes = new ArrayBuffer[(Array[Byte], DataType)]()
-    val valueBytes = new ArrayBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
+    keyBytes.clear()
+    valueBytes.clear()
     for (i <- 0 until values.length) {
       val value = values(i)
       val column = columns(i)
@@ -92,7 +94,6 @@ object HBaseKVHelper {
         valueBytes += ((Bytes.toBytes(realCol.family), Bytes.toBytes(realCol.qualifier), bytes))
       }
     }
-    (keyBytes, valueBytes)
   }
 
   def string2Bytes(v: String, dataType: DataType, bu: BytesUtils): Array[Byte] = dataType match {
