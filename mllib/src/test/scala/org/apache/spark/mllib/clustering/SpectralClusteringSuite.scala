@@ -26,11 +26,13 @@ object SpectralClusteringSuite {
   def main(args: Array[String]) {
     val sc = new SparkContext("local[2]", "GSTest")
     val testee = new SpectralClusteringSuite
-    // testee.testBroadcast
-    testee.testGaussianSimilarity(sc)
+    // testee.te`stBroadcast
+    testee.testIter(sc)
+//    testee.testGaussianSimilarity(sc)
   }
 }
 class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
+  import SpectralClustering._
   val NCols = 3 // 100
   val NRows = 8 // 10000
   def testGaussianSimilarity(@transient sc: SparkContext) = {
@@ -55,6 +57,11 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       val predictions = model.predict(rddVecs)
       println(s"Predictions=${predictions.collect.mkString(",")}")
     }
+  }
+  def testIter(sc: SparkContext) = {
+    val arr = Array(1.0, 2.0, 3.0, 1.1, 2.15, 3.17, 1.25,2.3, 3.4)
+    val pit = powerIt(3, 3, arr)
+    println(printMatrix(1, 3, pit))
   }
 
   import org.apache.spark._

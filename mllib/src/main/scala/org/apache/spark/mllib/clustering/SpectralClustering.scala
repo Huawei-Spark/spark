@@ -36,6 +36,43 @@ object SpectralClustering {
     computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, 1.0)
   }
 
+  /**
+   * @param nRows
+   * @param nCols
+   * @param arr  Input array in Column Major format
+   * @param nIters
+   * @return
+   */
+  def powerIt(nRows: Int, nCols: Int, arr: Array[Double], nIters: Int = 20) = {
+    val rand = new java.util.Random
+    val oarr = Array.tabulate(nCols) { x => rand.nextDouble}
+    for (iter <- 0 until nIters) {
+      (0 until nCols).foreach { r =>
+        (0 until nCols).foreach { c =>
+          oarr(r) = arr(r * nCols + c) * oarr(r)
+        }
+        println(s"iter=$iter oarr(r) = ${oarr(r)}%.2f")
+      }
+      val norm = Math.sqrt(oarr.reduceLeft(_ * _))
+      (0 until nRows).foreach { rx =>
+        oarr(rx) /= norm
+      }
+      println(s"oarr = ${oarr.mkString(",")}")
+    }
+    oarr
+  }
+
+  def printMatrix(nRows: Int, nCols: Int, arr: Array[Double]) = {
+    val sb = new StringBuilder
+    for (rx <- 0 until nRows) {
+      for (cx <- 0 until nCols) {
+        sb.append(s"${arr(rx*nCols+cx)%7.2f} ")
+      }
+      sb.append("\n")
+    }
+    sb.toString
+  }
+
   def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, sigma: Double): IndexedRowMatrix = {
 
     def gaussianDist(c1arr: Array[Double], c2arr: Array[Double], sigma: Double) = {
@@ -63,7 +100,7 @@ object SpectralClustering {
         for (ox <- 0 until nr) {
           rowOutput(ox) = if (ox < rx) {
             Double.NaN
-          } else if (ox==rx) {
+          } else if (ox == rx) {
             0.0
           } else {
             val otherRow = allRows(ox)
@@ -115,7 +152,7 @@ object SpectralClustering {
     new BDM(K, K, darr)
   }
 
-  def computeDegreeMatrix(inMat: BDM[Double], negative : Boolean = false): BDM[Double] = {
+  def computeDegreeMatrix(inMat: BDM[Double], negative: Boolean = false): BDM[Double] = {
     val umat = computeUnnormalizedDegreeMatrix(inMat)
     val mult = if (negative) -1.0 else 1.0
     (umat - inMat) * mult
@@ -129,28 +166,28 @@ object SpectralClustering {
       v => mat * v, mat.cols, k, tol, maxIterations)
     val evectarr = (Seq(0.0) ++ eig._1.toArray.toSeq).toArray
     val oneslen = eig._2.rows
-    val emarr = new Array[Double](oneslen+eig._2.size)
+    val emarr = new Array[Double](oneslen + eig._2.size)
     val arr1 = Array.fill(oneslen)(1.0)
-    System.arraycopy(arr1,0,emarr,0,oneslen)
-//    System.arraycopy(BDV.ones(oneslen).toArray,0,emarr,0,oneslen)
-    System.arraycopy(eig._2.toArray,0,emarr,oneslen,eig._2.size)
-//    val emarr = (Seq(BDV.ones(eig._1.length+1).toArray ++ eig._2.toArray)).toArray
-    (new BDV[Double](evectarr), new BDM[Double](eig._2.rows, eig._2.cols+1,emarr,0, eig._2.rows,false))
+    System.arraycopy(arr1, 0, emarr, 0, oneslen)
+    //    System.arraycopy(BDV.ones(oneslen).toArray,0,emarr,0,oneslen)
+    System.arraycopy(eig._2.toArray, 0, emarr, oneslen, eig._2.size)
+    //    val emarr = (Seq(BDV.ones(eig._1.length+1).toArray ++ eig._2.toArray)).toArray
+    (new BDV[Double](evectarr), new BDM[Double](eig._2.rows, eig._2.cols + 1, emarr, 0, eig._2.rows, false))
   }
 
   def eigsToKmeans(sc: SparkContext, eigs: (BDV[Double], BDM[Double])) = {
-        val dm = eigs._2
+    val dm = eigs._2
     val darr = eigs._2.toArray
     val vecs = (0 until dm.rows).map { row =>
-      org.apache.spark.mllib.linalg.Vectors.dense( (0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
+      org.apache.spark.mllib.linalg.Vectors.dense((0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
         arr(colx) = darr(row + colx * dm.rows)
-          arr
+        arr
       })
     }
     val rddVecs = sc.parallelize(vecs)
-//    val model = KMeans.train(rddVecs,2,10)
-    val model = KMeans.train(rddVecs,2,10)
-    (rddVecs,model)
+    //    val model = KMeans.train(rddVecs,2,10)
+    val model = KMeans.train(rddVecs, 2, 10)
+    (rddVecs, model)
   }
 
   import org.apache.spark.mllib.linalg.DenseMatrix
@@ -185,6 +222,7 @@ object SpectralClustering {
     printMatrix(outmat)
 
   }
+
   def printVector(vect: BDV[Double]) = {
     val sb = new StringBuilder
     def leftJust(s: String, len: Int) = {
