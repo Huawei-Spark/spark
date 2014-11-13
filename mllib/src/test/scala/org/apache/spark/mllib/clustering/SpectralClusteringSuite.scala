@@ -1,4 +1,3 @@
-package org.apache.spark.mllib.clustering
 /*
 * Licensed to the Apache Software Foundation (ASF) under one or more
 * contributor license agreements. See the NOTICE file distributed with
@@ -15,6 +14,7 @@ package org.apache.spark.mllib.clustering
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+package org.apache.spark.mllib.clustering
 import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
 import org.apache.spark.mllib.util.LocalSparkContext
 import org.apache.spark.rdd.{ZippedWithIndexRDDPartition, ParallelCollectionPartition, RDD}
