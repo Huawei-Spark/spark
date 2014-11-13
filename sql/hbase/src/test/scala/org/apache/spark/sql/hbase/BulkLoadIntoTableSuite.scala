@@ -98,7 +98,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     bulkLoad.makeBulkLoadRDD(splitKeys.toArray)
   }
 
-  ignore("load data into hbase") { // this need to local test with hbase, so here to ignore this
+  test("load data into hbase") { // this need to local test with hbase, so here to ignore this
 
     val drop = "drop table testblk"
     val executeSql0 = hbc.executeSql(drop)

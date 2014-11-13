@@ -46,6 +46,7 @@ abstract class RuleExecutor[TreeType <: TreeNode[_]] extends Logging {
    * using the defined execution strategy. Within each batch, rules are also executed serially.
    */
   def apply(plan: TreeType): TreeType = {
+    val begin = System.currentTimeMillis()
     var curPlan = plan
 
     batches.foreach { batch =>
@@ -95,7 +96,8 @@ abstract class RuleExecutor[TreeType <: TreeNode[_]] extends Logging {
         logTrace(s"Batch ${batch.name} has no effect.")
       }
     }
-
+    val end = System.currentTimeMillis()
+    logInfo(s"${this.getClass.getSimpleName} cost ${end - begin} ms")
     curPlan
   }
 }
