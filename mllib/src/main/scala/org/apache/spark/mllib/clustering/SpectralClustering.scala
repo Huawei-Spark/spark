@@ -1,19 +1,19 @@
 /*
-* Licensed to the Apache Software Foundation (ASF) under one or more
-* contributor license agreements. See the NOTICE file distributed with
-* this work for additional information regarding copyright ownership.
-* The ASF licenses this file to You under the Apache License, Version 2.0
-* (the "License"); you may not use this file except in compliance with
-* the License. You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.spark.mllib.clustering
 
 import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
@@ -43,7 +43,7 @@ object SpectralClustering {
    * @param nIters
    * @return
    */
-  def powerIt(nRows: Int, nCols: Int, arr: Array[Double], nIters: Int = 20) = {
+  def powerIt(nRows: Int, nCols: Int, arr: Array[Double], nIters: Int = 500) = {
     val rand = new java.util.Random
     val oarr = Array.tabulate(nCols) { x => rand.nextDouble}
     for (iter <- 0 until nIters) {
@@ -51,9 +51,9 @@ object SpectralClustering {
         (0 until nCols).foreach { c =>
           oarr(r) = arr(r * nCols + c) * oarr(r)
         }
-        println(s"iter=$iter oarr(r) = ${oarr(r)}%.2f")
+        //        println(s"iter=$iter oarr(r) = ${oarr(r)}%.2f")
       }
-      val norm = Math.sqrt(oarr.reduceLeft(_ * _))
+      val norm = Math.sqrt(oarr.reduceLeft((sum, cval) => sum + cval * cval))
       (0 until nRows).foreach { rx =>
         oarr(rx) /= norm
       }
@@ -66,14 +66,15 @@ object SpectralClustering {
     val sb = new StringBuilder
     for (rx <- 0 until nRows) {
       for (cx <- 0 until nCols) {
-        sb.append(s"${arr(rx*nCols+cx)%7.2f} ")
+        sb.append(s"${arr(rx * nCols + cx) % 7.2f} ")
       }
       sb.append("\n")
     }
     sb.toString
   }
 
-  def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, sigma: Double): IndexedRowMatrix = {
+  def computeGaussianSimilarity(sc: SparkContext, mat: IndexedRowMatrix, sigma: Double):
+      IndexedRowMatrix = {
 
     def gaussianDist(c1arr: Array[Double], c2arr: Array[Double], sigma: Double) = {
       val c1c2 = c1arr.zip(c2arr)
@@ -172,14 +173,16 @@ object SpectralClustering {
     //    System.arraycopy(BDV.ones(oneslen).toArray,0,emarr,0,oneslen)
     System.arraycopy(eig._2.toArray, 0, emarr, oneslen, eig._2.size)
     //    val emarr = (Seq(BDV.ones(eig._1.length+1).toArray ++ eig._2.toArray)).toArray
-    (new BDV[Double](evectarr), new BDM[Double](eig._2.rows, eig._2.cols + 1, emarr, 0, eig._2.rows, false))
+    (new BDV[Double](evectarr), new BDM[Double]
+    (eig._2.rows, eig._2.cols + 1, emarr, 0, eig._2.rows, false))
   }
 
   def eigsToKmeans(sc: SparkContext, eigs: (BDV[Double], BDM[Double])) = {
     val dm = eigs._2
     val darr = eigs._2.toArray
     val vecs = (0 until dm.rows).map { row =>
-      org.apache.spark.mllib.linalg.Vectors.dense((0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
+      org.apache.spark.mllib.linalg.Vectors
+          .dense((0 until dm.cols).foldLeft(Array.ofDim[Double](dm.cols)) { case (arr, colx) =>
         arr(colx) = darr(row + colx * dm.rows)
         arr
       })
