@@ -142,7 +142,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
 
   val conf = hbContext.sc.hadoopConfiguration
 
-  val job = new Job(hbContext.sc.hadoopConfiguration)
+  val job = new Job(conf)
 
   val hadoopReader = if (isLocal) {
     val fs = FileSystem.getLocal(conf)
@@ -160,9 +160,13 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
       .asInstanceOf[Ordering[ImmutableBytesWritableWrapper]]
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(rdd)(splitKeys)
+    // Todo: fix issues with HBaseShuffledRDD
+//    val shuffled =
+//      new HBaseShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
+//        .setHbasePartitions(relation.partitions)
+//        .setKeyOrdering(ordering)
     val shuffled =
-      new HBaseShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
-        .setHbasePartitions(relation.partitions)
+      new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
         .setKeyOrdering(ordering)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
       // the rdd now already sort by key, to sort by value
@@ -209,6 +213,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
         Iterator.empty
       }
     }
+
     job.setOutputKeyClass(classOf[ImmutableBytesWritable])
     job.setOutputValueClass(classOf[KeyValue])
     job.setOutputFormatClass(classOf[HFileOutputFormat])
@@ -217,7 +222,6 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
   }
 
   override def execute() = {
-    hbContext.sc.getConf.set("spark.sql.hbase.bulkload.textfile.splitRegex", delimiter.get)
     val splitKeys = relation.getRegionStartKeys().toArray
     makeBulkLoadRDD(splitKeys)
     val hbaseConf = HBaseConfiguration.create
