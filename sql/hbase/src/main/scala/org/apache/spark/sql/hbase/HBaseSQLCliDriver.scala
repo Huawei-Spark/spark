@@ -88,6 +88,10 @@ object HBaseSQLCLIDriver {
   private def processLine(line: String, allowInterrupting: Boolean): Int = {
     processCmd(line)
     println(s"processing line: $line")
+
+    // TODO: install interrupt handler
+    // TODO: support multiple cmd in a line separated by ;
+
     try {
 
       // Since we are using SqlParser to handle 'select' clause, and it does not handle ';',
@@ -95,6 +99,7 @@ object HBaseSQLCLIDriver {
       val statement =
         if (line.trim.toLowerCase.startsWith("select")) line.substring(0, line.length - 1)
         else line
+
 
       val start = System.currentTimeMillis()
       val rdd = hbaseCtx.sql(statement)
@@ -122,6 +127,8 @@ object HBaseSQLCLIDriver {
     val cmd = line.trim.toLowerCase
     if (cmd.startsWith("quit") || cmd.startsWith("exit"))
       System.exit(0)
+
+    // TODO: support for "!" to exec bash cmd
   }
 
 }
