@@ -129,10 +129,10 @@ object HBaseMainTest extends FunSuite with BeforeAndAfterAll with Logging {
     }
     val htable = new HTable(config, HbaseTabName)
 
-    var row = new GenericRow(Array(12345.0, "Upen", 12345:Short))
+    var row = new GenericRow(Array(1024.0, "Upen", 128:Short))
     var key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
     var put = new Put(key)
-    Seq((123.toByte, ByteType, "cf1", "cq11"),
+    Seq((64.toByte, ByteType, "cf1", "cq11"),
       (12345678, IntegerType, "cf1", "cq12"),
       (12345678901234L, LongType, "cf2", "cq21"),
       (1234.5678F, FloatType, "cf2", "cq22")).foreach {
@@ -140,13 +140,24 @@ object HBaseMainTest extends FunSuite with BeforeAndAfterAll with Logging {
         addRowVals(put, rowValue, rowType, colFamily, colQualifier)
     }
     htable.put(put)
-    row = new GenericRow(Array(456789.0, "Michigan", 4567:Short))
+    row = new GenericRow(Array(2048.0, "Michigan", 256:Short))
     key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
     put = new Put(key)
-    Seq((457.toByte, ByteType, "cf1", "cq11"),
+    Seq((32.toByte, ByteType, "cf1", "cq11"),
       (456789012, IntegerType, "cf1", "cq12"),
       (4567890123446789L, LongType, "cf2", "cq21"),
       (456.78901F, FloatType, "cf2", "cq22")).foreach {
+      case (rowValue, rowType, colFamily, colQualifier) =>
+        addRowVals(put, rowValue, rowType, colFamily, colQualifier)
+    }
+    htable.put(put)
+    row = new GenericRow(Array(4096.0, "SF", 512:Short))
+    key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
+    put = new Put(key)
+    Seq((16.toByte, ByteType, "cf1", "cq11"),
+      (98767, IntegerType, "cf1", "cq12"),
+      (987563454423454L, LongType, "cf2", "cq21"),
+      (987.645F, FloatType, "cf2", "cq22")).foreach {
       case (rowValue, rowType, colFamily, colQualifier) =>
         addRowVals(put, rowValue, rowType, colFamily, colQualifier)
     }
@@ -291,10 +302,6 @@ object HBaseMainTest extends FunSuite with BeforeAndAfterAll with Logging {
         DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType, new BytesUtils)
       }
     }
-
-//    val key0 = DataTypeUtils.getRowColumnFromHBaseRawType(row, 0, DoubleType)
-//    val key1 = DataTypeUtils.getRowColumnFromHBaseRawType(row, 1, StringType)
-//    val key2 = DataTypeUtils.getRowColumnFromHBaseRawType(row, 2, ShortType)
 
     encodingRawKeyColumns(rawKeyCol)
   }

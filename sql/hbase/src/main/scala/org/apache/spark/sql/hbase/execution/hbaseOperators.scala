@@ -55,12 +55,11 @@ case class HBaseSQLTableScan(
   extends LeafNode {
 
   override def outputPartitioning = {
-    val prunedPartitions = relation.getPrunedPartitions(partitionPredicate)
     var ordering = List[SortOrder]()
     for (key <- relation.partitionKeys) {
       ordering = ordering :+ SortOrder(key, Ascending)
     }
-    RangePartitioning(ordering.toSeq, prunedPartitions.get.size)
+    RangePartitioning(ordering.toSeq, relation.partitions.size)
   }
 
   override def execute(): RDD[Row] = {

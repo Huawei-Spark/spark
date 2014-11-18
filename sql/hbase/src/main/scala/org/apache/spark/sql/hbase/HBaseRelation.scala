@@ -108,11 +108,9 @@ private[hbase] case class HBaseRelation(
     val buffer = ListBuffer[HBaseRawType]()
     val start = getData(dt, buffer, partition.lowerBound)
     val end = getData(dt, buffer, partition.upperBound)
-    if (isLastKeyIndex) {
-      new PartitionRange(start, true, end, false, partition.index, dt)
-    } else {
-      new PartitionRange(start, true, end, true, partition.index, dt)
-    }
+    val startInclusive = !start.isEmpty
+    val endInclusive = !end.isEmpty && !isLastKeyIndex
+    new PartitionRange(start, startInclusive, end, endInclusive, partition.index, dt)
   }
 
   private def prePruneRanges(ranges: Seq[PartitionRange[_]], keyIndex: Int)

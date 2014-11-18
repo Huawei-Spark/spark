@@ -31,7 +31,7 @@ class Range[T](val start: Option[T], // None for open ends
                val startInclusive: Boolean,
                val end: Option[T], // None for open ends
                val endInclusive: Boolean,
-               val dt:NativeType) {
+               val dt: NativeType) {
   require(dt != null && !(start.isDefined && end.isDefined &&
     ((dt.ordering.eq(start.get, end.get) &&
       (!startInclusive || !endInclusive)) ||
@@ -43,7 +43,7 @@ class Range[T](val start: Option[T], // None for open ends
 // @param
 // id: partition id to be used to map to a HBase partition
 class PartitionRange[T](start: Option[T], startInclusive: Boolean,
-                        end: Option[T], endInclusive: Boolean, val id: Int, dt:NativeType)
+                        end: Option[T], endInclusive: Boolean, val id: Int, dt: NativeType)
   extends Range[T](start, startInclusive, end, endInclusive, dt)
 
 // A PointRange is a range of a single point. It is used for convenience when
@@ -78,11 +78,33 @@ class RangeType[T] extends PartiallyOrderingDataType {
     // In the future when more generic range comparisons, these two methods
     // must be functional as expected
     def tryCompare(a: JvmType, b: JvmType): Option[Int] = {
-      val p1 = lteq(a, b)
-      val p2 = lteq(b, a)
-      if (p1) {
-        if (p2) Some(0) else Some(-1)
-      } else if (p2) Some(1) else None
+      val aRange = a.asInstanceOf[Range[T]]
+      val aStartInclusive = aRange.startInclusive
+      val aStart = aRange.start.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val aEnd = aRange.end.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val aEndInclusive = aRange.endInclusive
+      val bRange = b.asInstanceOf[Range[T]]
+      val bStart = bRange.start.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val bEnd = bRange.end.getOrElse(null).asInstanceOf[aRange.dt.JvmType]
+      val bStartInclusive = bRange.startInclusive
+      val bEndInclusive = bRange.endInclusive
+
+      // return 1 iff aStart > bEnd
+      // return 1 iff aStart = bEnd, aStartInclusive & bEndInclusive are not true at same position
+      if ((aStart != null
+        && bEnd != null)
+        && (aRange.dt.ordering.gt(aStart, bEnd)
+        || (aRange.dt.ordering.eq(aStart, bEnd) && !(aStartInclusive && bEndInclusive)))) {
+        Some(1)
+      } //Vice versa
+      else if ((bStart != null
+        && aEnd != null)
+        && (aRange.dt.ordering.gt(bStart, aEnd)
+        || (aRange.dt.ordering.eq(bStart, aEnd) && !(bStartInclusive && aEndInclusive)))) {
+        Some(-1)
+      } else {
+        None
+      }
     }
 
     def lteq(a: JvmType, b: JvmType): Boolean = {
@@ -106,7 +128,7 @@ class RangeType[T] extends PartiallyOrderingDataType {
           case (_, true, true, _) => {
             if (aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
               bStart.asInstanceOf[aRange.dt.JvmType])) {
-                true
+              true
             } else {
               false
             }
@@ -122,7 +144,7 @@ class RangeType[T] extends PartiallyOrderingDataType {
           }
           // [(aStart, aEnd) compare to [bStart, bEnd)]
           case (_, false, true, _) => {
-            if (a.end != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
+            if (aEnd != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
               bStart.asInstanceOf[aRange.dt.JvmType])) {
               true
             } else {
@@ -131,7 +153,7 @@ class RangeType[T] extends PartiallyOrderingDataType {
           }
           // [(aStart, aEnd) compare to (bStart, bEnd)]
           case (_, false, false, _) => {
-            if (a.end != null && bStart != null &&
+            if (aEnd != null && bStart != null &&
               aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
                 bStart.asInstanceOf[aRange.dt.JvmType])) {
               true
@@ -147,19 +169,31 @@ class RangeType[T] extends PartiallyOrderingDataType {
 }
 
 object RangeType {
+
   object StringRangeType extends RangeType[String]
+
   object IntegerRangeType extends RangeType[Int]
+
   object LongRangeType extends RangeType[Long]
+
   object DoubleRangeType extends RangeType[Double]
+
   object FloatRangeType extends RangeType[Float]
+
   object ByteRangeType extends RangeType[Byte]
+
   object ShortRangeType extends RangeType[Short]
+
   object BooleanRangeType extends RangeType[Boolean]
+
   object DecimalRangeType extends RangeType[BigDecimal]
+
   object TimestampRangeType extends RangeType[Timestamp]
+
   val primitiveToPODataTypeMap: HashMap[NativeType, PartiallyOrderingDataType] =
-  HashMap(IntegerType->IntegerRangeType, LongType->LongRangeType, DoubleType->DoubleRangeType,
-            FloatType->FloatRangeType, ByteType->ByteRangeType, ShortType->ShortRangeType,
-            BooleanType->BooleanRangeType, DecimalType->DecimalRangeType,
-            TimestampType->TimestampRangeType)
+    HashMap(IntegerType -> IntegerRangeType, LongType -> LongRangeType,
+      DoubleType -> DoubleRangeType, FloatType -> FloatRangeType,
+      ByteType -> ByteRangeType, ShortType -> ShortRangeType,
+      BooleanType -> BooleanRangeType, DecimalType -> DecimalRangeType,
+      TimestampType -> TimestampRangeType)
 }

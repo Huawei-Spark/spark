@@ -31,6 +31,46 @@ object PartialPredicateOperations {
   implicit class partialPredicateEvaluator(e: Expression) {
     def partialEval(input: Row): Any = {
       e match {
+        case And(left, right)  => {
+          val l = left.partialEval(input)
+          if (l == false) {
+            false
+          } else {
+            val r = right.partialEval(input)
+            if (r == false) {
+              false
+            } else {
+              if (l != null && r != null) {
+                true
+              } else {
+                null
+              }
+            }
+          }
+        }
+        case Or(left, right)  => {
+          val l = left.partialEval(input)
+          if (l == true) {
+            true
+          } else {
+            val r = right.partialEval(input)
+            if (r == true) {
+              true
+            } else {
+              if (l != null && r != null) {
+                false
+              } else {
+                null
+              }
+            }
+          }
+        }
+        case Not(child)  => {
+          child.partialEval(input) match {
+            case null => null
+            case b: Boolean => !b
+          }
+        }
         case In(value, list) => {
           val evaluatedValue = value.partialEval(input)
           if (evaluatedValue == null) {
