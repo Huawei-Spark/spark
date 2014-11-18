@@ -50,3 +50,15 @@ case class BulkLoadPlan(path: String, child: LogicalPlan,
 
   override def toString = s"LogicalPlan: LoadDataIntoTable(LOAD $path INTO $child)"
 }
+
+
+case class InsertValueIntoTable(
+                            table: LogicalPlan,
+                            partition: Map[String, Option[String]],
+                            valueSeq: Seq[String])
+  extends LogicalPlan {
+
+  override def children = Nil
+  override def output = null
+
+}

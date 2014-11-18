@@ -46,6 +46,7 @@ class HBaseSQLParser extends SqlParser {
   protected val MAPPED = Keyword("MAPPED")
   protected val PRIMARY = Keyword("PRIMARY")
   protected val SHORT = Keyword("SHORT")
+  protected val VALUES = Keyword("VALUES")
   protected val TERMINATED = Keyword("TERMINATED")
 
   protected val newReservedWords: Seq[String] =
@@ -67,11 +68,12 @@ class HBaseSQLParser extends SqlParser {
       )
 
   override protected lazy val insert: Parser[LogicalPlan] =
-    INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {
-      case r ~ s =>
-        InsertIntoTable(
-          r, Map[String, Option[String]](), s, false)
-    }
+    (INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {
+      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, false)}
+    |
+     INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
+      case r ~ valueSeq => InsertValueIntoTable(r, Map[String, Option[String]](), valueSeq)}
+    )
 
   protected lazy val create: Parser[LogicalPlan] =
     CREATE ~> TABLE ~> ident ~

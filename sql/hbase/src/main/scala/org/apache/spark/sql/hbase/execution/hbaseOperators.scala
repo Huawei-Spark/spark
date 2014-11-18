@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.hbase.execution
 
+import org.apache.hadoop.hbase.client.HTable
 import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.TaskContext
@@ -46,12 +47,12 @@ import scala.collection.JavaConversions._
  */
 @DeveloperApi
 case class HBaseSQLTableScan(
-    relation: HBaseRelation,
-    output: Seq[Attribute],
-    rowKeyPredicate: Option[Expression],
-    valuePredicate: Option[Expression],
-    partitionPredicate: Option[Expression],
-    coProcessorPlan: Option[SparkPlan])(@transient context: HBaseSQLContext)
+                              relation: HBaseRelation,
+                              output: Seq[Attribute],
+                              rowKeyPredicate: Option[Expression],
+                              valuePredicate: Option[Expression],
+                              partitionPredicate: Option[Expression],
+                              coProcessorPlan: Option[SparkPlan])(@transient context: HBaseSQLContext)
   extends LeafNode {
 
   override def outputPartitioning = {
@@ -146,9 +147,29 @@ case class InsertIntoHBaseTable(
 }
 
 @DeveloperApi
+case class InsertValueIntoHBaseTable(relation: HBaseRelation, valueSeq: Seq[String])(
+  @transient hbContext: HBaseSQLContext) extends LeafNode {
+
+  override def execute() = {
+    val buffer = ArrayBuffer[Byte]()
+    val (keyBytes, valueBytes) = HBaseKVHelper.string2KV(valueSeq, relation.allColumns)
+    val rowKey = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
+    val put = new Put(rowKey)
+    valueBytes.foreach { case (family, qualifier, value) =>
+      put.add(family, qualifier, value)
+    }
+    relation.htable.put(put)
+
+    hbContext.sc.parallelize(Seq.empty[Row], 1)
+  }
+
+  override def output = Nil
+}
+
+@DeveloperApi
 case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
                              isLocal: Boolean, delimiter: Option[String])(
-  @transient hbContext: HBaseSQLContext) extends LeafNode {
+                              @transient hbContext: HBaseSQLContext) extends LeafNode {
 
   val conf = hbContext.sc.hadoopConfiguration
 
