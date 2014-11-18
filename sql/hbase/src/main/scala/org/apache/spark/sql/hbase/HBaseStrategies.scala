@@ -102,6 +102,8 @@ private[hbase] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
       case logical.DropTablePlan(tableName) =>
         Seq(DropHbaseTableCommand(tableName)
           (hbaseSQLContext))
+      case logical.DescribePlan(table: HBaseRelation) =>
+        execution.DescribeTableCommand(table)(hbaseSQLContext) :: Nil
       case _ => Nil
     }
   }

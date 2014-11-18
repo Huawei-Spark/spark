@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase.execution
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.{Command, LeafNode}
-import org.apache.spark.sql.hbase.{NonKeyColumn, KeyColumn, HBaseSQLContext}
+import org.apache.spark.sql.hbase.{HBaseRelation, NonKeyColumn, KeyColumn, HBaseSQLContext}
 
 case class CreateHBaseTableCommand(
                                     tableName: String,
@@ -98,6 +98,18 @@ case class DropHbaseTableCommand(tableName: String)
 
   override protected[sql] lazy val sideEffectResult = {
     context.catalog.deleteTable(tableName)
+    Seq.empty[Row]
+  }
+
+  override def output: Seq[Attribute] = Seq.empty
+}
+
+case class DescribeTableCommand(table: HBaseRelation)
+                               (@transient context: HBaseSQLContext)
+  extends LeafNode with Command {
+
+  override protected[sql] lazy val sideEffectResult = {
+    // TODO: write output into a temp file like Hive does?
     Seq.empty[Row]
   }
 
