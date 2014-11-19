@@ -25,11 +25,11 @@ case class CreateHBaseTablePlan(tableName: String,
                                 keyCols: Seq[(String, String)],
                                 nonKeyCols: Seq[(String, String, String, String)]) extends Command
 
-case class DropTablePlan(tableName: String) extends Command
+case class DropTablePlan(tableName: LogicalPlan) extends Command
 
-case class AlterDropColPlan(tableName: String, colName: String) extends Command
+case class AlterDropColPlan(tableName: LogicalPlan, colName: String) extends Command
 
-case class AlterAddColPlan(tableName: String,
+case class AlterAddColPlan(tableName: LogicalPlan,
                            colName: String,
                            colType: String,
                            colFamily: String,

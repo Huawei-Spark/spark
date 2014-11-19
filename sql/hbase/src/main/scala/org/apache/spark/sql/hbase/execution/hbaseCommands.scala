@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase.execution
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.{Command, LeafNode}
-import org.apache.spark.sql.hbase.{NonKeyColumn, KeyColumn, HBaseSQLContext}
+import org.apache.spark.sql.hbase.{HBaseRelation, NonKeyColumn, KeyColumn, HBaseSQLContext}
 
 case class CreateHBaseTableCommand(
                                     tableName: String,
@@ -61,19 +61,19 @@ case class CreateHBaseTableCommand(
   override def output: Seq[Attribute] = Seq.empty
 }
 
-case class AlterDropColCommand(tableName: String, columnName: String)
+case class AlterDropColCommand(tableName: HBaseRelation, columnName: String)
                               (@transient context: HBaseSQLContext)
   extends LeafNode with Command {
 
   override protected[sql] lazy val sideEffectResult = {
-    context.catalog.alterTableDropNonKey(tableName, columnName)
+    context.catalog.alterTableDropNonKey(tableName.tableName, columnName)
     Seq.empty[Row]
   }
 
   override def output: Seq[Attribute] = Seq.empty
 }
 
-case class AlterAddColCommand(tableName: String,
+case class AlterAddColCommand(tableName: HBaseRelation,
                               colName: String,
                               colType: String,
                               colFamily: String,
@@ -82,7 +82,7 @@ case class AlterAddColCommand(tableName: String,
   extends LeafNode with Command {
 
   override protected[sql] lazy val sideEffectResult = {
-    context.catalog.alterTableAddNonKey(tableName,
+    context.catalog.alterTableAddNonKey(tableName.tableName,
       NonKeyColumn(
         colName, context.catalog.getDataType(colType), colFamily, colQualifier)
     )
@@ -92,12 +92,12 @@ case class AlterAddColCommand(tableName: String,
   override def output: Seq[Attribute] = Seq.empty
 }
 
-case class DropHbaseTableCommand(tableName: String)
+case class DropHbaseTableCommand(tableName: HBaseRelation)
                                 (@transient context: HBaseSQLContext)
   extends LeafNode with Command {
 
   override protected[sql] lazy val sideEffectResult = {
-    context.catalog.deleteTable(tableName)
+    context.catalog.deleteTable(tableName.tableName)
     Seq.empty[Row]
   }
 

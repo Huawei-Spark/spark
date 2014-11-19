@@ -134,17 +134,17 @@ class HBaseSQLParser extends SqlParser {
     }
 
   protected lazy val drop: Parser[LogicalPlan] =
-    DROP ~> TABLE ~> ident <~ opt(";") ^^ {
+    DROP ~> TABLE ~> relation <~ opt(";") ^^ {
       case tableName => DropTablePlan(tableName)
     }
 
   protected lazy val alterDrop: Parser[LogicalPlan] =
-    ALTER ~> TABLE ~> ident ~
+    ALTER ~> TABLE ~> relation ~
       (DROP ~> ident) <~ opt(";") ^^ {
       case tableName ~ colName => AlterDropColPlan(tableName, colName)
     }
   protected lazy val alterAdd: Parser[LogicalPlan] =
-    ALTER ~> TABLE ~> ident ~
+    ALTER ~> TABLE ~> relation ~
       (ADD ~> tableCol) ~
       (MAPPED ~> BY ~> "(" ~> expressions <~ ")") ^^ {
       case tableName ~ tableColumn ~ mappingInfo => {
