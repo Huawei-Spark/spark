@@ -23,6 +23,7 @@ package org.apache.spark
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.{HashMap, ArrayBuffer, HashSet}
 
 case class ExtResourceInfo(slaveHostname: String, executorId: String,
@@ -88,7 +89,8 @@ case class ExtResource[T](
           // map of partition to (use count, instance)
           instances = new HashMap[Int, ResourceRefCountPerPartition[T]]
         case (true, false) =>
-          instances = init(-1, params)
+//          instances = init(-1, params)
+          instances = new HashSet[T]()
         case (false, true) =>
           instances = new HashMap[Int, ArrayBuffer[T]]
         case (false, false) =>
@@ -157,7 +159,7 @@ case class ExtResource[T](
           ExtResourceInfo(host, executorId, name, timestamp, true, true, instanceCnt, instanceUseCnt)
         }
         case (true, false) => {
-          ExtResourceInfo(host, executorId, name, timestamp, true, false, 1, instancesInUse.asInstanceOf[Int])
+          ExtResourceInfo(host, executorId, name, timestamp, true, false, instances.asInstanceOf[HashSet[T]].size, instancesInUse.asInstanceOf[Int])
         }
         case (false, true) =>
           val usedCount = instancesInUse.asInstanceOf[
@@ -206,11 +208,14 @@ case class ExtResource[T](
             res.instance
           }
           case (true, false) => {
-            if(instances != null)
-              instances
-            else
-              instances = init(-1, params)
-            instances.asInstanceOf[T]
+            val res = instances.asInstanceOf[HashSet[T]]
+            if(res.size>0)
+              res.head
+            else{
+              val rsc = init(-1, params)
+              res += rsc
+              rsc
+            }
           }
         }
       }
@@ -286,13 +291,14 @@ case class ExtResource[T](
             instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]].clear
           }
         case (true, false) =>
-          if (instancesInUse.asInstanceOf[Int] > 0)
-          // an all-or-nothing cleanup mechanism
+          if (instancesInUse.asInstanceOf[Int] > 0) {
+            // an all-or-nothing cleanup mechanism
             return errorString
-          else {
-            if (instances != null)
-              term(-1, instances.asInstanceOf[T], params)
-            instances = null
+          }else {
+            val res = instances.asInstanceOf[HashSet[T]]
+            if (res.size>0)
+              term(-1, res.head, params)
+            res.clear()
           }
         case (false, true) =>
           if (!instancesInUse.asInstanceOf[HashMap[Long, Pair[Int, ArrayBuffer[T]]]].isEmpty)
