@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.sql.catalyst.expressions._
 
@@ -99,7 +99,7 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
   private def classifyBinary(left: Expression, right: Expression, pred: Expression)
   : (Option[Expression], Option[Expression]) = {
     (left, right) match {
-      case (Literal(_, _), AttributeReference(_, _, _)) => {
+      case (Literal(_, _), AttributeReference(_,_,_,_)) => {
         if (relation.isNonKey(right.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
@@ -111,7 +111,7 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
           }
         }
       }
-      case (AttributeReference(_, _, _), Literal(_, _)) => {
+      case (AttributeReference(_,_,_,_), Literal(_, _)) => {
         if (relation.isNonKey(left.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {

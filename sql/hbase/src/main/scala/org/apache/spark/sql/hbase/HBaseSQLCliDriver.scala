@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import java.io.File
 

@@ -14,8 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
-private[hbase] trait IndexMappable {
+private[hbasesource] trait IndexMappable {
     def mappedIndex: Int
 }

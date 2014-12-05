@@ -60,6 +60,7 @@ class Analyzer(catalog: Catalog, registry: FunctionRegistry, caseSensitive: Bool
       ResolveFunctions ::
       GlobalAggregates ::
       UnresolvedHavingClauseAttributes ::
+      TrimGroupingAliases ::
       typeCoercionRules ++
       extendedRules : _*),
     Batch("Check Analysis", Once,
@@ -90,6 +91,16 @@ class Analyzer(catalog: Catalog, registry: FunctionRegistry, caseSensitive: Bool
   }
 
   /**
+   * Removes no-op Alias expressions from the plan.
+   */
+  object TrimGroupingAliases extends Rule[LogicalPlan] {
+    def apply(plan: LogicalPlan): LogicalPlan = plan transform {
+      case Aggregate(groups, aggs, child) =>
+        Aggregate(groups.map(_.transform { case Alias(c, _) => c }), aggs, child)
+    }
+  }
+
+  /**
    * Checks for non-aggregated attributes with aggregation
    */
   object CheckAggregation extends Rule[LogicalPlan] {
@@ -104,10 +115,15 @@ class Analyzer(catalog: Catalog, registry: FunctionRegistry, caseSensitive: Bool
             case e => e.children.forall(isValidAggregateExpression)
           }
 
-          aggregateExprs.foreach { e =>
-            if (!isValidAggregateExpression(e)) {
-              throw new TreeNodeException(plan, s"Expression not in GROUP BY: $e")
-            }
+          aggregateExprs.find { e =>
+            !isValidAggregateExpression(e.transform {
+              // Should trim aliases around `GetField`s. These aliases are introduced while
+              // resolving struct field accesses, because `GetField` is not a `NamedExpression`.
+              // (Should we just turn `GetField` into a `NamedExpression`?)
+              case Alias(g: GetField, _) => g
+            })
+          }.foreach { e =>
+            throw new TreeNodeException(plan, s"Expression not in GROUP BY: $e")
           }
 
           aggregatePlan
@@ -163,7 +179,7 @@ class Analyzer(catalog: Catalog, registry: FunctionRegistry, caseSensitive: Bool
         val missingInProject = requiredAttributes -- p.output
         if (missingInProject.nonEmpty) {
           // Add missing attributes and then project them away after the sort.
-          Project(projectList,
+          Project(projectList.map(_.toAttribute),
             Sort(ordering,
               Project(projectList ++ missingInProject, child)))
         } else {
@@ -310,4 +326,3 @@ object EliminateAnalysisOperators extends Rule[LogicalPlan] {
     case Subquery(_, child) => child
   }
 }
-

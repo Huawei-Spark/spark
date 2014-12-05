@@ -14,12 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase.execution
+package org.apache.spark.sql.hbasesource.execution
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.{Command, LeafNode}
-import org.apache.spark.sql.hbase.{HBaseRelation, HBaseSQLContext, KeyColumn, NonKeyColumn}
+import org.apache.spark.sql.hbasesource.{HBaseRelation, HBaseSQLContext, KeyColumn, NonKeyColumn}
 
 import scala.collection.mutable.ArrayBuffer
 

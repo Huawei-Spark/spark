@@ -14,12 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.{SparkSQLParser, SqlLexical, SqlParser}
-import org.apache.spark.sql.hbase.logical._
+import org.apache.spark.sql.hbasesource.logical._
 
 object HBaseSQLParser {
   def getKeywords(): Seq[String] = {
@@ -42,7 +42,6 @@ class HBaseSQLParser extends SqlParser {
   protected val CREATE = Keyword("CREATE")
   protected val DATA = Keyword("DATA")
   protected val DESCRIBE = Keyword("DESCRIBE")
-  protected val DOUBLE = Keyword("DOUBLE")
   protected val DROP = Keyword("DROP")
   protected val EXISTS = Keyword("EXISTS")
   protected val FIELDS = Keyword("FIELDS")

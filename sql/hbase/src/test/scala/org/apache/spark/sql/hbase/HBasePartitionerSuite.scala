@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.hadoop.hbase.{HColumnDescriptor, TableName, HTableDescriptor}
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.parquet.{OrFilter, AndFilter, ComparisonFilter, ParquetFilters}
 import org.scalatest.FunSuite
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.rdd.ShuffledRDD
@@ -40,7 +39,7 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
       new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
     }
-    import org.apache.spark.sql.hbase.HBasePartitioner._
+    import org.apache.spark.sql.hbasesource.HBasePartitioner._
     val partitioner = new HBasePartitioner(rdd)(splitKeys.toArray)
     val shuffled =
       new ShuffledRDD[ImmutableBytesWritableWrapper, Int, Int](rdd, partitioner)

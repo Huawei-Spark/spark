@@ -14,15 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.hadoop.hbase.util.Bytes
 import scala.collection.mutable.{ArrayBuffer, Set}
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.catalyst.types.Range
+import org.apache.spark.sql.hbasesource.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbasesource.catalyst.types.Range
 import org.apache.spark.sql.catalyst.types.{IntegralType, NativeType}
-import org.apache.spark.sql.hbase.CriticalPointType.CriticalPointType
+import org.apache.spark.sql.hbasesource.CriticalPointType.CriticalPointType
 
 object CriticalPointType extends Enumeration {
   type CriticalPointType = Value
@@ -41,7 +41,7 @@ case class CriticalPoint[T](value: T, ctype: CriticalPointType, dt: NativeType) 
 }
 
 
-private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boolean,
+private [hbasesource] class CriticalPointRange[T](start: Option[T], startInclusive: Boolean,
                             end: Option[T], endInclusive: Boolean, dimIndex:Int,
                             dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt) {
@@ -49,7 +49,7 @@ private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Bo
   lazy val isPoint: Boolean = startInclusive && endInclusive && start.get == end.get
   var prefixIndex: Int = 0 // # of prefix key dimensions
 
-  private[hbase] def convert(prefix: HBaseRawType, origin: CriticalPointRange[_])
+  private[hbasesource] def convert(prefix: HBaseRawType, origin: CriticalPointRange[_])
                             : Seq[CriticalPointRange[HBaseRawType]]  = {
     val rawStart: Option[HBaseRawType] = if (start.isDefined) {
       if (prefix == null) Some(DataTypeUtils.dataToBytes(start.get, dt))
@@ -79,7 +79,7 @@ private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Bo
  * Must be called before reference binding
  */
 object RangeCriticalPoint {
-  private[hbase] def collect[T](expression: Expression, key: AttributeReference)
+  private[hbasesource] def collect[T](expression: Expression, key: AttributeReference)
                                : Seq[CriticalPoint[T]] = {
     if (key.references.subsetOf(expression.references)) {
       val pointSet = Set[CriticalPoint[T]]()
@@ -100,28 +100,28 @@ object RangeCriticalPoint {
         }
       }
       expression transform {
-        case a@EqualTo(AttributeReference(_, _, _), Literal(value, _)) =>
+        case a@EqualTo(AttributeReference(_,_,_,_), Literal(value, _)) =>
           if (a.left.equals(key)) checkAndAdd(value, CriticalPointType.bothInclusive)
           a
-        case a@EqualTo(Literal(value, _), AttributeReference(_, _, _)) =>
+        case a@EqualTo(Literal(value, _), AttributeReference(_,_,_,_)) =>
           if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.bothInclusive)
           a
-        case a@LessThan(AttributeReference(_, _, _), Literal(value, _)) =>
+        case a@LessThan(AttributeReference(_,_,_,_), Literal(value, _)) =>
           if (a.left.equals(key)) checkAndAdd(value, CriticalPointType.upInclusive)
           a
-        case a@LessThan(Literal(value, _), AttributeReference(_, _, _)) =>
+        case a@LessThan(Literal(value, _), AttributeReference(_,_,_,_)) =>
           if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.lowInclusive)
           a
-        case a@LessThanOrEqual(AttributeReference(_, _, _), Literal(value, _)) =>
+        case a@LessThanOrEqual(AttributeReference(_,_,_,_), Literal(value, _)) =>
           if (a.left.equals(key)) checkAndAdd(value, CriticalPointType.lowInclusive)
           a
-        case a@LessThanOrEqual(Literal(value, _), AttributeReference(_, _, _)) =>
+        case a@LessThanOrEqual(Literal(value, _), AttributeReference(_,_,_,_)) =>
           if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.upInclusive)
           a
-        case a@GreaterThanOrEqual(AttributeReference(_, _, _), Literal(value, _)) =>
+        case a@GreaterThanOrEqual(AttributeReference(_,_,_,_), Literal(value, _)) =>
           if (a.left.equals(key)) checkAndAdd(value, CriticalPointType.upInclusive)
           a
-        case a@GreaterThanOrEqual(Literal(value, _), AttributeReference(_, _, _)) =>
+        case a@GreaterThanOrEqual(Literal(value, _), AttributeReference(_,_,_,_)) =>
           if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.lowInclusive)
           a
       }
@@ -132,7 +132,7 @@ object RangeCriticalPoint {
 /*
  * create partition ranges on a *sorted* list of critical points
  */
-  private[hbase] def generateCriticalPointRange[T](cps: Seq[CriticalPoint[T]],
+  private[hbasesource] def generateCriticalPointRange[T](cps: Seq[CriticalPoint[T]],
                                                    dimIndex: Int, dt: NativeType)
          : Seq[CriticalPointRange[T]] = {
     if (cps.isEmpty) Nil
@@ -262,7 +262,7 @@ object RangeCriticalPoint {
   }
 
   // Step 1
-  private[hbase] def generateCriticalpointRanges(relation: HBaseRelation,
+  private[hbasesource] def generateCriticalpointRanges(relation: HBaseRelation,
                        pred: Option[Expression], dimIndex: Int): Seq[CriticalPointRange[_]] =  {
     if (!pred.isDefined) Nil
     else {
@@ -275,7 +275,7 @@ object RangeCriticalPoint {
     }
   }
 
-  private[hbase] def generateCriticalpointRangesHelper(relation: HBaseRelation,
+  private[hbasesource] def generateCriticalpointRangesHelper(relation: HBaseRelation,
                  predExpr: Expression, dimIndex: Int, row: MutableRow,
                  boundPred: Expression, predRefs: Seq[Attribute])
                  : Seq[CriticalPointRange[_]] = {
@@ -550,7 +550,7 @@ object RangeCriticalPoint {
     }
   }
 
-  private[hbase] def prunePartitions(cprs: Seq[CriticalPointRange[HBaseRawType]],
+  private[hbasesource] def prunePartitions(cprs: Seq[CriticalPointRange[HBaseRawType]],
                                      pred: Option[Expression], partitions: Seq[HBasePartition],
                                      dimSize: Int): Seq[HBasePartition] = {
     if (cprs.isEmpty) {
@@ -626,8 +626,9 @@ object RangeCriticalPoint {
     *   3.3 For each partition mapped to multiple critical point ranges, use the original
     *       predicate so the slave will
    */
-  private[hbase] def generatePrunedPartitions(relation: HBaseRelation, pred: Option[Expression])
-       : Seq[HBasePartition] = {
+  private[hbasesource] def generatePrunedPartitions(
+      relation: HBaseRelation,
+      pred: Option[Expression]): Seq[HBasePartition] = {
     // Step 1
     val cprs: Seq[CriticalPointRange[_]] = generateCriticalpointRanges(relation, pred, 0)
     // Step 2

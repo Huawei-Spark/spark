@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.sql.catalyst.SqlParser
 import org.apache.spark.sql.catalyst.types.{IntegerType, NativeType}
-import org.apache.spark.sql.hbase.TestHbase._
+import org.apache.spark.sql.hbasesource.TestHbase._
 
 import scala.collection.immutable.HashMap
 

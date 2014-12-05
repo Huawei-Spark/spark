@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.hbase.logical.BulkLoadPlan
+import org.apache.spark.sql.hbasesource.logical.BulkLoadPlan
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.apache.spark.{SparkContext, Logging}
 import org.apache.spark.sql.catalyst.types.IntegerType
-import org.apache.spark.sql.hbase.execution.BulkLoadIntoTable
+import org.apache.spark.sql.hbasesource.execution.BulkLoadIntoTable
 import org.apache.hadoop.hbase.util.Bytes
 
 class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Logging{

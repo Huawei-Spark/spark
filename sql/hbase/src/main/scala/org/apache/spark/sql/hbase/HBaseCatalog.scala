@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import java.io._
 
@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.analysis.SimpleCatalog
 import org.apache.spark.sql.catalyst.expressions.Row
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.hbase.HBaseCatalog._
+import org.apache.spark.sql.hbasesource.HBaseCatalog._
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer, SynchronizedMap}
 
@@ -66,7 +66,7 @@ case class NonKeyColumn(
   }
 }
 
-private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
+private[hbasesource] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
   extends SimpleCatalog(false) with Logging with Serializable {
 
   lazy val logger = Logger.getLogger(getClass.getName)
@@ -288,11 +288,11 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     admin.createTable(descriptor)
   }
 
-  private[hbase] def checkHBaseTableExists(hbaseTableName: String): Boolean = {
+  private[hbasesource] def checkHBaseTableExists(hbaseTableName: String): Boolean = {
     admin.tableExists(hbaseTableName)
   }
 
-  private[hbase] def checkLogicalTableExist(tableName: String): Boolean = {
+  private[hbasesource] def checkLogicalTableExist(tableName: String): Boolean = {
     if (!admin.tableExists(MetaData)) {
       // create table
       createMetadataTable()
@@ -305,7 +305,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     result.size() > 0
   }
 
-  private[hbase] def checkFamilyExists(hbaseTableName: String, family: String): Boolean = {
+  private[hbasesource] def checkFamilyExists(hbaseTableName: String, family: String): Boolean = {
     val tableDescriptor = admin.getTableDescriptor(TableName.valueOf(hbaseTableName))
     tableDescriptor.hasFamily(Bytes.toBytes(family))
   }

@@ -1,4 +1,4 @@
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.Logging
 import org.scalatest.{BeforeAndAfterAll, FunSuite}

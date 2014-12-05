@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase.execution
+package org.apache.spark.sql.hbasesource.execution
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
@@ -33,8 +33,8 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.RangePartitioning
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.{LeafNode, SparkPlan, UnaryNode}
-import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.HBasePartitioner._
+import org.apache.spark.sql.hbasesource._
+import org.apache.spark.sql.hbasesource.HBasePartitioner._
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -184,7 +184,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
   // tmp path for storing HFile
   val tmpPath = Util.getTempFilePath(conf, relation.tableName)
 
-  private[hbase] def makeBulkLoadRDD(splitKeys: Array[ImmutableBytesWritableWrapper]) = {
+  private[hbasesource] def makeBulkLoadRDD(splitKeys: Array[ImmutableBytesWritableWrapper]) = {
     val ordering = HBasePartitioner.orderingRowKey
       .asInstanceOf[Ordering[ImmutableBytesWritableWrapper]]
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile

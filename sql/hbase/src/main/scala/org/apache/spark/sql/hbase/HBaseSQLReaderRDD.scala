@@ -14,16 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.hadoop.hbase.client.Result
-import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbasesource.catalyst.expressions.PartialPredicateOperations._
 import org.apache.log4j.Logger
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions.codegen.GeneratePredicate
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
+import org.apache.spark.sql.hbasesource.catalyst.types.PartitionRange
 import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
 
 

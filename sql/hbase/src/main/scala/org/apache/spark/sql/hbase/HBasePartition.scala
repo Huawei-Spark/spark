@@ -14,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.types.BinaryType
-import org.apache.spark.sql.hbase.catalyst.types.Range
+import org.apache.spark.sql.hbasesource.catalyst.types.Range
 
-private[hbase] class HBasePartition(
+private[hbasesource] class HBasePartition(
     val idx: Int, val mappedIndex: Int,
     val keyPartialEvalIndex: Int = -1,
     val lowerBound: Option[HBaseRawType] = None,

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.SparkContext
@@ -26,13 +26,13 @@ import scala.collection.mutable.ListBuffer
 /**
  * Helper class for scanning files stored in Hadoop - e.g., to read text file when bulk loading.
  */
-private[hbase]
+private[hbasesource]
 class HadoopReader(
                    @transient sc: SparkContext,
                    path: String,
                    delimiter: Option[String])(columns: Seq[AbstractColumn]) {
   // make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file
-  private[hbase] def makeBulkLoadRDDFromTextFile = {
+  private[hbasesource] def makeBulkLoadRDDFromTextFile = {
 
     val rdd = sc.textFile(path)
     val splitRegex = delimiter.getOrElse(",")

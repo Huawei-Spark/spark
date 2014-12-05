@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase.catalyst.types
+package org.apache.spark.sql.hbasesource.catalyst.types
 
 import java.sql.Timestamp
 
@@ -59,7 +59,7 @@ class RangeType[T] extends PartiallyOrderingDataType {
     case s: Short => new Range[Short](Some(s), true, Some(s), true, ShortType)
     case s: String => new Range[String](Some(s), true, Some(s), true, StringType)
     case b: Boolean => new Range[Boolean](Some(b), true, Some(b), true, BooleanType)
-    case d: BigDecimal => new Range[BigDecimal](Some(d), true, Some(d), true, DecimalType)
+    case d: BigDecimal => new Range[BigDecimal](Some(d), true, Some(d), true, DecimalType.Unlimited)
     case t: Timestamp => new Range[Timestamp](Some(t), true, Some(t), true, TimestampType)
     case _ => s
   }
@@ -194,7 +194,7 @@ object RangeType {
       ByteType -> ByteRangeType,
       ShortType -> ShortRangeType,
       BooleanType -> BooleanRangeType,
-      DecimalType -> DecimalRangeType,
+      DecimalType.Unlimited -> DecimalRangeType,
       TimestampType -> TimestampRangeType,
       StringType -> StringRangeType
     )

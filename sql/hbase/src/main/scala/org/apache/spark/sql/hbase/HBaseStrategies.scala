@@ -15,17 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{Strategy, SQLContext}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, QueryPlanner}
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, LogicalPlan}
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.hbase.logical.InsertValueIntoTable
+import org.apache.spark.sql.hbasesource.execution._
+import org.apache.spark.sql.hbasesource.logical.InsertValueIntoTable
 
-private[hbase] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
+private[hbasesource] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
   self: SQLContext#SparkPlanner =>
 
   val hbaseSQLContext: HBaseSQLContext

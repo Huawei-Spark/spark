@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase.catalyst.expressions
+package org.apache.spark.sql.hbasesource.catalyst.expressions
 
 import org.apache.spark.sql.catalyst.errors.TreeNodeException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types.{DataType, NativeType}
-import org.apache.spark.sql.hbase.catalyst.types._
+import org.apache.spark.sql.hbasesource.catalyst.types._
 
 
 object PartialPredicateOperations {
@@ -86,7 +86,7 @@ object PartialPredicateOperations {
             }
           }
         }
-        case InSet(value, hset, child) => {
+        case InSet(value, hset) => {
           val evaluatedValue = value.partialEval(input)
           if (evaluatedValue == null) {
             null
@@ -286,10 +286,10 @@ object PartialPredicateOperations {
             }
           }
         }
-        case InSet(value, hset, child) => {
+        case InSet(value, hset) => {
           val evaluatedValue = value.partialReduce(input, schema)
           if (evaluatedValue.isInstanceOf[Expression]) {
-            InSet(evaluatedValue.asInstanceOf[Expression], hset, child)
+            InSet(evaluatedValue.asInstanceOf[Expression], hset)
           } else {
             hset.contains(evaluatedValue)
           }

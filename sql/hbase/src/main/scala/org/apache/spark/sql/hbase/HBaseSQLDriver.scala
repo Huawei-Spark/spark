@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import java.util.{ArrayList => JArrayList}
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.Row
 
-private[hbase] class HBaseSQLDriver(val context: HBaseSQLContext) extends Logging {
+private[hbasesource] class HBaseSQLDriver(val context: HBaseSQLContext) extends Logging {
   private var hbaseResponse: Seq[String] = _
 
   def run(command: String): Array[Row] = {

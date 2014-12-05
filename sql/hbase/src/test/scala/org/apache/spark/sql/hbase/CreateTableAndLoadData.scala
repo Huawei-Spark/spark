@@ -1,4 +1,4 @@
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.util.Bytes

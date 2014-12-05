@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbasesource
 
 import java.util.ArrayList
 
@@ -28,15 +28,15 @@ import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.hbase.catalyst.NOTPusher
-import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
+import org.apache.spark.sql.hbasesource.catalyst.NOTPusher
+import org.apache.spark.sql.hbasesource.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbasesource.catalyst.types.PartitionRange
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 
-private[hbase] case class HBaseRelation(
+private[hbasesource] case class HBaseRelation(
     tableName: String,
     hbaseNamespace: String,
     hbaseTableName: String,
@@ -128,7 +128,7 @@ private[hbase] case class HBaseRelation(
     }
   }
 
-  private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
+  private[hbasesource] def generateRange(partition: HBasePartition, pred: Expression,
                             index: Int):
   (PartitionRange[_]) = {
     def getData(dt: NativeType,
