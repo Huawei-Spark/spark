@@ -51,7 +51,6 @@ class SparkSQLJoinSuite extends FunSuite {
     println(query)
     val res = ssc.sql(query).sortBy(r =>
       s"${r.getInt(0)} ${r.getInt(1)} ${r.getString(2)} ${r.getString(3)}")
-    //    res.collect.foreach(println)
     val exparr = Seq[Seq[Any]](
       Seq(1, 1, "valA1", "valB1"),
       Seq(1, 1, "valA1", "valB2"),
