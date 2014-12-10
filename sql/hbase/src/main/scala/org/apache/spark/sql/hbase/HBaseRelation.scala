@@ -403,7 +403,6 @@ private[hbase] case class HBaseRelation(
     val filters = new util.ArrayList[Filter]
     if (pred.isDefined) {
       val expression = pred.get
-      val bu = new BytesUtils
       expression match {
         case And(left, right) =>
           if (left != null) {
@@ -445,7 +444,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER,
-              DataTypeUtils.getComparator(bu, right))
+              DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
           }
         case GreaterThan(left: Literal, right: AttributeReference) =>
@@ -460,7 +459,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER,
-              DataTypeUtils.getComparator(bu, left))
+              DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
@@ -475,7 +474,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              DataTypeUtils.getComparator(bu, right))
+              DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
@@ -490,7 +489,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              DataTypeUtils.getComparator(bu, left))
+              DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
           }
         case EqualTo(left: AttributeReference, right: Literal) =>
@@ -505,7 +504,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.EQUAL,
-              DataTypeUtils.getComparator(bu, right))
+              DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
           }
         case EqualTo(left: Literal, right: AttributeReference) =>
@@ -520,7 +519,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.EQUAL,
-              DataTypeUtils.getComparator(bu, left))
+              DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
           }
         case LessThan(left: AttributeReference, right: Literal) =>
@@ -535,7 +534,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS,
-              DataTypeUtils.getComparator(bu, right))
+              DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
           }
         case LessThan(left: Literal, right: AttributeReference) =>
@@ -550,7 +549,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS,
-              DataTypeUtils.getComparator(bu, left))
+              DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
           }
         case LessThanOrEqual(left: AttributeReference, right: Literal) =>
@@ -565,7 +564,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS_OR_EQUAL,
-              DataTypeUtils.getComparator(bu, right))
+              DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
           }
         case LessThanOrEqual(left: Literal, right: AttributeReference) =>
@@ -580,7 +579,7 @@ private[hbase] case class HBaseRelation(
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS_OR_EQUAL,
-              DataTypeUtils.getComparator(bu, left))
+              DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
           }
       }

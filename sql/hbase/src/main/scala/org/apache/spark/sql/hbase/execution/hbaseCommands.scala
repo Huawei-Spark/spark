@@ -111,7 +111,7 @@ case class ShowTablesCommand(@transient context: HBaseSQLContext)
 
   override protected[sql] lazy val sideEffectResult = {
     val buffer = new ArrayBuffer[Row]()
-    val tables = context.catalog.getAllTableName()
+    val tables = context.catalog.getAllTableName
     tables.foreach(x => buffer.append(Row(x)))
     buffer.toSeq
   }

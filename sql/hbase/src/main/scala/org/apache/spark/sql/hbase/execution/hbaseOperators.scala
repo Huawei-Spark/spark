@@ -241,7 +241,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
   }
 
   override def execute() = {
-    val splitKeys = relation.getRegionStartKeys().toArray
+    val splitKeys = relation.getRegionStartKeys.toArray
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
     makeBulkLoadRDD(splitKeys)
     val tablePath = new Path(tmpPath)
