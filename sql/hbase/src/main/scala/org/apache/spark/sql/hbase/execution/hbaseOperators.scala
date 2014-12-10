@@ -25,16 +25,14 @@ import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat, LoadIncrementalHFil
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.mapreduce.Job
 import org.apache.log4j.Logger
-import org.apache.spark.SparkContext._
 import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.{ShuffledRDD, RDD}
+import org.apache.spark.rdd.{RDD, ShuffledRDD}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.RangePartitioning
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.{LeafNode, SparkPlan, UnaryNode}
 import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.HBasePartitioner._
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -45,12 +43,11 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
  */
 @DeveloperApi
 case class HBaseSQLTableScan(
-                        relation: HBaseRelation,
-                        output: Seq[Attribute],
-                        filterPredicate: Option[Expression],
-                        coProcessorPlan: Option[SparkPlan])(@transient context: HBaseSQLContext)
-  extends LeafNode {
-
+                              relation: HBaseRelation,
+                              output: Seq[Attribute],
+                              filterPredicate: Option[Expression],
+                              coProcessorPlan: Option[SparkPlan])
+                            (@transient context: HBaseSQLContext) extends LeafNode {
   override def outputPartitioning = {
     var ordering = List[SortOrder]()
     for (key <- relation.partitionKeys) {
@@ -102,7 +99,7 @@ case class InsertIntoHBaseTable(
       val buffer = ListBuffer[Byte]()
       while (iterator.hasNext) {
         val row = iterator.next()
-        val rawKeyCol = relation.keyColumns.map (
+        val rawKeyCol = relation.keyColumns.map(
           kc => {
             val rowColumn = DataTypeUtils.getRowColumnFromHBaseRawType(
               row, kc.ordinal, kc.dataType)
@@ -112,7 +109,7 @@ case class InsertIntoHBaseTable(
         )
         val key = HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
         val put = new Put(key)
-        relation.nonKeyColumns.foreach (
+        relation.nonKeyColumns.foreach(
           nkc => {
             val rowVal = DataTypeUtils.getRowColumnFromHBaseRawType(
               row, nkc.ordinal, nkc.dataType)
@@ -130,7 +127,7 @@ case class InsertIntoHBaseTable(
           rowIndexInBatch = 0
         }
       }
-      if (!puts.isEmpty) {
+      if (puts.nonEmpty) {
         htable.put(puts.toList)
       }
     }
@@ -140,7 +137,6 @@ case class InsertIntoHBaseTable(
 @DeveloperApi
 case class InsertValueIntoHBaseTable(relation: HBaseRelation, valueSeq: Seq[String])(
   @transient hbContext: HBaseSQLContext) extends LeafNode {
-
   override def execute() = {
     val buffer = ListBuffer[Byte]()
     val keyBytes = ListBuffer[(Array[Byte], DataType)]()
@@ -164,7 +160,6 @@ case class InsertValueIntoHBaseTable(relation: HBaseRelation, valueSeq: Seq[Stri
 case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
                              isLocal: Boolean, delimiter: Option[String])(
                               @transient hbContext: HBaseSQLContext) extends LeafNode {
-
   val logger = Logger.getLogger(getClass.getName)
 
   val conf = hbContext.sc.hadoopConfiguration
@@ -191,7 +186,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
     val shuffled =
       new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
         .setKeyOrdering(ordering)
-        //.setHbasePartitions(relation.partitions)
+    //.setHbasePartitions(relation.partitions)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
       // the rdd now already sort by key, to sort by value
       val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
@@ -201,7 +196,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
       if (iter.hasNext) {
         preKV = iter.next()
         var cellsIter = preKV._2.toPut().getFamilyCellMap.values().iterator()
-        while (cellsIter.hasNext()) {
+        while (cellsIter.hasNext) {
           cellsIter.next().foreach { cell =>
             val kv = KeyValueUtil.ensureKeyValue(cell)
             map.add(kv)
@@ -211,7 +206,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
           nowKV = iter.next()
           if (0 == (nowKV._1 compareTo preKV._1)) {
             cellsIter = nowKV._2.toPut().getFamilyCellMap.values().iterator()
-            while (cellsIter.hasNext()) {
+            while (cellsIter.hasNext) {
               cellsIter.next().foreach { cell =>
                 val kv = KeyValueUtil.ensureKeyValue(cell)
                 map.add(kv)
@@ -222,7 +217,7 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
             preKV = nowKV
             map.clear()
             cellsIter = preKV._2.toPut().getFamilyCellMap.values().iterator()
-            while (cellsIter.hasNext()) {
+            while (cellsIter.hasNext) {
               cellsIter.next().foreach { cell =>
                 val kv = KeyValueUtil.ensureKeyValue(cell)
                 map.add(kv)
@@ -257,5 +252,4 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
   }
 
   override def output = Nil
-
 }
