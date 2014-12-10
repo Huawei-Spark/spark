@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.hbase
 
+import java.util
 import java.util.ArrayList
 
 import org.apache.hadoop.conf.Configuration
@@ -26,7 +27,7 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.log4j.Logger
 import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.LeafNode
+import org.apache.spark.sql.catalyst.plans.logical.{Statistics, LeafNode}
 import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NOTPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
@@ -47,16 +48,22 @@ private[hbase] case class HBaseRelation(
 
   @transient lazy val keyColumns = allColumns.filter(_.isInstanceOf[KeyColumn])
     .asInstanceOf[Seq[KeyColumn]].sortBy(_.order)
+
   @transient lazy val nonKeyColumns = allColumns.filter(_.isInstanceOf[NonKeyColumn])
     .asInstanceOf[Seq[NonKeyColumn]]
-  @transient lazy val partitionKeys: Seq[AttributeReference] = keyColumns.map(col =>
+
+  lazy val partitionKeys: Seq[AttributeReference] = keyColumns.map(col =>
     AttributeReference(col.sqlName, col.dataType, nullable = false)())
+
   @transient lazy val columnMap = allColumns.map {
     case key: KeyColumn => (key.sqlName, key.order)
     case nonKey: NonKeyColumn => (nonKey.sqlName, nonKey)
   }.toMap
 
   allColumns.zipWithIndex.foreach(pi=> pi._1.ordinal = pi._2)
+
+  // TODO: use a more resonable value than the default of 1
+  @transient override lazy val statistics = Statistics(sizeInBytes = 1)
 
   private var serializedConfiguration: Array[Byte] = _
 
@@ -105,7 +112,12 @@ private[hbase] case class HBaseRelation(
     partitionKeys.indexWhere(_.exprId == attr.exprId)
   }
 
-  def closeHTable() = htable.close
+  // find the index in a sequence of AttributeReferences that is a key; -1 if not present
+  def rowIndex(refs: Seq[Attribute], keyIndex: Int): Int = {
+    refs.indexWhere(_.exprId == partitionKeys(keyIndex).exprId)
+  }
+
+  def closeHTable() = htable.close()
 
   val output: Seq[Attribute] = {
     allColumns.map {
@@ -174,14 +186,14 @@ private[hbase] case class HBaseRelation(
       val keyIndexToPredIndex = (for {
         (keyColumn, keyIndex) <- keyColumns.zipWithIndex
         (predRef, predIndex) <- predRefs.zipWithIndex
-        if (keyColumn.sqlName == predRef.name)
+        if keyColumn.sqlName == predRef.name
       } yield (keyIndex, predIndex)).toMap
 
       val row = new GenericMutableRow(predRefs.size)
       var notPrunedRanges = partitions.map(generateRange(_, null, 0))
       var prunedRanges: Seq[PartitionRange[_]] = Nil
 
-      for (keyIndex <- 0 until keyColumns.size; if (!notPrunedRanges.isEmpty)) {
+      for (keyIndex <- 0 until keyColumns.size; if notPrunedRanges.nonEmpty) {
         val (passedRanges, toBePrunedRanges) = prePruneRanges(notPrunedRanges, keyIndex)
         prunedRanges = prunedRanges ++ passedRanges
         notPrunedRanges =
@@ -232,14 +244,14 @@ private[hbase] case class HBaseRelation(
       val keyIndexToPredIndex = (for {
         (keyColumn, keyIndex) <- keyColumns.zipWithIndex
         (predRef, predIndex) <- predRefs.zipWithIndex
-        if (keyColumn.sqlName == predRef.name)
+        if keyColumn.sqlName == predRef.name
       } yield (keyIndex, predIndex)).toMap
 
       val row = new GenericMutableRow(predRefs.size)
       var notPrunedRanges = partitions.map(generateRange(_, boundPruningPred, 0))
       var prunedRanges: Seq[PartitionRange[_]] = Nil
 
-      for (keyIndex <- 0 until keyColumns.size; if (!notPrunedRanges.isEmpty)) {
+      for (keyIndex <- 0 until keyColumns.size; if notPrunedRanges.nonEmpty) {
         val (passedRanges, toBePrunedRanges) = prePruneRanges(notPrunedRanges, keyIndex)
         prunedRanges = prunedRanges ++ passedRanges
         notPrunedRanges =
@@ -249,15 +261,15 @@ private[hbase] case class HBaseRelation(
                 val predIndex = keyIndexToPredIndex(keyIndex)
                 row.update(predIndex, range)
                 val partialEvalResult = range.pred.partialReduce(row, predRefs)
-                range.pred = if (partialEvalResult.isInstanceOf[Expression]) {
+                range.pred = if (partialEvalResult._1 == null) {
                   // progressively fine tune the constraining predicate
-                  partialEvalResult.asInstanceOf[Expression]
+                  partialEvalResult._2
                 } else {
                   null
                 }
                 // MAYBE is represented by a to-be-qualified-with expression
-                partialEvalResult.isInstanceOf[Expression] ||
-                partialEvalResult.asInstanceOf[Boolean]
+                partialEvalResult._1 == null ||
+                partialEvalResult._1.asInstanceOf[Boolean]
               }
             )
           } else toBePrunedRanges
@@ -299,7 +311,7 @@ private[hbase] case class HBaseRelation(
    * Return the start keys of all of the regions in this table,
    * as a list of SparkImmutableBytesWritable.
    */
-  def getRegionStartKeys() = {
+  def getRegionStartKeys = {
     val byteKeys: Array[Array[Byte]] = htable.getStartKeys
     val ret = ArrayBuffer[ImmutableBytesWritableWrapper]()
     for (byteKey <- byteKeys) {
@@ -314,13 +326,13 @@ private[hbase] case class HBaseRelation(
                    valuePredicate: Option[Expression]) = {
     val distinctProjList = projList.distinct
     if (distinctProjList.size == allColumns.size) {
-      Option(new FilterList(new ArrayList[Filter]))
+      Option(new FilterList(new util.ArrayList[Filter]))
     } else {
       val filtersList: List[Filter] = nonKeyColumns.filter {
         case nkc => distinctProjList.exists(nkc == _.name)
       }.map {
-        case NonKeyColumn(_, _, family, qualifier) => {
-          val columnFilters = new ArrayList[Filter]
+        case NonKeyColumn(_, _, family, qualifier) =>
+          val columnFilters = new util.ArrayList[Filter]
           columnFilters.add(
             new FamilyFilter(
               CompareFilter.CompareOp.EQUAL,
@@ -332,7 +344,6 @@ private[hbase] case class HBaseRelation(
               new BinaryComparator(Bytes.toBytes(qualifier))
             ))
           new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
-        }
       }.toList
 
       Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
@@ -352,8 +363,8 @@ private[hbase] case class HBaseRelation(
       val filtersList: List[Filter] = nonKeyColumns.filter {
         case nkc => distinctProjList.exists(nkc == _.name)
       }.map {
-        case NonKeyColumn(_, _, family, qualifier) => {
-          val columnFilters = new ArrayList[Filter]
+        case NonKeyColumn(_, _, family, qualifier) =>
+          val columnFilters = new util.ArrayList[Filter]
           columnFilters.add(
             new FamilyFilter(
               CompareFilter.CompareOp.EQUAL,
@@ -365,7 +376,6 @@ private[hbase] case class HBaseRelation(
               new BinaryComparator(Bytes.toBytes(qualifier))
             ))
           new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
-        }
       }.toList
 
       Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
@@ -390,11 +400,12 @@ private[hbase] case class HBaseRelation(
 
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
     var result: Option[FilterList] = None
-    val filters = new ArrayList[Filter]
+    val filters = new util.ArrayList[Filter]
     if (pred.isDefined) {
       val expression = pred.get
+      val bu = new BytesUtils
       expression match {
-        case And(left, right) => {
+        case And(left, right) =>
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
             if (leftFilterList.isDefined) {
@@ -408,8 +419,7 @@ private[hbase] case class HBaseRelation(
             }
           }
           result = Option(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
-        }
-        case Or(left, right) => {
+        case Or(left, right) =>
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
             if (leftFilterList.isDefined) {
@@ -423,87 +433,156 @@ private[hbase] case class HBaseRelation(
             }
           }
           result = Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
-        }
-        case GreaterThan(left: AttributeReference, right: Literal) => {
+        case GreaterThan(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
           val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
-              new BinaryComparator(Bytes.toBytes(right.value.toString)))
+              new BinaryComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER,
-              DataTypeUtils.getComparator(right))
+              DataTypeUtils.getComparator(bu, right))
             result = Option(new FilterList(filter))
           }
-        }
-        case GreaterThanOrEqual(left: AttributeReference, right: Literal) => {
+        case GreaterThan(left: Literal, right: AttributeReference) =>
+          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
+          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          if (keyColumn.isDefined) {
+            val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
+              new BinaryComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
+            result = Option(new FilterList(filter))
+          } else if (nonKeyColumn.isDefined) {
+            val column = nonKeyColumn.get
+            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
+              Bytes.toBytes(column.qualifier),
+              CompareFilter.CompareOp.GREATER,
+              DataTypeUtils.getComparator(bu, left))
+            result = Option(new FilterList(filter))
+          }
+        case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
           val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              new BinaryComparator(Bytes.toBytes(right.value.toString)))
+              new BinaryComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              DataTypeUtils.getComparator(right))
+              DataTypeUtils.getComparator(bu, right))
             result = Option(new FilterList(filter))
           }
-        }
-        case EqualTo(left: AttributeReference, right: Literal) => {
+        case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
+          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
+          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          if (keyColumn.isDefined) {
+            val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
+              new BinaryComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
+            result = Option(new FilterList(filter))
+          } else if (nonKeyColumn.isDefined) {
+            val column = nonKeyColumn.get
+            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
+              Bytes.toBytes(column.qualifier),
+              CompareFilter.CompareOp.GREATER_OR_EQUAL,
+              DataTypeUtils.getComparator(bu, left))
+            result = Option(new FilterList(filter))
+          }
+        case EqualTo(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
           val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(Bytes.toBytes(right.value.toString)))
+              new BinaryComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.EQUAL,
-              DataTypeUtils.getComparator(right))
+              DataTypeUtils.getComparator(bu, right))
             result = Option(new FilterList(filter))
           }
-        }
-        case LessThan(left: AttributeReference, right: Literal) => {
+        case EqualTo(left: Literal, right: AttributeReference) =>
+          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
+          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          if (keyColumn.isDefined) {
+            val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
+              new BinaryComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
+            result = Option(new FilterList(filter))
+          } else if (nonKeyColumn.isDefined) {
+            val column = nonKeyColumn.get
+            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
+              Bytes.toBytes(column.qualifier),
+              CompareFilter.CompareOp.EQUAL,
+              DataTypeUtils.getComparator(bu, left))
+            result = Option(new FilterList(filter))
+          }
+        case LessThan(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
           val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS,
-              new BinaryComparator(Bytes.toBytes(right.value.toString)))
+              new BinaryComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS,
-              DataTypeUtils.getComparator(right))
+              DataTypeUtils.getComparator(bu, right))
             result = Option(new FilterList(filter))
           }
-        }
-        case LessThanOrEqual(left: AttributeReference, right: Literal) => {
+        case LessThan(left: Literal, right: AttributeReference) =>
+          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
+          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          if (keyColumn.isDefined) {
+            val filter = new RowFilter(CompareFilter.CompareOp.LESS,
+              new BinaryComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
+            result = Option(new FilterList(filter))
+          } else if (nonKeyColumn.isDefined) {
+            val column = nonKeyColumn.get
+            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
+              Bytes.toBytes(column.qualifier),
+              CompareFilter.CompareOp.LESS,
+              DataTypeUtils.getComparator(bu, left))
+            result = Option(new FilterList(filter))
+          }
+        case LessThanOrEqual(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
           val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
-              new BinaryComparator(Bytes.toBytes(right.value.toString)))
+              new BinaryComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
               Bytes.toBytes(column.qualifier),
               CompareFilter.CompareOp.LESS_OR_EQUAL,
-              DataTypeUtils.getComparator(right))
+              DataTypeUtils.getComparator(bu, right))
             result = Option(new FilterList(filter))
           }
-        }
+        case LessThanOrEqual(left: Literal, right: AttributeReference) =>
+          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
+          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          if (keyColumn.isDefined) {
+            val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
+              new BinaryComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
+            result = Option(new FilterList(filter))
+          } else if (nonKeyColumn.isDefined) {
+            val column = nonKeyColumn.get
+            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
+              Bytes.toBytes(column.qualifier),
+              CompareFilter.CompareOp.LESS_OR_EQUAL,
+              DataTypeUtils.getComparator(bu, left))
+            result = Option(new FilterList(filter))
+          }
       }
     }
     result
@@ -677,12 +756,11 @@ private[hbase] case class HBaseRelation(
           val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
           DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, colValue,
             column.dataType)
-        case ki => {
+        case ki =>
           val keyIndex = ki.asInstanceOf[Int]
           val rowKey = rowKeys(keyIndex)
           DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, rowKey,
             keyColumns(keyIndex).dataType)
-        }
       }
     }
     row
