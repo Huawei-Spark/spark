@@ -21,7 +21,8 @@ object HBaseMainTest extends HBaseIntegrationTestBase(false) with CreateTableAnd
 with Logging {
   @transient val logger = Logger.getLogger(getClass.getName)
 
-  val TabName: String = "ta"
+  val TabName_a: String = "ta"
+  val TabName_b: String = "tb"
   val HbaseTabName: String = "hta"
 
   def tableSetup() = {
@@ -31,7 +32,13 @@ with Logging {
   def createTable() = {
     try {
       try {
-        hbc.sql(s"""CREATE TABLE $TabName(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
+        hbc.sql(s"""CREATE TABLE $TabName_a(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
+          col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
+          MAPPED BY ($HbaseTabName, COLS=[col2=cf1.cq11,
+          col4=cf1.cq12, col5=cf2.cq21, col6=cf2.cq22])"""
+          .stripMargin)
+
+        hbc.sql(s"""CREATE TABLE $TabName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
           col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
           MAPPED BY ($HbaseTabName, COLS=[col2=cf1.cq11,
           col4=cf1.cq12, col5=cf2.cq21, col6=cf2.cq22])"""
@@ -125,7 +132,7 @@ with Logging {
   def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]) = {
     val rawKeyCol = dataTypeOfKeys.zipWithIndex.map {
       case (dataType, index) =>
-        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType, new BytesUtils),
+        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType),
           dataType)
     }
 
