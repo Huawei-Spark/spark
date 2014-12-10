@@ -31,7 +31,7 @@ object PartialPredicateOperations {
   implicit class partialPredicateEvaluator(e: Expression) {
     def partialEval(input: Row): Any = {
       e match {
-        case And(left, right)  => {
+        case And(left, right) =>
           val l = left.partialEval(input)
           if (l == false) {
             false
@@ -47,8 +47,7 @@ object PartialPredicateOperations {
               }
             }
           }
-        }
-        case Or(left, right)  => {
+        case Or(left, right) =>
           val l = left.partialEval(input)
           if (l == true) {
             true
@@ -64,40 +63,36 @@ object PartialPredicateOperations {
               }
             }
           }
-        }
-        case Not(child)  => {
+        case Not(child) =>
           child.partialEval(input) match {
             case null => null
             case b: Boolean => !b
           }
-        }
-        case In(value, list) => {
+        case In(value, list) =>
           val evaluatedValue = value.partialEval(input)
           if (evaluatedValue == null) {
             null
           } else {
             val evaluatedList = list.map(_.partialEval(input))
-            if (evaluatedList.exists(e=> e == evaluatedValue)) {
+            if (evaluatedList.contains(evaluatedValue)) {
               true
-            } else  if (evaluatedList.exists(e=> e == null)) {
+            } else if (evaluatedList.contains(null)) {
               null
             } else {
               false
             }
           }
-        }
-        case InSet(value, hset) => {
+        case InSet(value, hset) =>
           val evaluatedValue = value.partialEval(input)
           if (evaluatedValue == null) {
             null
           } else {
             hset.contains(evaluatedValue)
           }
-        }
         case l: LeafExpression => l.eval(input)
         case b: BoundReference => b.eval(input) //Really a LeafExpression but not declared as such
         case n: NamedExpression => n.eval(input) //Really a LeafExpression but not declared as such
-        case IsNull(child) => {
+        case IsNull(child) =>
           if (child.partialEval(input) == null) {
             // In partial evaluation, null indicates MAYBE
             null
@@ -105,52 +100,46 @@ object PartialPredicateOperations {
             // Now we only support non-nullable primary key components
             false
           }
-        }
         // TODO: CAST/Arithithmetic can be treated more nicely
         case Cast(_, _) => null
         // case BinaryArithmetic => null
         case UnaryMinus(_) => null
-        case EqualTo(left, right) => {
+        case EqualTo(left, right) =>
           val cmp = pc2(input, left, right)
           if (cmp.isDefined) {
             cmp.get == 0
           } else {
             null
           }
-        }
-        case LessThan(left, right) => {
+        case LessThan(left, right) =>
           val cmp = pc2(input, left, right)
           if (cmp.isDefined) {
             cmp.get < 0
           } else {
             null
           }
-        }
-        case LessThanOrEqual(left, right) => {
+        case LessThanOrEqual(left, right) =>
           val cmp = pc2(input, left, right)
           if (cmp.isDefined) {
             cmp.get <= 0
           } else {
             null
           }
-        }
-        case GreaterThan(left, right) => {
+        case GreaterThan(left, right) =>
           val cmp = pc2(input, left, right)
           if (cmp.isDefined) {
             cmp.get > 0
           } else {
             null
           }
-        }
-        case GreaterThanOrEqual(left, right) => {
+        case GreaterThanOrEqual(left, right) =>
           val cmp = pc2(input, left, right)
           if (cmp.isDefined) {
             cmp.get >= 0
           } else {
             null
           }
-        }
-        case If(predicate, trueE, falseE) => {
+        case If(predicate, trueE, falseE) =>
           val v = predicate.partialEval(input)
           if (v == null) {
             null
@@ -159,7 +148,6 @@ object PartialPredicateOperations {
           } else {
             falseE.partialEval(input)
           }
-        }
         case _ => null
       }
     }
@@ -182,8 +170,8 @@ object PartialPredicateOperations {
           None
         } else {
           e1.dataType match {
-            case nativeType: NativeType => {
-              val pdt = RangeType.primitiveToPODataTypeMap.get(nativeType).getOrElse(null)
+            case nativeType: NativeType =>
+              val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType, null)
               if (pdt == null) {
                 sys.error(s"Type $i does not have corresponding partial ordered type")
               } else {
@@ -191,7 +179,6 @@ object PartialPredicateOperations {
                   pdt.toPartiallyOrderingDataType(evalE1, nativeType).asInstanceOf[pdt.JvmType],
                   pdt.toPartiallyOrderingDataType(evalE2, nativeType).asInstanceOf[pdt.JvmType])
               }
-            }
             case other => sys.error(s"Type $other does not support partially ordered operations")
           }
         }
@@ -205,216 +192,202 @@ object PartialPredicateOperations {
   // There are 3 possible results: TRUE, FALSE, and MAYBE represented by a predicate
   // which will be used to further filter the results
   implicit class partialPredicateReducer(e: Expression) {
-    def partialReduce(input: Row, schema: Seq[Attribute]): Any = {
+    def partialReduce(input: Row, schema: Seq[Attribute]): (Any, Expression) = {
       e match {
-        case And(left, right)  => {
+        case And(left, right) =>
           val l = left.partialReduce(input, schema)
-          if (l == false) {
-            false
+          if (l._1 == false) {
+            (false, null)
           } else {
             val r = right.partialReduce(input, schema)
-            if (r == false) {
-              false
+            if (r._1 == false) {
+              (false, null)
             } else {
-              (l, r) match {
-                case (true, true) => true
-                case (true, _) => r
-                case (_, true) => l
-                case (nl: Expression, nr: Expression) => {
-                  if ((nl fastEquals left) && (nr fastEquals right)) {
-                    e
+              (l._1, r._1) match {
+                case (true, true) => (true, null)
+                case (true, _) => (null, r._2)
+                case (_, true) => (null, l._2)
+                case (_, _) =>
+                  if ((l._2 fastEquals left) && (r._2 fastEquals right)) {
+                    (null, e)
                   } else {
-                    And(nl, nr)
+                    (null, And(l._2, r._2))
                   }
-                }
                 case _ => sys.error("unexpected child type(s) in partial reduction")
               }
             }
           }
-        }
-        case Or(left, right)  => {
+        case Or(left, right) =>
           val l = left.partialReduce(input, schema)
-          if (l == true) {
-            true
+          if (l._1 == true) {
+            (true, null)
           } else {
             val r = right.partialReduce(input, schema)
             if (r == true) {
-              true
+              (true, null)
             } else {
-              (l, r) match {
-                case (false, false) => false
-                case (false, _) => r
-                case (_, false) => l
-                case (nl: Expression, nr: Expression) => {
-                  if ((nl fastEquals left) && (nr fastEquals right)) {
-                    e
+              (l._1, r._1) match {
+                case (false, false) => (false, null)
+                case (false, _) => (null, r._2)
+                case (_, false) => (null, l._2)
+                case (_, _) =>
+                  if ((l._2 fastEquals left) && (r._2 fastEquals right)) {
+                    (null, e)
                   } else {
-                    Or(nl, nr)
+                    (null, Or(l._2, r._2))
                   }
-                }
                 case _ => sys.error("unexpected child type(s) in partial reduction")
               }
             }
           }
-        }
-        case Not(child)  => {
+        case Not(child) =>
           child.partialReduce(input, schema) match {
-            case b: Boolean => !b
-            case ec: Expression => if (ec fastEquals child) { e } else { Not(ec) }
-          }
-        }
-        case In(value, list) => {
-          val evaluatedValue = value.partialReduce(input, schema)
-          if (evaluatedValue.isInstanceOf[Expression]) {
-            val evaluatedList = list.map(e=>e.partialReduce(input, schema) match {
-              case e: Expression => e
-              case d => Literal(d, e.dataType)
-            })
-            In(evaluatedValue.asInstanceOf[Expression], evaluatedList)
-          } else {
-            val evaluatedList = list.map(_.partialReduce(input, schema))
-            if (evaluatedList.exists(e=> e == evaluatedValue)) {
-              true
+            case (b: Boolean, e: Expression) => (!b, e)
+            case (null, ec: Expression) => if (ec fastEquals child) {
+              (null, e)
             } else {
-              val newList = evaluatedList.filter(_.isInstanceOf[Expression])
-                .map(_.asInstanceOf[Expression])
-              if (newList.isEmpty) {
-                false
-              } else {
-                In(Literal(evaluatedValue, value.dataType), newList)
-              }
+              (null, Not(ec))
             }
           }
-        }
-        case InSet(value, hset) => {
+        case In(value, list) =>
+          //          val (evaluatedValue, expr) = value.partialReduce(input, schema)
+          //          if (evaluatedValue == null) {
+          //            val evaluatedList = list.map(e=>e.partialReduce(input, schema) match {
+          //              case (null, e: Expression) => (null, e)
+          //              case (d, _)  => Literal(d, e.dataType)
+          //              case _ => _
+          //            })
+          //            In(evaluatedValue.asInstanceOf[Expression], evaluatedList)
+          //          } else {
+          //            val evaluatedList = list.map(_.partialReduce(input, schema))
+          //            if (evaluatedList.exists(e=> e == evaluatedValue)) {
+          //              true
+          //            } else {
+          //              val newList = evaluatedList.filter(_.isInstanceOf[Expression])
+          //                .map(_.asInstanceOf[Expression])
+          //              if (newList.isEmpty) {
+          //                false
+          //              } else {
+          //                In(Literal(evaluatedValue, value.dataType), newList)
+          //              }
+          //            }
+          (null, e)
+        case InSet(value, hset) =>
           val evaluatedValue = value.partialReduce(input, schema)
-          if (evaluatedValue.isInstanceOf[Expression]) {
-            InSet(evaluatedValue.asInstanceOf[Expression], hset)
+          if (evaluatedValue._1 == null) {
+            (null, InSet(evaluatedValue._2.asInstanceOf[Expression], hset))
           } else {
-            hset.contains(evaluatedValue)
+            (hset.contains(evaluatedValue._1), null)
           }
-        }
-        case l: LeafExpression => {
+        case l: LeafExpression =>
           val res = l.eval(input)
-          if (res == null) { l } else {res}
-        }
-        case b: BoundReference => {
+          (res, l)
+        case b: BoundReference =>
           val res = b.eval(input)
-          // If the result is a MAYBE, returns the original expression
-          if (res == null) { schema(b.ordinal) } else {res}
-        }
-        case n: NamedExpression => {
+          (res, schema(b.ordinal))
+        case n: NamedExpression =>
           val res = n.eval(input)
-          if(res == null) { n } else { res }
-        }
-        case IsNull(child) => e
+          (res, n)
+        case IsNull(child) => (null, e)
         // TODO: CAST/Arithithmetic could be treated more nicely
-        case Cast(_, _) => e
+        case Cast(_, _) => (null, e)
         // case BinaryArithmetic => null
-        case UnaryMinus(_) => e
-        case EqualTo(left, right) => {
+        case UnaryMinus(_) => (null, e)
+        case EqualTo(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
-          if (evalL.isInstanceOf[Expression] && evalR.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
-          } else  if (evalL.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], right)
-          } else  if (evalR.isInstanceOf[Expression]) {
-            EqualTo(left.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
+          if (evalL._1 == null && evalR._1 == null) {
+            (null, EqualTo(evalL._2, evalR._2))
+          } else if (evalL._1 == null) {
+            (null, EqualTo(evalL._2, right))
+          } else if (evalR._1 == null) {
+            (null, EqualTo(left, evalR._2))
           } else {
-            val cmp = prc2(input, left.dataType, right.dataType, evalL, evalR)
+            val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              cmp.get == 0
+              (cmp.get == 0, EqualTo(evalL._2, evalR._2))
             } else {
-              e
+              (null, EqualTo(evalL._2, evalR._2))
             }
           }
-        }
-        case LessThan(left, right) => {
+        case LessThan(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
-          if (evalL.isInstanceOf[Expression] && evalR.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
-          } else  if (evalL.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], right)
-          } else  if (evalR.isInstanceOf[Expression]) {
-            EqualTo(left, evalR.asInstanceOf[Expression])
+          if (evalL._1 == null && evalR._1 == null) {
+            (null, LessThan(evalL._2, evalR._2))
+          } else if (evalL._1 == null) {
+            (null, LessThan(evalL._2, right))
+          } else if (evalR._1 == null) {
+            (null, LessThan(left, evalR._2))
           } else {
-            val cmp = prc2(input, left.dataType, right.dataType, evalL, evalR)
+            val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              cmp.get < 0
+              (cmp.get < 0, LessThan(evalL._2, evalR._2))
             } else {
-              e
+              (null, LessThan(evalL._2, evalR._2))
             }
           }
-        }
-        case LessThanOrEqual(left, right) => {
+        case LessThanOrEqual(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
-          if (evalL.isInstanceOf[Expression] && evalR.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
-          } else  if (evalL.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], right)
-          } else  if (evalR.isInstanceOf[Expression]) {
-            EqualTo(left, evalR.asInstanceOf[Expression])
+          if (evalL._1 == null && evalR._1 == null) {
+            (null, LessThanOrEqual(evalL._2, evalR._2))
+          } else if (evalL._1 == null) {
+            (null, LessThanOrEqual(evalL._2, right))
+          } else if (evalR._1 == null) {
+            (null, LessThanOrEqual(left, evalR._2))
           } else {
-            val cmp = prc2(input, left.dataType, right.dataType, evalL, evalR)
+            val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              cmp.get <= 0
+              (cmp.get <= 0, LessThanOrEqual(evalL._2, evalR._2))
             } else {
-              e
+              (null, LessThanOrEqual(evalL._2, evalR._2))
             }
           }
-        }
-        case GreaterThan(left, right) => {
+        case GreaterThan(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
-          if (evalL.isInstanceOf[Expression] && evalR.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
-          } else  if (evalL.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], right)
-          } else  if (evalR.isInstanceOf[Expression]) {
-            EqualTo(left, evalR.asInstanceOf[Expression])
+          if (evalL._1 == null && evalR._1 == null) {
+            (null, GreaterThan(evalL._2, evalR._2))
+          } else if (evalL._1 == null) {
+            (null, GreaterThan(evalL._2, right))
+          } else if (evalR._1 == null) {
+            (null, GreaterThan(left, evalR._2))
           } else {
-            val cmp = prc2(input, left.dataType, right.dataType, evalL, evalR)
+            val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              cmp.get > 0
+              (cmp.get > 0, GreaterThan(evalL._2, evalR._2))
             } else {
-              e
+              (null, GreaterThan(evalL._2, evalR._2))
             }
           }
-        }
-        case GreaterThanOrEqual(left, right) => {
+        case GreaterThanOrEqual(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
-          if (evalL.isInstanceOf[Expression] && evalR.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], evalR.asInstanceOf[Expression])
-          } else  if (evalL.isInstanceOf[Expression]) {
-            EqualTo(evalL.asInstanceOf[Expression], right)
-          } else  if (evalR.isInstanceOf[Expression]) {
-            EqualTo(left, evalR.asInstanceOf[Expression])
+          if (evalL._1 == null && evalR._1 == null) {
+            (null, GreaterThanOrEqual(evalL._2, evalR._2))
+          } else if (evalL._1 == null) {
+            (null, GreaterThanOrEqual(evalL._2, right))
+          } else if (evalR._1 == null) {
+            (null, GreaterThanOrEqual(left, evalR._2))
           } else {
-            val cmp = prc2(input, left.dataType, right.dataType, evalL, evalR)
+            val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              cmp.get >= 0
+              (cmp.get >= 0, GreaterThanOrEqual(evalL._2, evalR._2))
             } else {
-              e
+              (null, GreaterThanOrEqual(evalL._2, evalR._2))
             }
           }
-        }
-        case If(predicate, trueE, falseE) => {
-          val v = predicate.partialReduce(input, schema)
-          if (v.isInstanceOf[Expression]) {
-           If(v.asInstanceOf[Expression],
-              trueE.partialReduce(input, schema).asInstanceOf[Expression],
-              falseE.partialReduce(input, schema).asInstanceOf[Expression])
+        case If(predicate, trueE, falseE) =>
+          val (v, expression) = predicate.partialReduce(input, schema)
+          if (v == null) {
+            (null, e)
           } else if (v.asInstanceOf[Boolean]) {
             trueE.partialReduce(input, schema)
           } else {
             falseE.partialReduce(input, schema)
           }
-        }
-        case _ => e
+        case _ => (null, e)
       }
     }
 
@@ -436,8 +409,8 @@ object PartialPredicateOperations {
           None
         } else {
           e1.dataType match {
-            case nativeType: NativeType => {
-              val pdt = RangeType.primitiveToPODataTypeMap.get(nativeType).getOrElse(null)
+            case nativeType: NativeType =>
+              val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType, null)
               if (pdt == null) {
                 sys.error(s"Type $i does not have corresponding partial ordered type")
               } else {
@@ -445,7 +418,6 @@ object PartialPredicateOperations {
                   pdt.toPartiallyOrderingDataType(evalE1, nativeType).asInstanceOf[pdt.JvmType],
                   pdt.toPartiallyOrderingDataType(evalE2, nativeType).asInstanceOf[pdt.JvmType])
               }
-            }
             case other => sys.error(s"Type $other does not support partially ordered operations")
           }
         }
@@ -454,18 +426,18 @@ object PartialPredicateOperations {
 
     @inline
     protected def prc2(
-                       i: Row,
-                       dataType1: DataType,
-                       dataType2: DataType,
-                       eval1: Any,
-                       eval2: Any): Option[Int] = {
+                        i: Row,
+                        dataType1: DataType,
+                        dataType2: DataType,
+                        eval1: Any,
+                        eval2: Any): Option[Int] = {
       if (dataType1 != dataType2) {
-        throw new TreeNodeException(e, s"Types do not match ${dataType1} != ${dataType2}")
+        throw new TreeNodeException(e, s"Types do not match $dataType1 != $dataType2")
       }
 
       dataType1 match {
-        case nativeType: NativeType => {
-          val pdt = RangeType.primitiveToPODataTypeMap.get(nativeType).getOrElse(null)
+        case nativeType: NativeType =>
+          val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType, null)
           if (pdt == null) {
             sys.error(s"Type $i does not have corresponding partial ordered type")
           } else {
@@ -473,9 +445,9 @@ object PartialPredicateOperations {
               pdt.toPartiallyOrderingDataType(eval1, nativeType).asInstanceOf[pdt.JvmType],
               pdt.toPartiallyOrderingDataType(eval2, nativeType).asInstanceOf[pdt.JvmType])
           }
-        }
         case other => sys.error(s"Type $other does not support partially ordered operations")
       }
     }
   }
+
 }
