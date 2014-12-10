@@ -571,8 +571,9 @@ object RangeCriticalPoint {
       val result = Seq[HBasePartition]()
       while (cprStartIndex < cprs.size && pStartIndex < partitions.size && !done) {
         val cpr = cprs(cprStartIndex)
-        val qualifiedPartitionIndexes = getOverlappedRanges(cpr, partitions, pStartIndex,
-                                                            cpr.prefixIndex, dimSize, srcPartition = false)
+        val qualifiedPartitionIndexes =
+          getOverlappedRanges(
+            cpr, partitions, pStartIndex, cpr.prefixIndex, dimSize, srcPartition = false)
         if (qualifiedPartitionIndexes == null) done = true
         else {
           val (pstart, pend) = qualifiedPartitionIndexes
