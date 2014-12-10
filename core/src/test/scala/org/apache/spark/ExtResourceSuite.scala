@@ -26,7 +26,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.JavaConverters._
 
 /**
- * Test add and remove behavior of ExecutorAllocationManager.
+ * Test add and remove behavior of ExtResource.
+ * 
  */
 class ExtResourceSuite extends FunSuite with LocalSparkContext {
   import ExtResourceSuite._
