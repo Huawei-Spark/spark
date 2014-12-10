@@ -60,6 +60,7 @@ case class NonKeyColumn(sqlName: String, dataType: DataType, family: String, qua
   @transient lazy val qualifierRaw = Bytes.toBytes(qualifier)
 
   override def isKeyColumn: Boolean = false
+
   override def toString = {
     s"$sqlName , $dataType.typeName , $family:$qualifier"
   }
@@ -243,7 +244,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     val inflaterInputStream = new InflaterInputStream(byteArrayInputStream)
     val objectInputStream = new ObjectInputStream(inflaterInputStream)
     val hbaseRelation: HBaseRelation
-      = objectInputStream.readObject().asInstanceOf[HBaseRelation]
+    = objectInputStream.readObject().asInstanceOf[HBaseRelation]
     hbaseRelation.setConfig(configuration)
     hbaseRelation
   }
