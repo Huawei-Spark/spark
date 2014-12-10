@@ -30,7 +30,8 @@ import org.apache.spark.sql.catalyst.plans.logical.{Subquery, LogicalPlan}
 import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.HBaseCatalog._
 
-import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer, SynchronizedMap}
+import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 /**
  * Column represent the sql column
@@ -73,8 +74,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
   lazy val configuration = hbaseContext.optConfiguration
     .getOrElse(HBaseConfiguration.create())
 
-  lazy val relationMapCache = new scala.collection.mutable.HashMap[String, HBaseRelation]
-    with scala.collection.mutable.SynchronizedMap[String, HBaseRelation]
+  lazy val relationMapCache = new mutable.HashMap[String, HBaseRelation]
+    with mutable.SynchronizedMap[String, HBaseRelation]
 
   lazy val admin = new HBaseAdmin(configuration)
 

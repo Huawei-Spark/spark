@@ -17,7 +17,8 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
-import scala.collection.mutable.{ArrayBuffer, Set}
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.Range
@@ -82,8 +83,8 @@ object RangeCriticalPoint {
   private[hbase] def collect[T](expression: Expression, key: AttributeReference)
                                : Seq[CriticalPoint[T]] = {
     if (key.references.subsetOf(expression.references)) {
-      val pointSet = Set[CriticalPoint[T]]()
-      val dt: NativeType = expression.dataType.asInstanceOf[NativeType]
+      val pointSet = mutable.Set[CriticalPoint[T]]()
+      val dt: NativeType = key.dataType.asInstanceOf[NativeType]
       def checkAndAdd(value: Any, ct: CriticalPointType): Unit = {
         val cp = CriticalPoint[T](value.asInstanceOf[T], ct, dt)
         if (!pointSet.add(cp)) {
@@ -123,6 +124,12 @@ object RangeCriticalPoint {
           a
         case a@GreaterThanOrEqual(Literal(value, _), AttributeReference(_, _, _, _)) =>
           if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.lowInclusive)
+          a
+        case a@GreaterThan(AttributeReference(_, _, _, _), Literal(value, _)) =>
+          if (a.left.equals(key)) checkAndAdd(value, CriticalPointType.lowInclusive)
+          a
+        case a@GreaterThan(Literal(value, _), AttributeReference(_, _, _, _)) =>
+          if (a.right.equals(key)) checkAndAdd(value, CriticalPointType.upInclusive)
           a
       }
       pointSet.toSeq.sortWith((a: CriticalPoint[T], b: CriticalPoint[T])
@@ -262,7 +269,7 @@ object RangeCriticalPoint {
   }
 
   // Step 1
-  private[hbase] def generateCriticalpointRanges(relation: HBaseRelation,
+  private[hbase] def generateCriticalPointRanges(relation: HBaseRelation,
                        pred: Option[Expression], dimIndex: Int): Seq[CriticalPointRange[_]] =  {
     if (!pred.isDefined) Nil
     else {
@@ -271,11 +278,11 @@ object RangeCriticalPoint {
       val boundPred = BindReferences.bindReference(predExpr, predRefs)
       val row = new GenericMutableRow(predRefs.size)
       // Step 1
-      generateCriticalpointRangesHelper(relation, predExpr, dimIndex, row, boundPred, predRefs)
+      generateCriticalPointRangesHelper(relation, predExpr, dimIndex, row, boundPred, predRefs)
     }
   }
 
-  private[hbase] def generateCriticalpointRangesHelper(relation: HBaseRelation,
+  private[hbase] def generateCriticalPointRangesHelper(relation: HBaseRelation,
                  predExpr: Expression, dimIndex: Int, row: MutableRow,
                  boundPred: Expression, predRefs: Seq[Attribute])
                  : Seq[CriticalPointRange[_]] = {
@@ -293,8 +300,8 @@ object RangeCriticalPoint {
       val qualifiedCPRanges = cpRanges.filter(cpr => {
         row.update(keyIndex, cpr)
         val prRes = boundPred.partialReduce(row, predRefs)
-        if (prRes.isInstanceOf[Expression]) cpr.pred = prRes.asInstanceOf[Expression]
-        prRes.isInstanceOf[Expression] || prRes.asInstanceOf[Boolean]
+        if (prRes._1 == null) cpr.pred = prRes._2
+        prRes._1 == null || prRes._1.asInstanceOf[Boolean]
       })
 
       // Step 1.3
@@ -302,7 +309,7 @@ object RangeCriticalPoint {
         // For point range, generate CPs for the next dim
         qualifiedCPRanges.foreach(cpr => {
           if (cpr.isPoint) {
-            cpr.nextDimCriticalPointRanges = generateCriticalpointRangesHelper(relation,
+            cpr.nextDimCriticalPointRanges = generateCriticalPointRangesHelper(relation,
                 cpr.pred, dimIndex + 1, row, boundPred, predRefs)
           }
         })
@@ -538,8 +545,8 @@ object RangeCriticalPoint {
           else prevSmaller
         }
       }
-      val pLargestStart = binarySearch(src.end.orNull, src.endInclusive, false)
-      val pSmallestEnd = binarySearch(src.start.orNull, src.startInclusive, true)
+      val pLargestStart = binarySearch(src.end.orNull, src.endInclusive, lowBound = false)
+      val pSmallestEnd = binarySearch(src.start.orNull, src.startInclusive, lowBound = true)
       if (pSmallestEnd == -1 || pLargestStart == -1
           || pSmallestEnd > pLargestStart)
       {
@@ -565,7 +572,7 @@ object RangeCriticalPoint {
       while (cprStartIndex < cprs.size && pStartIndex < partitions.size && !done) {
         val cpr = cprs(cprStartIndex)
         val qualifiedPartitionIndexes = getOverlappedRanges(cpr, partitions, pStartIndex,
-                                                            cpr.prefixIndex, dimSize, false)
+                                                            cpr.prefixIndex, dimSize, srcPartition = false)
         if (qualifiedPartitionIndexes == null) done = true
         else {
           val (pstart, pend) = qualifiedPartitionIndexes
@@ -599,7 +606,7 @@ object RangeCriticalPoint {
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getOverlappedRanges(partitions(pend), cprs, cprStartIndex,
-                                                        -1, dimSize, true)
+                                                        -1, dimSize, srcPartition = true)
           if (qualifiedCPRIndexes == null) done = true
           else cprStartIndex = qualifiedPartitionIndexes._2
         }
@@ -629,7 +636,7 @@ object RangeCriticalPoint {
   private[hbase] def generatePrunedPartitions(relation: HBaseRelation, pred: Option[Expression])
        : Seq[HBasePartition] = {
     // Step 1
-    val cprs: Seq[CriticalPointRange[_]] = generateCriticalpointRanges(relation, pred, 0)
+    val cprs: Seq[CriticalPointRange[_]] = generateCriticalPointRanges(relation, pred, 0)
     // Step 2
     val expandedCPRs: Seq[CriticalPointRange[HBaseRawType]] = Nil
     cprs.foreach(cpr=>expandedCPRs ++ cpr.convert(null, cpr))
