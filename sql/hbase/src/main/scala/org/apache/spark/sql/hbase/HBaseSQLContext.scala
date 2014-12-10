@@ -18,10 +18,9 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.log4j.Logger
+
 import org.apache.spark.SparkContext
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution._
 
 /**
@@ -30,15 +29,10 @@ import org.apache.spark.sql.execution._
  */
 class HBaseSQLContext(@transient val sc: SparkContext,
                       val optConfiguration: Option[Configuration] = None)
-  extends SQLContext(sc) with Serializable {
+  extends SQLContext(sc) {
   self =>
 
-  private val logger = Logger.getLogger(getClass.getName)
-
   override protected[sql] lazy val catalog: HBaseCatalog = new HBaseCatalog(this)
-
-  // Change the default SQL dialect to HiveQL
-  override private[spark] def dialect: String = getConf(SQLConf.DIALECT, "hbaseql")
 
   // TODO: can we use SparkSQLParser directly instead of HBaseSparkSQLParser?
   @transient
@@ -49,18 +43,10 @@ class HBaseSQLContext(@transient val sc: SparkContext,
 
   override def sql(sqlText: String): SchemaRDD = {
     if (dialect == "sql") {
-      sys.error(s"SQL dialect in HBase context")
-    } else if (dialect == "hbaseql") {
       new SchemaRDD(this, sqlParser(sqlText))
     } else {
       sys.error(s"Unsupported SQL dialect: $dialect.  Try 'sql' or 'hbaseql'")
     }
-  }
-
-  override protected[sql] def executeSql(sql: String): QueryExecution = {
-    logger.debug(sql)
-    println(sql)
-    super.executeSql(sql)
   }
 
   protected[sql] class HBasePlanner extends SparkPlanner with HBaseStrategies {
