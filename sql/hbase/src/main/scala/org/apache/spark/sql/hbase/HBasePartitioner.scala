@@ -113,12 +113,3 @@ class HBasePartitioner [K : Ordering : ClassTag, V](
     }
   }
 }
-
-object HBasePartitioner {
-  implicit val orderingRowKey =
-    OrderingRowKey.asInstanceOf[Ordering[ImmutableBytesWritableWrapper]]
-}
-
-object OrderingRowKey extends Ordering[ImmutableBytesWritableWrapper] {
-  def compare(a: ImmutableBytesWritableWrapper, b: ImmutableBytesWritableWrapper) = a.compareTo(b)
-}

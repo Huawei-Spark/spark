@@ -33,6 +33,12 @@ package object hbase {
     }
 
     def toImmutableBytesWritable() = new ImmutableBytesWritable(rowKey)
+
+  }
+
+  implicit object ImmutableBytesWritableWrapperOdering extends Ordering[ImmutableBytesWritableWrapper] {
+    def compare(a: ImmutableBytesWritableWrapper,
+                b: ImmutableBytesWritableWrapper) = a.compareTo(b)
   }
 
   class PutWrapper(rowKey: Array[Byte]) extends Serializable {

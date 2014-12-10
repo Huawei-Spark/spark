@@ -26,10 +26,6 @@ import org.apache.spark.rdd.ShuffledRDD
 import scala.collection.mutable.{ListBuffer, ArrayBuffer}
 
 class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
-/*
-TODO: fix the compilation error of the test case below
- */
-  /*
   test("test hbase partitioner") {
     val data = (1 to 40).map { r =>
       val rowKey = Bytes.toBytes(r)
@@ -53,7 +49,6 @@ TODO: fix the compilation error of the test case below
       assert(r._1 > 5 * r._2 && r._1 <= 5 * (1 + r._2))
     }
   }
-*/
 
   test("test HBaseRelation getPrunedPartions") {
     val namespace = "testNamespace"
