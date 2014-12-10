@@ -74,7 +74,7 @@ class JoinsSuite extends JoinsSuiteBase  {
 //    val results: SchemaRDD = sql("SELECT * FROM records")
 //  }
 
-  test("Basic Join on vanilla SparkSql: Simple Two Way") {
+  ignore("Basic Join on vanilla SparkSql: Simple Two Way") {
     testnm = "Basic Join on vanilla SparkSql: Simple Two Way"
     import org.apache.spark.sql._
 //    val hbclocal = hbc.asInstanceOf[SQLContext]
@@ -98,7 +98,7 @@ class JoinsSuite extends JoinsSuiteBase  {
     run(ssc, testnm, query, exparr)
   }
 
-  test("Basic Join on vanilla SparkSql: Simple Two Way using where") {
+  ignore("Basic Join on vanilla SparkSql: Simple Two Way using where") {
     testnm = "Basic Join on vanilla SparkSql: Simple Two Way using where"
     import org.apache.spark.sql._
 //    val hbclocal = hbc.asInstanceOf[SQLContext]
@@ -122,7 +122,7 @@ class JoinsSuite extends JoinsSuiteBase  {
     run(ssc, testnm, query, exparr)
   }
 
-  test("Basic Join on vanilla SparkSql: Simple Two Way  2 cols") {
+  ignore("Basic Join on vanilla SparkSql: Simple Two Way  2 cols") {
     testnm = "Basic Join on vanilla SparkSql: Simple Two Way 2 cols"
     import org.apache.spark.sql._
 //    val hbclocal = hbc.asInstanceOf[SQLContext]

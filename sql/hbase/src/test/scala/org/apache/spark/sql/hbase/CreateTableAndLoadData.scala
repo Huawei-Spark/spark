@@ -35,7 +35,7 @@ trait CreateTableAndLoadData {
   val DefaultHbaseTabName = s"Hb$DefaultTableName"
   val DefaultHbaseColFamiles = Seq("cf1", "cf2")
 
-  val CsvPath = "sql/hbase/src/test/resources"
+  val CsvPath = "src/test/resources"
   val DefaultLoadFile = s"$CsvPath/testTable.csv"
 
   var AvoidRowkeyBug = false
