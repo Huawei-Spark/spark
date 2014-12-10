@@ -144,7 +144,7 @@ with Logging {
                  colFamily: String, colQulifier: String) = {
     val bos = new ByteArrayOutputStream()
     val dos = new DataOutputStream(bos)
-    val bu = new BytesUtils
+    val bu = BytesUtils.create(rowType)
     rowType match {
       case StringType => dos.write(bu.toBytes(rowValue.asInstanceOf[String]))
       case IntegerType => dos.write(bu.toBytes(rowValue.asInstanceOf[Int]))

@@ -20,12 +20,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.spark._
-import org.apache.spark.sql.catalyst.types.{BooleanType, FloatType, IntegerType, StringType}
+import org.apache.spark.sql.catalyst.types._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-/**
- * Created by mengbo on 10/2/14.
- */
 //@Ignore
 class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   var sparkConf: SparkConf = _
@@ -55,28 +52,43 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   }
 
   test("Bytes Utility") {
-    assert((new BytesUtils).toBoolean((new BytesUtils).toBytes(true)) === true)
-    assert((new BytesUtils).toBoolean((new BytesUtils).toBytes(false)) === false)
+    assert(BytesUtils.create(BooleanType).toBoolean(BytesUtils.create(BooleanType)
+      .toBytes(input = true)) === true)
+    assert(BytesUtils.create(BooleanType).toBoolean(BytesUtils.create(BooleanType)
+      .toBytes(input = false)) === false)
 
-    assert((new BytesUtils).toDouble((new BytesUtils).toBytes(12.34d)) === 12.34d)
-    assert((new BytesUtils).toDouble((new BytesUtils).toBytes(-12.34d)) === -12.34d)
+    assert(BytesUtils.create(DoubleType).toDouble(BytesUtils.create(DoubleType).toBytes(12.34d))
+      === 12.34d)
+    assert(BytesUtils.create(DoubleType).toDouble(BytesUtils.create(DoubleType).toBytes(-12.34d))
+      === -12.34d)
 
-    assert((new BytesUtils).toFloat((new BytesUtils).toBytes(12.34f)) === 12.34f)
-    assert((new BytesUtils).toFloat((new BytesUtils).toBytes(-12.34f)) === -12.34f)
+    assert(BytesUtils.create(FloatType).toFloat(BytesUtils.create(FloatType).toBytes(12.34f))
+      === 12.34f)
+    assert(BytesUtils.create(FloatType).toFloat(BytesUtils.create(FloatType).toBytes(-12.34f))
+      === -12.34f)
 
-    assert((new BytesUtils).toInt((new BytesUtils).toBytes(12)) === 12)
-    assert((new BytesUtils).toInt((new BytesUtils).toBytes(-12)) === -12)
+    assert(BytesUtils.create(IntegerType).toInt(BytesUtils.create(IntegerType).toBytes(12))
+      === 12)
+    assert(BytesUtils.create(IntegerType).toInt(BytesUtils.create(IntegerType).toBytes(-12))
+      === -12)
 
-    assert((new BytesUtils).toLong((new BytesUtils).toBytes(1234l)) === 1234l)
-    assert((new BytesUtils).toLong((new BytesUtils).toBytes(-1234l)) === -1234l)
+    assert(BytesUtils.create(LongType).toLong(BytesUtils.create(LongType).toBytes(1234l))
+      === 1234l)
+    assert(BytesUtils.create(LongType).toLong(BytesUtils.create(LongType).toBytes(-1234l))
+      === -1234l)
 
-    assert((new BytesUtils).toShort((new BytesUtils).toBytes(12.asInstanceOf[Short])) === 12)
-    assert((new BytesUtils).toShort((new BytesUtils).toBytes(-12.asInstanceOf[Short])) === -12)
+    assert(BytesUtils.create(ShortType).toShort(BytesUtils.create(ShortType)
+      .toBytes(12.asInstanceOf[Short])) === 12)
+    assert(BytesUtils.create(ShortType).toShort(BytesUtils.create(ShortType)
+      .toBytes(-12.asInstanceOf[Short])) === -12)
 
-    assert((new BytesUtils).toString((new BytesUtils).toBytes("abc")) === "abc")
+    assert(BytesUtils.create(StringType).toString(BytesUtils.create(StringType).toBytes("abc"))
+      === "abc")
 
-    assert((new BytesUtils).toByte((new BytesUtils).toBytes(5.asInstanceOf[Byte])) === 5)
-    assert((new BytesUtils).toByte((new BytesUtils).toBytes(-5.asInstanceOf[Byte])) === -5)
+    assert(BytesUtils.create(ByteType).toByte(BytesUtils.create(ByteType)
+      .toBytes(5.asInstanceOf[Byte])) === 5)
+    assert(BytesUtils.create(ByteType).toByte(BytesUtils.create(ByteType)
+      .toBytes(-5.asInstanceOf[Byte])) === -5)
   }
 
   test("Create Table") {

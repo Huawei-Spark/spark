@@ -181,7 +181,8 @@ case class BulkLoadIntoTable(path: String, relation: HBaseRelation,
     val ordering = HBasePartitioner.orderingRowKey
       .asInstanceOf[Ordering[ImmutableBytesWritableWrapper]]
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
-    val partitioner = new HBasePartitioner(rdd)(splitKeys)
+//    val partitioner = new HBasePartitioner(rdd)(splitKeys)
+    val partitioner = null
     // Todo: fix issues with HBaseShuffledRDD
     val shuffled =
       new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)

@@ -64,26 +64,26 @@ TODO: fix the compilation error of the test case below
 
     val rowkey1 = HBaseKVHelper.encodingRawKeyColumns(
       ListBuffer[Byte](),
-      Seq(((new BytesUtils).toBytes(1), IntegerType)
-        , ((new BytesUtils).toBytes(2), IntegerType))
+      Seq((BytesUtils.create(IntegerType).toBytes(1), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
     )
 
     val rowkey2 = HBaseKVHelper.encodingRawKeyColumns(
       ListBuffer[Byte](),
-      Seq(((new BytesUtils).toBytes(9), IntegerType)
-        , ((new BytesUtils).toBytes(2), IntegerType))
+      Seq((BytesUtils.create(IntegerType).toBytes(9), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
     )
 
     val rowkey3 = HBaseKVHelper.encodingRawKeyColumns(
       ListBuffer[Byte](),
-      Seq(((new BytesUtils).toBytes(3), IntegerType)
-        , ((new BytesUtils).toBytes(4), IntegerType))
+      Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(4), IntegerType))
     )
 
     val rowkey4 = HBaseKVHelper.encodingRawKeyColumns(
       ListBuffer[Byte](),
-      Seq(((new BytesUtils).toBytes(3), IntegerType)
-        , ((new BytesUtils).toBytes(6), IntegerType))
+      Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
     )
 
     val partition1 = new HBasePartition(0, 0, -1, Some(rowkey1),
@@ -111,9 +111,9 @@ TODO: fix the compilation error of the test case below
   test("row key encode / decode") {
     val rowkey = HBaseKVHelper.encodingRawKeyColumns(
       ListBuffer[Byte](),
-      Seq(((new BytesUtils).toBytes(123.456), DoubleType),
-        ((new BytesUtils).toBytes("abcdef"), StringType),
-        ((new BytesUtils).toBytes(1234), IntegerType))
+      Seq((BytesUtils.create(DoubleType).toBytes(123.456), DoubleType),
+        (BytesUtils.create(StringType).toBytes("abcdef"), StringType),
+        (BytesUtils.create(IntegerType).toBytes(1234), IntegerType))
     )
 
     assert(rowkey.length === 8 + 6 + 1 + 4)
@@ -122,8 +122,8 @@ TODO: fix the compilation error of the test case below
       Seq(KeyColumn("col1", DoubleType, 0), KeyColumn("col2", StringType, 1),
         KeyColumn("col3", IntegerType, 2)))
 
-    assert((new BytesUtils).toDouble(keys(0)) === 123.456)
-    assert((new BytesUtils).toString(keys(1)) === "abcdef")
-    assert((new BytesUtils).toInt(keys(2)) === 1234)
+    assert(BytesUtils.create(DoubleType).toDouble(keys(0)) === 123.456)
+    assert(BytesUtils.create(StringType).toString(keys(1)) === "abcdef")
+    assert(BytesUtils.create(IntegerType).toInt(keys(2)) === 1234)
   }
 }
