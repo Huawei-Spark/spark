@@ -30,12 +30,12 @@ import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
  * HBaseSQLReaderRDD
  */
 class HBaseSQLReaderRDD(
-    relation: HBaseRelation,
-    codegenEnabled: Boolean,
-    output: Seq[Attribute],
-    filterPred: Option[Expression],
-    coprocSubPlan: Option[SparkPlan],
-    @transient hbaseContext: HBaseSQLContext)
+                         relation: HBaseRelation,
+                         codegenEnabled: Boolean,
+                         output: Seq[Attribute],
+                         filterPred: Option[Expression],
+                         coprocSubPlan: Option[SparkPlan],
+                         @transient hbaseContext: HBaseSQLContext)
   extends RDD[Row](hbaseContext.sparkContext, Nil) with Logging {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)
@@ -43,6 +43,7 @@ class HBaseSQLReaderRDD(
 
   override def getPartitions: Array[Partition] = {
     relation.getPrunedPartitions(filterPred).get.toArray
+    // RangeCriticalPoint.generatePrunedPartitions(relation,filterPred).toArray
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
@@ -76,7 +77,7 @@ class HBaseSQLReaderRDD(
           }
         }
         if (finished) {
-          close
+          close()
         }
         !finished
       }
@@ -133,7 +134,7 @@ class HBaseSQLReaderRDD(
           }
         }
         if (finished) {
-          close
+          close()
         }
         !finished
       }
@@ -158,7 +159,7 @@ class HBaseSQLReaderRDD(
     if (otherFilter == null) {
       new InterruptibleIterator(context, iter)
     } else {
-      new InterruptibleIterator(context, iter.filter((otherFilter)))
+      new InterruptibleIterator(context, iter.filter(otherFilter))
     }
   }
 
@@ -170,19 +171,22 @@ class HBaseSQLReaderRDD(
   // TODO: renamed to compute and add override
   def compute3(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
-    val pred = if (partition.keyPartialEvalIndex >= 0 && partition.filterPred.isDefined) {
+    val pred = if (partition.keyPartialEvalIndex >= 0 && partition.filterPred.isDefined &&
+      partition.filterPred.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
       val oriPred = partition.filterPred.get
       val predRefs = oriPred.references.toSeq
       val boundRef = BindReferences.bindReference(oriPred, predRefs)
       val row = new GenericMutableRow(predRefs.size)
-      for (i <- 0 to partition.keyPartialEvalIndex) {
-        val keyIndex = predRefs.indexWhere(_.exprId == relation.partitionKeys(i).exprId)
-        val range = relation.generateRange(partition, oriPred, keyIndex)
-        row.update(keyIndex, range)
-      }
+      for {
+        i <- 0 to partition.keyPartialEvalIndex
+        rowIndex = relation.rowIndex(predRefs, i)
+        if rowIndex >= 0
+      } row.update(rowIndex, relation.generateRange(partition, oriPred, i))
       val pr = boundRef.partialReduce(row, predRefs)
-      if (pr.isInstanceOf[Expression]) Some(pr.asInstanceOf[Expression])
-      else None
+      pr match {
+        case (null, e: Expression) => Some(e)
+        case _ => None
+      }
     } else partition.filterPred
     val (filters, otherFilters) = relation.buildFilter2(output, pred)
     val scan = relation.buildScan(split, filters, output)
@@ -213,7 +217,7 @@ class HBaseSQLReaderRDD(
           }
         }
         if (finished) {
-          close
+          close()
         }
         !finished
       }
@@ -238,7 +242,7 @@ class HBaseSQLReaderRDD(
     if (otherFilter == null) {
       new InterruptibleIterator(context, iter)
     } else {
-      new InterruptibleIterator(context, iter.filter((otherFilter)))
+      new InterruptibleIterator(context, iter.filter(otherFilter))
     }
   }
 }
