@@ -36,7 +36,8 @@ package object hbase {
 
   }
 
-  implicit object ImmutableBytesWritableWrapperOdering extends Ordering[ImmutableBytesWritableWrapper] {
+  implicit object ImmutableBytesWritableWrapperOdering
+    extends Ordering[ImmutableBytesWritableWrapper] {
     def compare(a: ImmutableBytesWritableWrapper,
                 b: ImmutableBytesWritableWrapper) = a.compareTo(b)
   }
