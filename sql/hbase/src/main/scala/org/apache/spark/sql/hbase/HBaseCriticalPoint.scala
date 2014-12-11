@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.Range
-import org.apache.spark.sql.catalyst.types.{IntegralType, NativeType}
+import org.apache.spark.sql.catalyst.types.{IntegralType, NativeType, BinaryType}
 import org.apache.spark.sql.hbase.CriticalPointType.CriticalPointType
 
 object CriticalPointType extends Enumeration {
@@ -68,7 +68,7 @@ private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Bo
       // Leaf node
       origin.prefixIndex = dimIndex
       Seq(new CriticalPointRange[HBaseRawType](rawStart, startInclusive,
-                                               rawEnd, endInclusive, dimIndex, dt, pred))
+                                               rawEnd, endInclusive, dimIndex, BinaryType, pred))
     } else {
       nextDimCriticalPointRanges.map(_.convert(rawStart.orNull, origin)).reduceLeft(_ ++ _)
     }
