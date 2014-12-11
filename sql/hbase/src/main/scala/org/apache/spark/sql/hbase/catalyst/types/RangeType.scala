@@ -34,7 +34,7 @@ class Range[T](val start: Option[T], // None for open ends
   require(dt != null && !(start.isDefined && end.isDefined &&
     ((dt.ordering.eq(start.get, end.get) &&
       (!startInclusive || !endInclusive)) ||
-      (dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType])))),
+      dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType]))),
     "Inappropriate range parameters")
 }
 
@@ -46,7 +46,7 @@ class PartitionRange[T](start: Option[T], startInclusive: Boolean,
                         val id: Int, dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt)
 
-class RangeType[T] extends PartiallyOrderingDataType {
+class RangeType[T] extends PartialOrderingDataType {
   private[sql] type JvmType = Range[T]
   @transient private[sql] val tag = typeTag[JvmType]
 
@@ -119,34 +119,31 @@ class RangeType[T] extends PartiallyOrderingDataType {
       val result =
         (aStartInclusive, aEndInclusive, bStartInclusive, bEndInclusive) match {
           // [(aStart, aEnd] compare to [bStart, bEnd)]
-          case (_, true, true, _) => {
+          case (_, true, true, _) =>
             if (aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
               bStart.asInstanceOf[aRange.dt.JvmType])) {
               true
             } else {
               false
             }
-          }
           // [(aStart, aEnd] compare to (bStart, bEnd)]
-          case (_, true, false, _) => {
+          case (_, true, false, _) =>
             if (bStart != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
               bStart.asInstanceOf[aRange.dt.JvmType])) {
               true
             } else {
               false
             }
-          }
           // [(aStart, aEnd) compare to [bStart, bEnd)]
-          case (_, false, true, _) => {
+          case (_, false, true, _) =>
             if (aEnd != null && aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
               bStart.asInstanceOf[aRange.dt.JvmType])) {
               true
             } else {
               false
             }
-          }
           // [(aStart, aEnd) compare to (bStart, bEnd)]
-          case (_, false, false, _) => {
+          case (_, false, false, _) =>
             if (aEnd != null && bStart != null &&
               aRange.dt.ordering.lteq(aEnd.asInstanceOf[aRange.dt.JvmType],
                 bStart.asInstanceOf[aRange.dt.JvmType])) {
@@ -154,7 +151,6 @@ class RangeType[T] extends PartiallyOrderingDataType {
             } else {
               false
             }
-          }
         }
 
       result
@@ -184,7 +180,7 @@ object RangeType {
 
   object TimestampRangeType extends RangeType[Timestamp]
 
-  val primitiveToPODataTypeMap: HashMap[NativeType, PartiallyOrderingDataType] =
+  val primitiveToPODataTypeMap: HashMap[NativeType, PartialOrderingDataType] =
     HashMap(
       IntegerType -> IntegerRangeType,
       LongType -> LongRangeType,

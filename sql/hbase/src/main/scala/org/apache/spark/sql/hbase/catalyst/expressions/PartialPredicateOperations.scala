@@ -222,7 +222,7 @@ object PartialPredicateOperations {
           if (l._1 == true) {
             (true, null)
           } else {
-            val r = right.partialReduce(input, schema)
+            val r= right.partialReduce(input, schema)
             if (r == true) {
               (true, null)
             } else {

@@ -23,11 +23,11 @@ import org.apache.spark.sql.catalyst.rules._
 /**
  * Pushes NOT through And/Or
  */
-object NOTPusher extends Rule[Expression] {
+object NotPusher extends Rule[Expression] {
   def apply(pred: Expression): Expression = pred transformDown  {
     case Not(And(left, right)) => Or(Not(left), Not(right))
     case Not(Or(left, right)) => And(Not(left), Not(right))
-    case not @ Not(exp) => {
+    case not @ Not(exp) =>
       // This pattern has been caught by optimizer but after NOT pushdown
       // more opportunities may present
       exp match {
@@ -38,6 +38,5 @@ object NOTPusher extends Rule[Expression] {
         case Not(e) => e
         case _ => not
       }
-    }
   }
 }
