@@ -282,7 +282,7 @@ private[hbase] case class HBaseRelation(
         Some(partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.keyPartialEvalIndex,
           p.lowerBound, p.upperBound, p.server, Some(pred))))
       } else {
-        val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred))
+        val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
         var idx: Int = -1
         val result = Some(prunedRanges.map(p => {
           val par = partitions(p.id)
