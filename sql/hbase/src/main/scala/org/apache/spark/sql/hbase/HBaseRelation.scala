@@ -29,7 +29,7 @@ import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Statistics, LeafNode}
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.hbase.catalyst.NOTPusher
+import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
 
@@ -385,9 +385,9 @@ private[hbase] case class HBaseRelation(
       val predExp: Expression = pred.get
       // build pred pushdown filters:
       // 1. push any NOT through AND/OR
-      val notPushedPred = NOTPusher(predExp)
+      val notPushedPred = NotPusher(predExp)
       // 2. classify the transformed predicate into pushdownable and non-pushdownable predicates
-      val classfier = new ScanPredClassfier(this, 0) // Right now only on primary key dimension
+      val classfier = new ScanPredClassifier(this, 0) // Right now only on primary key dimension
       val (pushdownFilterPred, otherPred) = classfier(notPushedPred)
       // 3. build a FilterList mirroring the pushdownable predicate
       val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)

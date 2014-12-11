@@ -26,7 +26,7 @@ import org.apache.spark.{SparkConf, SparkContext, Logging}
  * HBaseSQLCliDriver
  *
  */
-object HBaseSQLCLIDriver extends Logging {
+object HBaseSQLCliDriver extends Logging {
   private val prompt = "spark-hbaseql"
   private val continuedPrompt = "".padTo(prompt.length, ' ')
   private val conf = new SparkConf()
@@ -88,7 +88,7 @@ object HBaseSQLCLIDriver extends Logging {
 
       if (line.trim.endsWith(";") && !line.trim.endsWith("\\;")) {
         line = prefix + line
-        processLine(line, true)
+        processLine(line, allowInterrupting = true)
         prefix = ""
         currentPrompt = promptPrefix
       } else {
@@ -130,32 +130,27 @@ object HBaseSQLCLIDriver extends Logging {
       case EXIT => System.exit(0)
       case HELP => printHelp(token)
       case "!" => //TODO: add support for bash command startwith !
-      case _ => {
+      case _ =>
         logInfo(s"Processing $input")
         hbaseCtx.sql(input).collect().foreach(println)
-      }
     }
   }
 
   private def printHelp(token: Array[String]) = {
     if (token.length > 1) {
       token(1).toUpperCase match {
-        case "CREATE" => {
+        case "CREATE" =>
           println( """CREATE TABLE table_name (col_name data_type, ..., PRIMARY KEY(col_name, ...))
                 MAPPED BY (htable_name, COLS=[col_name=family_name.qualifier])""".stripMargin)
-        }
-        case "DROP" => {
+        case "DROP" =>
           println("DROP TABLE table_name")
-        }
-        case "ALTER" => {
+        case "ALTER" =>
           println("ALTER TABLE table_name ADD (col_name data_type, ...) MAPPED BY (expression)")
           println("ALTER TABLE table_name DROP col_name")
-        }
-        case "LOAD" => {
+        case "LOAD" =>
           println( """LOAD DATA [LOCAL] INPATH file_path [OVERWRITE] INTO TABLE
                 table_name [FIELDS TERMINATED BY char]""".stripMargin)
-        }
-        case "SELECT" => {
+        case "SELECT" =>
           println( """SELECT [ALL | DISTINCT] select_expr, select_expr, ...
                      |FROM table_reference
                      |[WHERE where_condition]
@@ -164,17 +159,13 @@ object HBaseSQLCLIDriver extends Logging {
                      |  | [DISTRIBUTE BY col_list] [SORT BY col_list]
                      |]
                      |[LIMIT number]""")
-        }
-        case "INSERT" => {
+        case "INSERT" =>
           println("INSERT INTO table_name SELECT clause")
           println("INSERT INTO table_name VALUES (value, ...)")
-        }
-        case "DESCRIBE" => {
+        case "DESCRIBE" =>
           println("DESCRIBE table_name")
-        }
-        case "SHOW" => {
+        case "SHOW" =>
           println("SHOW TABLES")
-        }
       }
     }
     0

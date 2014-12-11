@@ -23,11 +23,11 @@ import org.apache.spark.sql.catalyst.expressions._
  * Classfies a predicate into a pair of (push-downable, non-push-downable) predicates
  * for a Scan; the logic relationship between the two components of the pair is AND
  */
-class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
+class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
   def apply(pred: Expression): (Option[Expression], Option[Expression]) = {
     // post-order bottom-up traversal
     pred match {
-      case And(left, right) => {
+      case And(left, right) =>
         val (ll, lr) = apply(left)
         val (rl, rr) = apply(right)
         (ll, lr, rl, rr) match {
@@ -53,8 +53,7 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
           // No nones
           case _ => (Some(And(ll.get, rl.get)), Some(And(lr.get, rr.get)))
         }
-      }
-      case Or(left, right) => {
+      case Or(left, right) =>
         val (ll, lr) = apply(left)
         val (rl, rr) = apply(right)
         (ll, lr, rl, rr) match {
@@ -84,7 +83,6 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
           case _ => (Some(Or(ll.get, rl.get)), Some(And(Or(ll.get, rr.get),
             And(Or(lr.get, rl.get), Or(lr.get, rr.get)))))
         }
-      }
       case EqualTo(left, right) => classifyBinary(left, right, pred)
       case LessThan(left, right) => classifyBinary(left, right, pred)
       case LessThanOrEqual(left, right) => classifyBinary(left, right, pred)
@@ -99,7 +97,7 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
   private def classifyBinary(left: Expression, right: Expression, pred: Expression)
   : (Option[Expression], Option[Expression]) = {
     (left, right) match {
-      case (Literal(_, _), AttributeReference(_, _, _, _)) => {
+      case (Literal(_, _), AttributeReference(_, _, _, _)) =>
         if (relation.isNonKey(right.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
@@ -110,8 +108,7 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
             (None, Some(pred))
           }
         }
-      }
-      case (AttributeReference(_, _, _, _), Literal(_, _)) => {
+      case (AttributeReference(_, _, _, _), Literal(_, _)) =>
         if (relation.isNonKey(left.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
@@ -122,7 +119,6 @@ class ScanPredClassfier(relation: HBaseRelation, keyIndex: Int) {
             (None, Some(pred))
           }
         }
-      }
       case _ => (None, Some(pred))
     }
   }

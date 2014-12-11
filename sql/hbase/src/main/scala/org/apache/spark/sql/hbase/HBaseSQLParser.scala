@@ -81,7 +81,7 @@ class HBaseSQLParser extends SqlParser {
 
   override protected lazy val insert: Parser[LogicalPlan] =
     (INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {
-      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, false)}
+      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)}
     |
      INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
       case r ~ valueSeq => InsertValueIntoTable(r, Map[String, Option[String]](), valueSeq)}
@@ -113,7 +113,7 @@ class HBaseSQLParser extends SqlParser {
         if (tableColSet.size != tableColumns.length ||
           keySet.size != keySeq.length ||
           !(keySet union infoMap.keySet).equals(tableColSet) ||
-          !(keySet intersect infoMap.keySet).isEmpty
+          (keySet intersect infoMap.keySet).nonEmpty
         ) {
           throw new Exception(
             "The Column Info of Create Table are not correct")
@@ -162,7 +162,7 @@ class HBaseSQLParser extends SqlParser {
     ALTER ~> TABLE ~> ident ~
       (ADD ~> tableCol) ~
       (MAPPED ~> BY ~> "(" ~> expressions <~ ")") ^^ {
-      case tableName ~ tableColumn ~ mappingInfo => {
+      case tableName ~ tableColumn ~ mappingInfo =>
         //Since the lexical can not recognize the symbol "=" as we expected,
         //we compose it to expression first and then translate it into Map[String, (String, String)]
         //TODO: Now get the info by hacking, need to change it into normal way if possible
@@ -176,7 +176,6 @@ class HBaseSQLParser extends SqlParser {
 
         AlterAddColPlan(tableName, tableColumn._1, tableColumn._2,
           familyAndQualifier._1, familyAndQualifier._2)
-      }
     }
     
   // Load syntax:
@@ -186,19 +185,19 @@ class HBaseSQLParser extends SqlParser {
     (LOAD ~> DATA ~> INPATH ~> stringLit) ~
     (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation ) ~
     (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, false, delimiter)
+      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, isLocal = false, delimiter)
     }
   | (LOAD ~> DATA ~> LOCAL ~> INPATH ~> stringLit) ~
       (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ~
       (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, true, delimiter)
+      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, isLocal = true, delimiter)
     }
   )
 
   // syntax:
   // SHOW TABLES
   protected lazy val show: Parser[LogicalPlan] =
-    ( SHOW ~> TABLES <~ opt(";") ^^^ ShowTablesPlan() )
+    SHOW ~> TABLES <~ opt(";") ^^^ ShowTablesPlan()
 
   protected lazy val describe: Parser[LogicalPlan] =
     (DESCRIBE ~> ident) ^^ {

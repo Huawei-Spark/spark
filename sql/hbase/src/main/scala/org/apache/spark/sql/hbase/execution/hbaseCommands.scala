@@ -38,7 +38,7 @@ case class CreateHBaseTableCommand(
 
     val keyMap = keyCols.toMap
     val allColumns = colsSeq.map {
-      case name => {
+      case name =>
         if (keyMap.contains(name)) {
           KeyColumn(
             name,
@@ -53,7 +53,6 @@ case class CreateHBaseTableCommand(
             nonKeyCol._4
           )
         }
-      }
     }
 
     catalog.createTable(tableName, nameSpace, hbaseTable, allColumns)
