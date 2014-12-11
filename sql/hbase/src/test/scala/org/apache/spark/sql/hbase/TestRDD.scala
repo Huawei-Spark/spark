@@ -30,7 +30,7 @@ class TestRDD(parent : RDD[String], happyFace : String, nPartitions: Int)
   def myHappyFace = happyFace
 
   override def compute(split: Partition, context: TaskContext): Iterator[String]
-  = List(s"My partition is ${split.index} says parent is /* ${parentDebugString}").iterator
+  = List(s"My partition is ${split.index} says parent is /* $parentDebugString").iterator
 
   override protected def getPartitions: Array[Partition] = Array.tabulate[Partition](nPartitions){
     pindex : Int => new Partition() { def index = pindex }}
