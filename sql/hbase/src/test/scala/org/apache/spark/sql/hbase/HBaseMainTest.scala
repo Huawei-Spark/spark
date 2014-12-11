@@ -23,7 +23,7 @@ with Logging {
 
   val TabName_a: String = "ta"
   val TabName_b: String = "tb"
-  val HbaseTabName: String = "hta"
+  val HbaseTabName: String = "ht"
 
   def tableSetup() = {
     createTable()
