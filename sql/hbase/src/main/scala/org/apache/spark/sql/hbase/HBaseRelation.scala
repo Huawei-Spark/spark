@@ -218,7 +218,6 @@ private[hbase] case class HBaseRelation(
         Some(partitions)
       } else {
         val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
-        println("prunedRanges: " + prunedRanges.length)
         var idx: Int = -1
         val result = Some(prunedRanges.map(p => {
           val par = partitions(p.id)
@@ -230,7 +229,6 @@ private[hbase] case class HBaseRelation(
               par.server, Some(p.pred))
           }
         }))
-        result.foreach(println)
         result
       }
     }
@@ -284,8 +282,7 @@ private[hbase] case class HBaseRelation(
         Some(partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.keyPartialEvalIndex,
           p.lowerBound, p.upperBound, p.server, Some(pred))))
       } else {
-        val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
-        println("prunedRanges: " + prunedRanges.length)
+        val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred))
         var idx: Int = -1
         val result = Some(prunedRanges.map(p => {
           val par = partitions(p.id)
@@ -300,8 +297,6 @@ private[hbase] case class HBaseRelation(
               par.upperBound, par.server, Some(p.pred))
           }
         }))
-        // TODO: remove/modify the following debug info
-        // result.foreach(println)
         result
       }
     }
