@@ -185,7 +185,8 @@ class HBaseSQLReaderRDD(
       val pr = boundRef.partialReduce(row, predRefs)
       pr match {
         case (null, e: Expression) => Some(e)
-        case _ => None
+        case (true, _) => None
+        case (false, _) => Some(Literal(false))
       }
     } else partition.filterPred
     val (filters, otherFilters) = relation.buildFilter2(output, pred)
