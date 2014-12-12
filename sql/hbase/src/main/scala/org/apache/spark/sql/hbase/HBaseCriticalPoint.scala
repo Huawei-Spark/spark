@@ -308,7 +308,7 @@ object RangeCriticalPoint {
       if (dimIndex < relation.partitionKeys.size - 1) {
         // For point range, generate CPs for the next dim
         qualifiedCPRanges.foreach(cpr => {
-          if (cpr.isPoint) {
+          if (cpr.isPoint && cpr.pred != null) {
             cpr.nextDimCriticalPointRanges = generateCriticalPointRangesHelper(relation,
                 cpr.pred, dimIndex + 1, row, boundPred, predRefs)
           }
