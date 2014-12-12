@@ -117,4 +117,11 @@ def launch_gateway():
     java_import(gateway.jvm, "org.apache.spark.sql.hive.TestHiveContext")
     java_import(gateway.jvm, "scala.Tuple2")
 
+    java_import(gateway.jvm,'org.apache.spark.sql.hbase.*')
+    java_import(gateway.jvm,'org.apache.hadoop.conf.Configuration')
+    java_import(gateway.jvm,'org.apache.hadoop.hbase.*')
+    java_import(gateway.jvm,'org.apache.hadoop.hbase.util.*')
+    java_import(gateway.jvm,'org.apache.hadoop.hbase.client.*')
+    java_import(gateway.jvm,'org.apache.hadoop.hbase.filter.*')
+
     return gateway
