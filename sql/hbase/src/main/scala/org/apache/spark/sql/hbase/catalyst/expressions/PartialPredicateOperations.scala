@@ -192,6 +192,12 @@ object PartialPredicateOperations {
   // There are 3 possible results: TRUE, FALSE, and MAYBE represented by a predicate
   // which will be used to further filter the results
   implicit class partialPredicateReducer(e: Expression) {
+    def unboundAttributeReference(e: Expression, schema: Seq[Attribute]): Expression = {
+      e transform {
+        case b: BoundReference => schema(b.ordinal)
+      }
+    }
+
     def partialReduce(input: Row, schema: Seq[Attribute]): (Any, Expression) = {
       e match {
         case And(left, right) =>
@@ -209,7 +215,7 @@ object PartialPredicateOperations {
                 case (_, true) => (null, l._2)
                 case (_, _) =>
                   if ((l._2 fastEquals left) && (r._2 fastEquals right)) {
-                    (null, e)
+                    (null, unboundAttributeReference(e, schema))
                   } else {
                     (null, And(l._2, r._2))
                   }
@@ -222,8 +228,8 @@ object PartialPredicateOperations {
           if (l._1 == true) {
             (true, null)
           } else {
-            val r= right.partialReduce(input, schema)
-            if (r == true) {
+            val r = right.partialReduce(input, schema)
+            if (r._1 == true) {
               (true, null)
             } else {
               (l._1, r._1) match {
@@ -232,7 +238,7 @@ object PartialPredicateOperations {
                 case (_, false) => (null, l._2)
                 case (_, _) =>
                   if ((l._2 fastEquals left) && (r._2 fastEquals right)) {
-                    (null, e)
+                    (null, unboundAttributeReference(e, schema))
                   } else {
                     (null, Or(l._2, r._2))
                   }
@@ -242,11 +248,11 @@ object PartialPredicateOperations {
           }
         case Not(child) =>
           child.partialReduce(input, schema) match {
-            case (b: Boolean, e: Expression) => (!b, e)
+            case (b: Boolean, null) => (!b, null)
             case (null, ec: Expression) => if (ec fastEquals child) {
               (null, e)
             } else {
-              (null, Not(ec))
+              (null, ec)
             }
           }
         case In(value, list) =>
@@ -271,7 +277,7 @@ object PartialPredicateOperations {
           //                In(Literal(evaluatedValue, value.dataType), newList)
           //              }
           //            }
-          (null, e)
+          (null, unboundAttributeReference(e, schema))
         case InSet(value, hset) =>
           val evaluatedValue = value.partialReduce(input, schema)
           if (evaluatedValue._1 == null) {
@@ -288,11 +294,11 @@ object PartialPredicateOperations {
         case n: NamedExpression =>
           val res = n.eval(input)
           (res, n)
-        case IsNull(child) => (null, e)
+        case IsNull(child) => (null, unboundAttributeReference(e, schema))
         // TODO: CAST/Arithithmetic could be treated more nicely
-        case Cast(_, _) => (null, e)
+        case Cast(_, _) => (null, unboundAttributeReference(e, schema))
         // case BinaryArithmetic => null
-        case UnaryMinus(_) => (null, e)
+        case UnaryMinus(_) => (null, unboundAttributeReference(e, schema))
         case EqualTo(left, right) =>
           val evalL = left.partialReduce(input, schema)
           val evalR = right.partialReduce(input, schema)
@@ -305,7 +311,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get == 0, EqualTo(evalL._2, evalR._2))
+              (cmp.get == 0, null)
             } else {
               (null, EqualTo(evalL._2, evalR._2))
             }
@@ -322,7 +328,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get < 0, LessThan(evalL._2, evalR._2))
+              (cmp.get < 0, null)
             } else {
               (null, LessThan(evalL._2, evalR._2))
             }
@@ -339,7 +345,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get <= 0, LessThanOrEqual(evalL._2, evalR._2))
+              (cmp.get <= 0, null)
             } else {
               (null, LessThanOrEqual(evalL._2, evalR._2))
             }
@@ -356,7 +362,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get > 0, GreaterThan(evalL._2, evalR._2))
+              (cmp.get > 0, null)
             } else {
               (null, GreaterThan(evalL._2, evalR._2))
             }
@@ -373,7 +379,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get >= 0, GreaterThanOrEqual(evalL._2, evalR._2))
+              (cmp.get >= 0, null)
             } else {
               (null, GreaterThanOrEqual(evalL._2, evalR._2))
             }
@@ -381,13 +387,13 @@ object PartialPredicateOperations {
         case If(predicate, trueE, falseE) =>
           val (v, expression) = predicate.partialReduce(input, schema)
           if (v == null) {
-            (null, e)
+            (null, unboundAttributeReference(e, schema))
           } else if (v.asInstanceOf[Boolean]) {
             trueE.partialReduce(input, schema)
           } else {
             falseE.partialReduce(input, schema)
           }
-        case _ => (null, e)
+        case _ => (null, unboundAttributeReference(e, schema))
       }
     }
 
