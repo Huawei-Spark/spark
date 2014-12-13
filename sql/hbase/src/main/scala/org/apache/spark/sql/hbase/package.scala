@@ -29,17 +29,15 @@ package object hbase {
     extends Serializable {
 
     def compareTo(that: ImmutableBytesWritableWrapper): Int = {
-      this.toImmutableBytesWritable() compareTo that.toImmutableBytesWritable()
+      this.toImmutableBytesWritable compareTo that.toImmutableBytesWritable
     }
 
-    def toImmutableBytesWritable() = new ImmutableBytesWritable(rowKey)
-
+    def toImmutableBytesWritable = new ImmutableBytesWritable(rowKey)
   }
 
   implicit object ImmutableBytesWritableWrapperOdering
     extends Ordering[ImmutableBytesWritableWrapper] {
-    def compare(a: ImmutableBytesWritableWrapper,
-                b: ImmutableBytesWritableWrapper) = a.compareTo(b)
+    def compare(a: ImmutableBytesWritableWrapper, b: ImmutableBytesWritableWrapper) = a.compareTo(b)
   }
 
   class PutWrapper(rowKey: Array[Byte]) extends Serializable {
@@ -48,7 +46,7 @@ package object hbase {
     def add(family: Array[Byte], qualifier: Array[Byte], value: Array[Byte]) =
       fqv += ((family, qualifier, value))
 
-    def toPut() = {
+    def toPut = {
       val put = new Put(rowKey)
       fqv.foreach { fqv =>
         put.add(fqv._1, fqv._2, fqv._3)
@@ -63,6 +61,6 @@ package object hbase {
                          qualifier: Array[Byte],
                          value: Array[Byte]) extends Serializable {
 
-    def toKeyValue() = new KeyValue(rowKey, family, qualifier, value)
+    def toKeyValue = new KeyValue(rowKey, family, qualifier, value)
   }
 }

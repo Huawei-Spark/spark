@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.{SparkSQLParser, SqlLexical, SqlParser}
 import org.apache.spark.sql.hbase.logical._
 
 object HBaseSQLParser {
-  def getKeywords(): Seq[String] = {
+  def getKeywords: Seq[String] = {
     val hbaseSqlFields =
       Class.forName("org.apache.spark.sql.hbase.HBaseSQLParser").getDeclaredFields
     val sparkSqlFields = Class.forName("org.apache.spark.sql.catalyst.SqlParser").getDeclaredFields
