@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.catalyst.expressions._
 
 /**
- * Classfies a predicate into a pair of (push-downable, non-push-downable) predicates
+ * Classifies a predicate into a pair of (pushdownable, non-pushdownable) predicates
  * for a Scan; the logic relationship between the two components of the pair is AND
  */
 class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
@@ -40,7 +40,7 @@ class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
           case (_, None, None, None) => (ll, None)
           // two Nones
           case (None, None, _, _) => (rl, rr)
-          case (None, _, None, _) => (None, Some(And(rl.get, rr.get)))
+          case (None, _, None, _) => (None, Some(And(lr.get, rr.get)))
           case (None, _, _, None) => (rl, lr)
           case (_, None, None, _) => (ll, rr)
           case (_, None, _, None) => (Some(And(ll.get, rl.get)), None)
