@@ -208,8 +208,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
 
     val put = new Put(Bytes.toBytes(tableName))
     val byteArrayOutputStream = new ByteArrayOutputStream()
-    val deflatorOutputStream = new DeflaterOutputStream(byteArrayOutputStream)
-    val objectOutputStream = new ObjectOutputStream(deflatorOutputStream)
+    val deflaterOutputStream = new DeflaterOutputStream(byteArrayOutputStream)
+    val objectOutputStream = new ObjectOutputStream(deflaterOutputStream)
 
     objectOutputStream.writeObject(hbaseRelation)
     objectOutputStream.close()
