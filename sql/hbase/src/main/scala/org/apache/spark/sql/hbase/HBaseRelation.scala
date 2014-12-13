@@ -17,7 +17,6 @@
 package org.apache.spark.sql.hbase
 
 import java.util
-import java.util.ArrayList
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.HBaseConfiguration
@@ -26,23 +25,68 @@ import org.apache.hadoop.hbase.filter._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.log4j.Logger
 import org.apache.spark.Partition
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.{Statistics, LeafNode}
+import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
+import org.apache.spark.sql.sources.{LogicalRelation, CatalystScan, RelationProvider, BaseRelation}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+
+class HBaseSource extends RelationProvider {
+  // Returns a new HBase relation with the given parameters
+  override def createRelation(
+    sqlContext: SQLContext,
+    parameters: Map[String, String]): BaseRelation = {
+    val context = sqlContext.asInstanceOf[HBaseSQLContext]
+    val catalog = context.catalog
+
+    val tableName = parameters("tableName")
+    val rawNamespace = parameters("namespace")
+    val namespace: Option[String] = if (rawNamespace == null || rawNamespace.isEmpty) None
+                                    else Some(rawNamespace)
+    val hbaseTable = parameters("hbaseTableName")
+    val colsSeq = parameters("colsSeq").split(",")
+    val keyCols = parameters("keyCols").split(";")
+      .map{case c => val cols = c.split(","); (cols(0), cols(1))}
+    val nonKeyCols = parameters("nonKeyCols").split(";")
+      .map{case c => val cols = c.split(","); (cols(0), cols(1), cols(2), cols(3))}
+
+    val keyMap:Map[String, String] = keyCols.toMap
+    val allColumns = colsSeq.map {
+      case name =>
+        if (keyMap.contains(name)) {
+          KeyColumn(
+            name,
+            catalog.getDataType(keyMap.get(name).get),
+            keyCols.indexWhere(_._1 == name))
+        } else {
+          val nonKeyCol = nonKeyCols.find(_._1 == name).get
+          NonKeyColumn(
+            name,
+            catalog.getDataType(nonKeyCol._2),
+            nonKeyCol._3,
+            nonKeyCol._4
+          )
+        }
+    }
+    catalog.createTable(tableName, rawNamespace, hbaseTable, allColumns)
+    catalog.lookupRelation(namespace, tableName).asInstanceOf[LogicalRelation].relation
+  }
+}
 
 @SerialVersionUID(1529873946227428789L)
 private[hbase] case class HBaseRelation(
     tableName: String,
     hbaseNamespace: String,
     hbaseTableName: String,
-    allColumns: Seq[AbstractColumn])
-  extends LeafNode with Serializable {
+    allColumns: Seq[AbstractColumn])(@transient val context: HBaseSQLContext)
+  extends CatalystScan {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -61,9 +105,6 @@ private[hbase] case class HBaseRelation(
   }.toMap
 
   allColumns.zipWithIndex.foreach(pi=> pi._1.ordinal = pi._2)
-
-  // TODO: use a more resonable value than the default of 1
-  @transient override lazy val statistics = Statistics(sizeInBytes = 1)
 
   private var serializedConfiguration: Array[Byte] = _
 
@@ -126,9 +167,11 @@ private[hbase] case class HBaseRelation(
     }
   }
 
+  // TODO: override sizeInBytes with a reasonable estimate
+
   lazy val partitions: Seq[HBasePartition] = {
     val regionLocations = htable.getRegionLocations.asScala.toSeq
-    log.info(s"Number of HBase regions for " +
+    logger.info(s"Number of HBase regions for " +
       s"table ${htable.getName.getNameAsString}: ${regionLocations.size}")
     regionLocations.zipWithIndex.map {
       case p =>
@@ -591,6 +634,22 @@ private[hbase] case class HBaseRelation(
     // TODO: revisit this using new KeyComposer
     val rowKey: HBaseRawType = null
     new Put(rowKey)
+  }
+
+  def sqlContext = context
+  def schema: StructType = StructType.fromAttributes(output)
+
+  def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
+    val filterPredicate = if (filters.isEmpty) None
+                          else Some(filters(0))
+    new HBaseSQLReaderRDD(
+      this,
+      context.codegenEnabled,
+      requiredColumns,
+      filterPredicate, // PartitionPred : Option[Expression]
+      None, // coprocSubPlan: SparkPlan
+      context
+    )
   }
 
   def buildScan(

@@ -24,11 +24,12 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.log4j.Logger
 import org.apache.spark.Logging
-import org.apache.spark.sql.catalyst.analysis.SimpleCatalog
+import org.apache.spark.sql.catalyst.analysis.{OverrideCatalog, Catalog}
 import org.apache.spark.sql.catalyst.expressions.Row
 import org.apache.spark.sql.catalyst.plans.logical.{Subquery, LogicalPlan}
 import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.HBaseCatalog._
+import org.apache.spark.sql.sources.LogicalRelation
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -68,7 +69,7 @@ case class NonKeyColumn(sqlName: String, dataType: DataType, family: String, qua
 }
 
 private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
-  extends SimpleCatalog(false) with Logging with Serializable {
+  extends Catalog with Logging with Serializable {
 
   lazy val logger = Logger.getLogger(getClass.getName)
   lazy val configuration = hbaseContext.optConfiguration
@@ -91,6 +92,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
       tableName
     }
   }
+
+  val caseSensitive = false
 
   //Todo: This function is used to fake the rowkey. Just for test purpose
   def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]) = {
@@ -163,7 +166,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     }
     else {
       val hbaseRelation = HBaseRelation(tableName, hbaseNamespace, hbaseTableName,
-        allColumns)
+        allColumns)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation)
@@ -178,7 +181,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
       val relation = result.get
       val allColumns = relation.allColumns.filter(_.sqlName != columnName)
       val hbaseRelation = HBaseRelation(relation.tableName,
-        relation.hbaseNamespace, relation.hbaseTableName, allColumns)
+        relation.hbaseNamespace, relation.hbaseTableName, allColumns)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation)
@@ -193,7 +196,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
       val relation = result.get
       val allColumns = relation.allColumns :+ column
       val hbaseRelation = HBaseRelation(relation.tableName,
-        relation.hbaseNamespace, relation.hbaseTableName, allColumns)
+        relation.hbaseNamespace, relation.hbaseTableName, allColumns)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation)
@@ -263,14 +266,14 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     tables.toSeq
   }
 
-  override def lookupRelation(namespace: Option[String],
-                              tableName: String,
-                              alias: Option[String] = None): LogicalPlan = {
+  def lookupRelation(databaseName: Option[String],
+                     tableName: String,
+                     alias: Option[String] = None): LogicalPlan = {
     val hbaseRelation = getTable(tableName)
     if (hbaseRelation.isEmpty) {
       sys.error(s"Table Not Found: $tableName")
     } else {
-      val tableWithQualifiers = Subquery(tableName, hbaseRelation.get)
+      val tableWithQualifiers = Subquery(tableName, LogicalRelation(hbaseRelation.get))
       alias.map(a => Subquery(a.toLowerCase, tableWithQualifiers)).getOrElse(tableWithQualifiers)
     }
   }
@@ -295,8 +298,13 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     admin.createTable(descriptor)
   }
 
+
   private[hbase] def checkHBaseTableExists(hbaseTableName: String): Boolean = {
     admin.tableExists(hbaseTableName)
+  }
+
+  override def tableExists(db: Option[String], tableName: String): Boolean = {
+    checkLogicalTableExist(tableName)
   }
 
   private[hbase] def checkLogicalTableExist(tableName: String): Boolean = {
@@ -339,6 +347,23 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
       throw new IllegalArgumentException(s"Unrecognized data type: $dataType")
     }
   }
+
+  /**
+   * UNIMPLEMENTED: It needs to be decided how we will persist in-memory tables to the metastore.
+   * For now, if this functionality is desired mix in the in-memory [[OverrideCatalog]].
+   */
+  override def registerTable(
+                              databaseName: Option[String], tableName: String,
+                              plan: LogicalPlan): Unit = ???
+
+  /**
+   * UNIMPLEMENTED: It needs to be decided how we will persist in-memory tables to the metastore.
+   * For now, if this functionality is desired mix in the in-memory [[OverrideCatalog]].
+   */
+  override def unregisterTable(
+                                databaseName: Option[String], tableName: String): Unit = ???
+
+  override def unregisterAllTables() = {}
 }
 
 object HBaseCatalog {

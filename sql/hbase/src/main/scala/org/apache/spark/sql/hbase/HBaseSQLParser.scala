@@ -16,10 +16,14 @@
  */
 package org.apache.spark.sql.hbase
 
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.RunnableCommand
+import org.apache.spark.sql.hbase.execution._
+import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.sql.catalyst.SqlParser
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.catalyst.{SparkSQLParser, SqlLexical, SqlParser}
-import org.apache.spark.sql.hbase.logical._
+import org.apache.spark.util.Utils
 
 object HBaseSQLParser {
   def getKeywords(): Seq[String] = {
@@ -61,15 +65,15 @@ class HBaseSQLParser extends SqlParser {
   protected val VALUES = Keyword("VALUES")
   protected val TERMINATED = Keyword("TERMINATED")
 
-  protected val newReservedWords: Seq[String] =
+  override protected val reservedWords: Array[String] =
     this.getClass
       .getMethods
       .filter(_.getReturnType == classOf[Keyword])
       .map(_.invoke(this).asInstanceOf[Keyword].str)
 
-  override val lexical = new SqlLexical(newReservedWords)
-
-  override protected lazy val start: Parser[LogicalPlan] =
+  // Some commands are not DDL per se. They are included for convenience
+  // to use the overriden val of the super class
+  protected lazy val createTable: Parser[LogicalPlan] =
     (select *
       (UNION ~ ALL ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Union(q1, q2)}
         | INTERSECT ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Intersect(q1, q2)}
@@ -84,7 +88,8 @@ class HBaseSQLParser extends SqlParser {
       case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)}
     |
      INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
-      case r ~ valueSeq => InsertValueIntoTable(r, Map[String, Option[String]](), valueSeq)}
+      case r ~ valueSeq => InsertValueIntoTableCommand(r.asInstanceOf[LogicalRelation].
+        relation.asInstanceOf[HBaseRelation], valueSeq)}
     )
 
   protected lazy val create: Parser[LogicalPlan] =
@@ -143,19 +148,56 @@ class HBaseSQLParser extends SqlParser {
             (name, typeOfData, infoElem._1, infoElem._2)
         }
 
-        CreateHBaseTablePlan(tableName, customizedNameSpace, hbaseTableName,
-          tableColumns.unzip._1, keyColsWithDataType, nonKeyCols)
+        val colsSeqString = tableColumns.unzip._1.reduceLeft(_ + "," + _)
+        val keyColsString = keyColsWithDataType
+          .map(k => k._1 + "," + k._2)
+          .reduceLeft(_ + ";" + _)
+        val nonkeyColsString = nonKeyCols
+          .map(k => k._1 + "," + k._2 + "," + k._3 + "," + k._4)
+          .reduceLeft(_ + ";" + _)
+
+        val opts:Map[String, String] = Seq(
+          ("tableName", tableName),
+          ("namespace", customizedNameSpace),
+          ("hbaseTableName", hbaseTableName),
+          ("colsSeq", colsSeqString),
+          ("keyCols", keyColsString),
+          ("nonKeyCols", nonkeyColsString)
+        ).toMap
+        
+        CreateTable(tableName, "HBaseSource", opts)
     }
+
+  private[hbase] case class CreateTable(
+      tableName: String,
+      provider: String,
+      options: Map[String, String]) extends RunnableCommand {
+    // create table of persistent metadata
+    def run(sqlContext: SQLContext) = {
+      val loader = Utils.getContextOrSparkClassLoader
+      val clazz: Class[_] = try loader.loadClass(provider) catch {
+        case cnf: java.lang.ClassNotFoundException =>
+          try loader.loadClass(provider + ".DefaultSource") catch {
+            case cnf: java.lang.ClassNotFoundException =>
+              sys.error(s"Failed to load class for data source: $provider")
+          }
+      }
+      val dataSource = clazz.newInstance()
+        .asInstanceOf[org.apache.spark.sql.sources.RelationProvider]
+      dataSource.createRelation(sqlContext, options)
+      Seq.empty
+    }
+  }
 
   protected lazy val drop: Parser[LogicalPlan] =
     DROP ~> TABLE ~> ident <~ opt(";") ^^ {
-      case tableName => DropTablePlan(tableName)
+      case tableName => DropHbaseTableCommand(tableName)
     }
 
   protected lazy val alterDrop: Parser[LogicalPlan] =
     ALTER ~> TABLE ~> ident ~
       (DROP ~> ident) <~ opt(";") ^^ {
-      case tableName ~ colName => AlterDropColPlan(tableName, colName)
+      case tableName ~ colName => AlterDropColCommand(tableName, colName)
     }
 
   protected lazy val alterAdd: Parser[LogicalPlan] =
@@ -174,7 +216,7 @@ class HBaseSQLParser extends SqlParser {
           }.toMap
         val familyAndQualifier = infoMap(tableColumn._1)
 
-        AlterAddColPlan(tableName, tableColumn._1, tableColumn._2,
+        AlterAddColCommand(tableName, tableColumn._1, tableColumn._2,
           familyAndQualifier._1, familyAndQualifier._2)
     }
     
@@ -185,23 +227,27 @@ class HBaseSQLParser extends SqlParser {
     (LOAD ~> DATA ~> INPATH ~> stringLit) ~
     (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation ) ~
     (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, isLocal = false, delimiter)
+      case filePath ~ table ~ delimiter => BulkLoadIntoTableCommand(filePath,
+        table.asInstanceOf[LogicalRelation].relation.asInstanceOf[HBaseRelation],
+        isLocal = false, delimiter)
     }
   | (LOAD ~> DATA ~> LOCAL ~> INPATH ~> stringLit) ~
       (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ~
       (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadPlan(filePath, table, isLocal = true, delimiter)
+      case filePath ~ table ~ delimiter => BulkLoadIntoTableCommand(filePath,
+        table.asInstanceOf[LogicalRelation].relation.asInstanceOf[HBaseRelation],
+        isLocal = true, delimiter)
     }
   )
 
   // syntax:
   // SHOW TABLES
   protected lazy val show: Parser[LogicalPlan] =
-    SHOW ~> TABLES <~ opt(";") ^^^ ShowTablesPlan()
+    SHOW ~> TABLES <~ opt(";") ^^^ ShowTablesCommand
 
   protected lazy val describe: Parser[LogicalPlan] =
     (DESCRIBE ~> ident) ^^ {
-      case tableName => DescribePlan(tableName)
+      case tableName => DescribeTableCommand(tableName)
     }
 
   protected lazy val tableCol: Parser[(String, String)] =
@@ -218,6 +264,3 @@ class HBaseSQLParser extends SqlParser {
   protected lazy val expressions: Parser[Seq[Expression]] = repsep(expression, ",")
 
 }
-
-private[sql] class HBaseSparkSQLParser(fallback: String => LogicalPlan)
-  extends SparkSQLParser(fallback)

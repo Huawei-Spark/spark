@@ -92,7 +92,8 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column3", ShortType, family1, "qualifier1")
 
-    val hbr = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)
+    val hbr = HBaseRelation(tableName, namespace, hbaseTableName
+                , allColumns)(new HBaseSQLContext(sc))
     val partitions = List[HBasePartition](partition1, partition2)
 //    hbr.partitions = partitions
 

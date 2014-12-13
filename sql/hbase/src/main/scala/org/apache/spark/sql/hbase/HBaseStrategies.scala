@@ -17,114 +17,84 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.spark.sql.{SQLContext, Strategy}
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, QueryPlanner}
+import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, LogicalPlan}
-import org.apache.spark.sql.execution._
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.execution.{Project, SparkPlan}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{SQLContext, Strategy}
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.hbase.logical.InsertValueIntoTable
 
-private[hbase] trait HBaseStrategies extends QueryPlanner[SparkPlan] {
-  self: SQLContext#SparkPlanner =>
-
-  val hbaseSQLContext: HBaseSQLContext
 
   /**
    * Retrieves data using a HBaseTableScan.  Partition pruning predicates are also detected and
    * applied.
    */
-  object HBaseTableScans extends Strategy {
-    // YZ: to be revisited!
+private[hbase] trait HBaseStrategies {
+  self: SQLContext#SparkPlanner =>
+
+  private[hbase] object HBaseDataSource extends Strategy {
+
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case PhysicalOperation(projectList, inPredicates, relation: HBaseRelation) =>
-
-        // Filter out all predicates that only deal with partition keys
-        // val partitionsKeys = AttributeSet(relation.partitionKeys)
-        // val (rowKeyPredicates, otherPredicates) = inPredicates.partition {
-        //  _.references.subsetOf(partitionsKeys)
-        //}
-
-        // TODO: Ensure the outputs from the relation match the expected columns of the query
-
-        /*
-        val predAttributes = AttributeSet(inPredicates.flatMap(_.references))
-        val projectSet = AttributeSet(projectList.flatMap(_.references))
-        val attributes = projectSet ++ predAttributes
-
-        val rowPrefixPredicates = relation.getRowPrefixPredicates(rowKeyPredicates)
-
-        val rowKeyPreds: Seq[Expression] = if (!rowPrefixPredicates.isEmpty) {
-          Seq(rowPrefixPredicates.reduceLeft(And))
-        } else {
-          Nil
-        }
-        */
-
-        // TODO: add pushdowns
-        val filterPred = inPredicates.reduceLeftOption(And)
-        val scanBuilder: (Seq[Attribute] => SparkPlan) = HBaseSQLTableScan(
-          relation,
-          _,
-          filterPred, // partition predicate
-          None // coprocSubPlan
-        )(hbaseSQLContext)
-
-        pruneFilterProject(
+      case PhysicalOperation(projectList, inPredicates,
+      l@LogicalRelation(relation: HBaseRelation)) =>
+        pruneFilterProjectHBase(
+          l,
           projectList,
-          inPredicates, // TODO: replaced with the line below for enabled predicate pushdown
-          // Nil, // all predicates are either pushed down to HBase or to the Scan iterator
-          identity[Seq[Expression]], // removeRowKeyPredicates,
-          scanBuilder) :: Nil
+          inPredicates,
+          (a, f) => relation.buildScan(a, f)) :: Nil
 
-      case _ =>
-        Nil
-    }
-  }
-
-  object DataSink extends Strategy {
-    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case logical.BulkLoadPlan(path, table: HBaseRelation, isLocal, delimiter) =>
-        execution.BulkLoadIntoTable(path, table, isLocal, delimiter)(hbaseSQLContext) :: Nil
-
-      case InsertIntoTable(table: HBaseRelation, partition, child, _) =>
-        execution.InsertIntoHBaseTable(table, planLater(child))(hbaseSQLContext) :: Nil
-
-      case InsertValueIntoTable(table: HBaseRelation, partition, valueSeq) =>
-        execution.InsertValueIntoHBaseTable(table, valueSeq)(hbaseSQLContext) :: Nil
+      case InsertIntoTable(l@LogicalRelation(t: HBaseRelation), partition, child, _) =>
+          execution.InsertIntoHBaseTable(t, planLater(child)) :: Nil
       case _ => Nil
     }
-  }
 
-  case class HBaseCommandStrategy(context: HBaseSQLContext) extends Strategy {
-    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case logical.CreateHBaseTablePlan(
-      tableName, nameSpace, hbaseTableName, colsSeq, keyCols, nonKeyCols) =>
-        Seq(execution.CreateHBaseTableCommand(
-          tableName, nameSpace, hbaseTableName, colsSeq, keyCols, nonKeyCols)
-          (hbaseSQLContext))
+    // Based on Catalyst expressions.
+    // Almost identical to pruneFilterProjectRaw
+    protected def pruneFilterProjectHBase(
+                    relation: LogicalRelation,
+                    projectList: Seq[NamedExpression],
+                    filterPredicates: Seq[Expression],
+                    scanBuilder: (Seq[Attribute], Seq[Expression]) => RDD[Row]) = {
 
-      case logical.AlterDropColPlan(tableName, colName) =>
-        Seq(execution.AlterDropColCommand(tableName, colName)
-          (hbaseSQLContext))
+      val projectSet = AttributeSet(projectList.flatMap(_.references))
+      val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
 
-      case logical.AlterAddColPlan(tableName, colName, colType, colFamily, colQualifier) =>
-        Seq(execution.AlterAddColCommand(tableName, colName, colType, colFamily, colQualifier)
-          (hbaseSQLContext))
+      val pushedFilters = Seq(filterPredicates.map {
+        _ transform {
+          // Match original case of attributes.
+          case a: AttributeReference => relation.attributeMap(a)
+          // We will do HBase-specific predicate pushdown so just use the original predicate here
+        }
+      }.reduceLeft(And))
 
-      case logical.DropTablePlan(tableName) =>
-        Seq(execution.DropHbaseTableCommand(tableName)
-          (hbaseSQLContext))
+      val hbaseRelation = relation.relation.asInstanceOf[HBaseRelation]
+      if (projectList.map(_.toAttribute) == projectList &&
+        projectSet.size == projectList.size &&
+        filterSet.subsetOf(projectSet)) {
+        // When it is possible to just use column pruning to get the right projection and
+        // when the columns of this projection are enough to evaluate all filter conditions,
+        // just do a scan followed by a filter, with no extra project.
+        val requestedColumns =
+          projectList.asInstanceOf[Seq[Attribute]] // Safe due to if above.
+            .map(relation.attributeMap) // Match original case of attributes.
 
-      case logical.ShowTablesPlan() =>
-        Seq(execution.ShowTablesCommand(hbaseSQLContext))
+        // We have to use a HBase-specific scanner here while maintain as much compatibility
+        // with the data source API as possible, primarily because
+        // 1) We need to set up the outputPartitioning field to HBase-specific partitions
+        // 2) Future use of HBase co-processor
+        // 3) We will do partition-specific predicate pushdown
+        // The above two *now* are absent from the PhysicalRDD class.
 
-      case logical.DescribePlan(tableName) =>
-        Seq(execution.DescribeTableCommand(tableName)(hbaseSQLContext))
-
-      case _ => Nil
+        HBaseSQLTableScan(hbaseRelation, projectList.map(_.toAttribute),
+          scanBuilder(requestedColumns, pushedFilters))
+      } else {
+        val requestedColumns = (projectSet ++ filterSet).map(relation.attributeMap).toSeq
+        val scan = HBaseSQLTableScan(hbaseRelation, requestedColumns,
+            scanBuilder(requestedColumns, pushedFilters))
+        Project(projectList, scan)
+      }
     }
   }
-
-
 }

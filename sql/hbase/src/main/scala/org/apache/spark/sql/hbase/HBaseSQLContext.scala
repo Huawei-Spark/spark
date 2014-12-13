@@ -20,58 +20,23 @@ package org.apache.spark.sql.hbase
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql._
-import org.apache.spark.sql.execution._
+import org.apache.spark.sql.catalyst.SparkSQLParser
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
 
-/**
- * An instance of the Spark SQL execution engine that integrates with data stored in Hive.
- * Configuration for Hive is read from hive-site.xml on the classpath.
- */
-class HBaseSQLContext(@transient val sc: SparkContext,
+class HBaseSQLContext(sc: SparkContext,
                       val optConfiguration: Option[Configuration] = None)
   extends SQLContext(sc) {
-  self =>
 
-  override protected[sql] lazy val catalog: HBaseCatalog = new HBaseCatalog(this)
-
-  // TODO: can we use SparkSQLParser directly instead of HBaseSparkSQLParser?
-  @transient
   override protected[sql] val sqlParser = {
     val fallback = new HBaseSQLParser
-    new HBaseSparkSQLParser(fallback(_))
+    new SparkSQLParser(fallback(_))
   }
 
-  override def sql(sqlText: String): SchemaRDD = {
-    if (dialect == "sql") {
-      new SchemaRDD(this, sqlParser(sqlText))
-    } else {
-      sys.error(s"Unsupported SQL dialect: $dialect.  Try 'sql' or 'hbaseql'")
-    }
-  }
+  override protected[sql] lazy val catalog: HBaseCatalog =
+    new HBaseCatalog(this) with OverrideCatalog
 
-  protected[sql] class HBasePlanner extends SparkPlanner with HBaseStrategies {
-    val hbaseSQLContext = self
-    SparkPlan.currentContext.set(self)
+  protected[sql] class HBasePlanner extends SparkPlanner with HBaseStrategies
 
-    // TODO: suggest to append our strategies to parent's strategies using ++, currently there
-    // is compilation problem using super.strategies
-    override val strategies: Seq[Strategy] = Seq(
-      CommandStrategy(self),
-      HBaseCommandStrategy(self),
-      TakeOrdered,
-      HashAggregation,
-      LeftSemiJoin,
-      HashJoin,
-      InMemoryScans,
-      HBaseTableScans,
-      DataSink,
-      BasicOperators,
-      CartesianProduct,
-      BroadcastNestedLoopJoin
-    )
-  }
-
-  @transient
-  override protected[sql] val planner = new HBasePlanner
-
+  @transient override protected[sql] val planner = new HBasePlanner
 }
