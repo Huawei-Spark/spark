@@ -42,8 +42,8 @@ class HBaseSQLReaderRDD(
   private final val cachingSize: Int = 100 // To be made configurable
 
   override def getPartitions: Array[Partition] = {
-    relation.getPrunedPartitions(filterPred).get.toArray
-    // RangeCriticalPoint.generatePrunedPartitions(relation,filterPred).toArray
+    // relation.getPrunedPartitions(filterPred).get.toArray
+    RangeCriticalPoint.generatePrunedPartitions(relation,filterPred).toArray
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
@@ -52,7 +52,8 @@ class HBaseSQLReaderRDD(
     }.toSeq
   }
 
-  override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
+  // TODO: original implementation of compute(), to roll back, add override and change to compute()
+  def compute3(split: Partition, context: TaskContext): Iterator[Row] = {
     val filters = relation.buildFilter(output, filterPred, filterPred)
     val scan = relation.buildScan(split, filters, output)
     scan.setCaching(cachingSize)
@@ -102,74 +103,12 @@ class HBaseSQLReaderRDD(
     new InterruptibleIterator(context, iter)
   }
 
-  // TODO: renamed to compute and add override
-  def compute2(split: Partition, context: TaskContext): Iterator[Row] = {
-    val (filters, otherFilters) = relation.buildFilter2(output,
-      split.asInstanceOf[HBasePartition].filterPred)
-    val scan = relation.buildScan(split, filters, output)
-    scan.setCaching(cachingSize)
-    val scanner = relation.htable.getScanner(scan)
-    val otherFilter: (Row) => Boolean = if (otherFilters.isDefined) {
-      if (codegenEnabled) {
-        GeneratePredicate(otherFilters.get, output)
-      } else {
-        InterpretedPredicate(otherFilters.get, output)
-      }
-    } else null
-
-    val row = new GenericMutableRow(output.size)
-    val projections = output.zipWithIndex
-
-    var finished: Boolean = false
-    var gotNext: Boolean = false
-    var result: Result = null
-
-    val iter = new Iterator[Row] {
-      override def hasNext: Boolean = {
-        if (!finished) {
-          if (!gotNext) {
-            result = scanner.next
-            finished = result == null
-            gotNext = true
-          }
-        }
-        if (finished) {
-          close()
-        }
-        !finished
-      }
-
-      override def next(): Row = {
-        if (hasNext) {
-          gotNext = false
-          relation.buildRow(projections, result, row)
-        } else {
-          null
-        }
-      }
-
-      def close() = {
-        try {
-          scanner.close()
-        } catch {
-          case e: Exception => logWarning("Exception in scanner.close", e)
-        }
-      }
-    }
-    if (otherFilter == null) {
-      new InterruptibleIterator(context, iter)
-    } else {
-      new InterruptibleIterator(context, iter.filter(otherFilter))
-    }
-  }
-
   // For critical-point-based predicate pushdown
   // Identical to compute2 with the addition of partition-specific
   // partial reduction for those partitions mapped to multiple critical point ranges,
   // as indicated by the keyPartialEvalIndex in the partition, where the original
   // filter predicate will be used
-  // TODO: renamed to compute and add override
-  def compute3(split: Partition, context: TaskContext): Iterator[Row] = {
+  override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
     val pred = if (partition.keyPartialEvalIndex >= 0 && partition.filterPred.isDefined &&
       partition.filterPred.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
