@@ -84,7 +84,7 @@ object HBaseKVHelper {
    * Takes a record, translate it into HBase row key column and value by matching with metadata
    * @param values record that as a sequence of string
    * @param columns metadata that contains KeyColumn and NonKeyColumn
-   * @param keyBytes  output paramater, array of (key column and its type);
+   * @param keyBytes  output parameter, array of (key column and its type);
    * @param valueBytes array of (column family, column qualifier, value)
    */
   def string2KV(values: Seq[String],

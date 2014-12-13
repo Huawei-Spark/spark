@@ -62,7 +62,7 @@ private[hbase] case class HBaseRelation(
 
   allColumns.zipWithIndex.foreach(pi=> pi._1.ordinal = pi._2)
 
-  // TODO: use a more resonable value than the default of 1
+  // TODO: use a more reasonable value than the default of 1
   @transient override lazy val statistics = Statistics(sizeInBytes = 1)
 
   private var serializedConfiguration: Array[Byte] = _
@@ -382,8 +382,8 @@ private[hbase] case class HBaseRelation(
       // 1. push any NOT through AND/OR
       val notPushedPred = NotPusher(predExp)
       // 2. classify the transformed predicate into pushdownable and non-pushdownable predicates
-      val classfier = new ScanPredClassifier(this, 0) // Right now only on primary key dimension
-      val (pushdownFilterPred, otherPred) = classfier(notPushedPred)
+      val classier = new ScanPredClassifier(this, 0) // Right now only on primary key dimension
+      val (pushdownFilterPred, otherPred) = classier(notPushedPred)
       // 3. build a FilterList mirroring the pushdownable predicate
       val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)
       // 4. merge the above FilterList with the one from the projection

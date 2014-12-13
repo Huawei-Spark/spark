@@ -76,7 +76,7 @@ private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Bo
 }
 
 /**
- * find the critical points in the given expressiona: not really a transformer
+ * find the critical points in the given expression: not really a transformer
  * Must be called before reference binding
  */
 object RangeCriticalPoint {

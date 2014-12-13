@@ -129,7 +129,7 @@ object HBaseSQLCliDriver extends Logging {
       case QUIT => System.exit(0)
       case EXIT => System.exit(0)
       case HELP => printHelp(token)
-      case "!" => //TODO: add support for bash command startwith !
+      case "!" => //TODO: add support for bash command start with !
       case _ =>
         logInfo(s"Processing $input")
         hbaseCtx.sql(input).collect().foreach(println)

@@ -102,7 +102,7 @@ class HBaseSQLParser extends SqlParser {
         val infoMap: Map[String, (String, String)] =
           mappingInfo.map { case EqualTo(e1, e2) =>
             val info = e2.toString.substring(1).split('.')
-            if (info.length != 2) throw new Exception("\nSyntx Error of Create Table")
+            if (info.length != 2) throw new Exception("\nSyntax Error of Create Table")
             e1.toString.substring(1) ->(info(0), info(1))
           }.toMap
 
@@ -121,12 +121,12 @@ class HBaseSQLParser extends SqlParser {
 
         val customizedNameSpace = tableNameSpace.getOrElse("")
 
-        val devideTableColsByKeyOrNonkey = tableColumns.partition {
+        val divideTableColsByKeyOrNonkey = tableColumns.partition {
           case (name, _) =>
             keySeq.contains(name)
         }
-        val dataTypeOfKeyCols = devideTableColsByKeyOrNonkey._1
-        val dataTypeOfNonkeyCols = devideTableColsByKeyOrNonkey._2
+        val dataTypeOfKeyCols = divideTableColsByKeyOrNonkey._1
+        val dataTypeOfNonkeyCols = divideTableColsByKeyOrNonkey._2
 
         //Get Key Info
         val keyColsWithDataType = keySeq.map {
@@ -169,7 +169,7 @@ class HBaseSQLParser extends SqlParser {
         val infoMap: Map[String, (String, String)] =
           mappingInfo.map { case EqualTo(e1, e2) =>
             val info = e2.toString.substring(1).split('.')
-            if (info.length != 2) throw new Exception("\nSyntx Error of Create Table")
+            if (info.length != 2) throw new Exception("\nSyntax Error of Create Table")
             e1.toString.substring(1) ->(info(0), info(1))
           }.toMap
         val familyAndQualifier = infoMap(tableColumn._1)
@@ -179,7 +179,7 @@ class HBaseSQLParser extends SqlParser {
     }
     
   // Load syntax:
-  // LOAD DATA [LOCAL] INPATH filepath [OVERWRITE] INTO TABLE tablename [FIELDS TERMINATED BY char]
+  // LOAD DATA [LOCAL] INPATH filePath [OVERWRITE] INTO TABLE tableName [FIELDS TERMINATED BY char]
   protected lazy val load: Parser[LogicalPlan] =
   (
     (LOAD ~> DATA ~> INPATH ~> stringLit) ~

@@ -104,7 +104,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
   }
 
-  // Use a single HBaseAdmin throughout this instance instad of creating a new one in
+  // Use a single HBaseAdmin throughout this instance instead of creating a new one in
   // each method
   var hBaseAdmin = new HBaseAdmin(configuration)
   logger.debug(s"HBaseAdmin.configuration zkPort="

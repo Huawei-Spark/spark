@@ -100,7 +100,7 @@ object PartialPredicateOperations {
             // Now we only support non-nullable primary key components
             false
           }
-        // TODO: CAST/Arithithmetic can be treated more nicely
+        // TODO: CAST/Arithmetic can be treated more nicely
         case Cast(_, _) => null
         // case BinaryArithmetic => null
         case UnaryMinus(_) => null
@@ -295,7 +295,7 @@ object PartialPredicateOperations {
           val res = n.eval(input)
           (res, n)
         case IsNull(child) => (null, unboundAttributeReference(e, schema))
-        // TODO: CAST/Arithithmetic could be treated more nicely
+        // TODO: CAST/Arithmetic could be treated more nicely
         case Cast(_, _) => (null, unboundAttributeReference(e, schema))
         // case BinaryArithmetic => null
         case UnaryMinus(_) => (null, unboundAttributeReference(e, schema))
