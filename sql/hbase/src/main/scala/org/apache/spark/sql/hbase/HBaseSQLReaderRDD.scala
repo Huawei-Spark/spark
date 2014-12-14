@@ -25,6 +25,8 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
 
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+
 
 /**
  * HBaseSQLReaderRDD
@@ -60,6 +62,8 @@ class HBaseSQLReaderRDD(
       + s"${relation.htable.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
     val scanner = relation.htable.getScanner(scan)
 
+    val lBuffer = ListBuffer[HBaseRawType]()
+    val aBuffer = ArrayBuffer[Byte]()
     val row = new GenericMutableRow(output.size)
     val projections = output.zipWithIndex
 
@@ -85,7 +89,7 @@ class HBaseSQLReaderRDD(
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, row)
+          relation.buildRow(projections, result, lBuffer, aBuffer, row)
         } else {
           null
         }
@@ -117,6 +121,8 @@ class HBaseSQLReaderRDD(
       }
     } else null
 
+    val lBuffer = ListBuffer[HBaseRawType]()
+    val aBuffer = ArrayBuffer[Byte]()
     val row = new GenericMutableRow(output.size)
     val projections = output.zipWithIndex
 
@@ -142,7 +148,7 @@ class HBaseSQLReaderRDD(
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, row)
+          relation.buildRow(projections, result, lBuffer, aBuffer, row)
         } else {
           null
         }
@@ -200,6 +206,8 @@ class HBaseSQLReaderRDD(
       }
     } else null
 
+    val lBuffer = ListBuffer[HBaseRawType]()
+    val aBuffer = ArrayBuffer[Byte]()
     val row = new GenericMutableRow(output.size)
     val projections = output.zipWithIndex
 
@@ -225,7 +233,7 @@ class HBaseSQLReaderRDD(
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, row)
+          relation.buildRow(projections, result, lBuffer, aBuffer, row)
         } else {
           null
         }

@@ -28,7 +28,6 @@ import org.apache.spark.Partition
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
@@ -188,11 +187,12 @@ private[hbase] case class HBaseRelation(
   (PartitionRange[_]) = {
     def getData(dt: NativeType,
                 buffer: ListBuffer[HBaseRawType],
+                aBuffer: ArrayBuffer[Byte],
                 bound: Option[HBaseRawType]): Option[Any] = {
       if (Bytes.toStringBinary(bound.get) == "") None
       else {
         Some(DataTypeUtils.bytesToData(
-          HBaseKVHelper.decodingRawKeyColumns(buffer, bound.get, keyColumns)(index),
+          HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, bound.get, keyColumns)(index),
           dt).asInstanceOf[dt.JvmType])
       }
     }
@@ -200,8 +200,9 @@ private[hbase] case class HBaseRelation(
     val dt = keyColumns(index).dataType.asInstanceOf[NativeType]
     val isLastKeyIndex = index == (keyColumns.size - 1)
     val buffer = ListBuffer[HBaseRawType]()
-    val start = getData(dt, buffer, partition.lowerBound)
-    val end = getData(dt, buffer, partition.upperBound)
+    val aBuffer = ArrayBuffer[Byte]()
+    val start = getData(dt, buffer, aBuffer, partition.lowerBound)
+    val end = getData(dt, buffer, aBuffer, partition.upperBound)
     val startInclusive = start.nonEmpty
     val endInclusive = end.nonEmpty && !isLastKeyIndex
     new PartitionRange(start, startInclusive, end, endInclusive, partition.index, dt, pred)
@@ -803,11 +804,12 @@ private[hbase] case class HBaseRelation(
 
   def buildRow(projections: Seq[(Attribute, Int)],
                result: Result,
+               buffer: ListBuffer[HBaseRawType],
+               aBuffer: ArrayBuffer[Byte],
                row: MutableRow): Row = {
     assert(projections.size == row.length, "Projection size and row size mismatched")
     // TODO: replaced with the new Key method
-    val buffer = ListBuffer[HBaseRawType]()
-    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(buffer, result.getRow, keyColumns)
+    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, result.getRow, keyColumns)
     projections.foreach { p =>
       columnMap.get(p._1.name).get match {
         case column: NonKeyColumn =>

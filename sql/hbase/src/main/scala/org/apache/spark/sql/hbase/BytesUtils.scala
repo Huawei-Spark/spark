@@ -32,6 +32,59 @@ object BytesUtils {
       case StringType => new BytesUtils(null, StringType)
     }
   }
+
+  def toString(input: HBaseRawType): String = {
+    Bytes.toString(input)
+  }
+
+  def toByte(input: HBaseRawType): Byte = {
+    // Flip sign bit back
+    val v: Int = input(0) ^ 0x80
+    v.asInstanceOf[Byte]
+  }
+
+  def toBoolean(input: HBaseRawType): Boolean = {
+    input(0) != 0
+  }
+
+  def toDouble(input: HBaseRawType): Double = {
+    var l: Long = Bytes.toLong(input)
+    l = l - 1
+    l ^= (~l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE
+    java.lang.Double.longBitsToDouble(l)
+  }
+
+  def toShort(input: HBaseRawType): Short = {
+    // flip sign bit back
+    var v: Int = input(0) ^ 0x80
+    v = (v << 8) + (input(1) & 0xff)
+    v.asInstanceOf[Short]
+  }
+
+  def toFloat(input: HBaseRawType): Float = {
+    var i = toInt(input)
+    i = i - 1
+    i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
+    java.lang.Float.intBitsToFloat(i)
+  }
+
+  def toInt(input: HBaseRawType): Int = {
+    // Flip sign bit back
+    var v: Int = input(0) ^ 0x80
+    for (i <- 1 to Bytes.SIZEOF_INT - 1) {
+      v = (v << 8) + (input(i) & 0xff)
+    }
+    v
+  }
+
+  def toLong(input: HBaseRawType): Long = {
+    // Flip sign bit back
+    var v: Long = input(0) ^ 0x80
+    for (i <- 1 to Bytes.SIZEOF_LONG - 1) {
+      v = (v << 8) + (input(i) & 0xff)
+    }
+    v
+  }
 }
 
 class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
@@ -43,20 +96,10 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer
   }
 
-  def toString(input: HBaseRawType): String = {
-    Bytes.toString(input)
-  }
-
   def toBytes(input: Byte): HBaseRawType = {
     // Flip sign bit so that Byte is binary comparable
     buffer(0) = (input ^ 0x80).asInstanceOf[Byte]
     buffer
-  }
-
-  def toByte(input: HBaseRawType): Byte = {
-    // Flip sign bit back
-    val v: Int = input(0) ^ 0x80
-    v.asInstanceOf[Byte]
   }
 
   def toBytes(input: Boolean): HBaseRawType = {
@@ -68,22 +111,11 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer
   }
 
-  def toBoolean(input: HBaseRawType): Boolean = {
-    input(0) != 0
-  }
-
   def toBytes(input: Double): HBaseRawType = {
     var l: Long = java.lang.Double.doubleToLongBits(input)
     l = (l ^ ((l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE)) + 1
     Bytes.putLong(buffer, 0, l)
     buffer
-  }
-
-  def toDouble(input: HBaseRawType): Double = {
-    var l: Long = Bytes.toLong(input)
-    l = l - 1
-    l ^= (~l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE
-    java.lang.Double.longBitsToDouble(l)
   }
 
   def toBytes(input: Short): HBaseRawType = {
@@ -92,24 +124,10 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer
   }
 
-  def toShort(input: HBaseRawType): Short = {
-    // flip sign bit back
-    var v: Int = input(0) ^ 0x80
-    v = (v << 8) + (input(1) & 0xff)
-    v.asInstanceOf[Short]
-  }
-
   def toBytes(input: Float): HBaseRawType = {
     var i: Int = java.lang.Float.floatToIntBits(input)
     i = (i ^ ((i >> Integer.SIZE - 1) | Integer.MIN_VALUE)) + 1
     toBytes(i)
-  }
-
-  def toFloat(input: HBaseRawType): Float = {
-    var i = toInt(input)
-    i = i - 1
-    i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
-    java.lang.Float.intBitsToFloat(i)
   }
 
   def toBytes(input: Int): HBaseRawType = {
@@ -119,15 +137,6 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(2) = (input >> 8).asInstanceOf[Byte]
     buffer(3) = input.asInstanceOf[Byte]
     buffer
-  }
-
-  def toInt(input: HBaseRawType): Int = {
-    // Flip sign bit back
-    var v: Int = input(0) ^ 0x80
-    for (i <- 1 to Bytes.SIZEOF_INT - 1) {
-      v = (v << 8) + (input(i) & 0xff)
-    }
-    v
   }
 
   def toBytes(input: Long): HBaseRawType = {
@@ -140,14 +149,5 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(6) = (input >> 8).asInstanceOf[Byte]
     buffer(7) = input.asInstanceOf[Byte]
     buffer
-  }
-
-  def toLong(input: HBaseRawType): Long = {
-    // Flip sign bit back
-    var v: Long = input(0) ^ 0x80
-    for (i <- 1 to Bytes.SIZEOF_LONG - 1) {
-      v = (v << 8) + (input(i) & 0xff)
-    }
-    v
   }
 }

@@ -18,6 +18,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.types._
 
 import scala.collection.mutable
@@ -52,11 +53,9 @@ object HBaseKVHelper {
    * @param keyColumns the sequence of key columns
    * @return sequence of byte array
    */
-  def decodingRawKeyColumns(buffer: ListBuffer[HBaseRawType],
-                            rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[HBaseRawType] = {
-    var listBuffer = buffer
-    listBuffer.clear()
-    var arrayBuffer = ArrayBuffer[Byte]()
+  def decodingRawKeyColumns(buffer: ListBuffer[HBaseRawType], arrayBuffer: ArrayBuffer[Byte],
+                        rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[HBaseRawType] = {
+    buffer.clear()
     var index = 0
     for (keyColumn <- keyColumns) {
       arrayBuffer.clear()
@@ -75,9 +74,9 @@ object HBaseKVHelper {
           index = index + 1
         }
       }
-      listBuffer += arrayBuffer.toArray
+      buffer += arrayBuffer.toArray
     }
-    listBuffer.toSeq
+    buffer.toSeq
   }
 
   /**
@@ -131,12 +130,12 @@ object HBaseKVHelper {
 
   /**
    * create a array of buffer that to be used for creating HBase Put object
-   * @param relation HBase relation
+   * @param schema the schema of the line buffer
    * @return
    */
-  private[hbase] def createLineBuffer(relation: HBaseRelation): Array[BytesUtils] = {
+  private[hbase] def createLineBuffer(schema: Seq[Attribute]): Array[BytesUtils] = {
     val buffer = ArrayBuffer[BytesUtils]()
-    relation.allColumns.foreach { x =>
+    schema.foreach { x =>
       buffer.append(BytesUtils.create(x.dataType))
     }
     buffer.toArray

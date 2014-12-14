@@ -123,7 +123,7 @@ case class InsertValueIntoTableCommand(relation: HBaseRelation, valueSeq: Seq[St
     val buffer = ListBuffer[Byte]()
     val keyBytes = ListBuffer[(Array[Byte], DataType)]()
     val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
-    val lineBuffer = HBaseKVHelper.createLineBuffer(relation)
+    val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
     HBaseKVHelper.string2KV(valueSeq, relation.allColumns, lineBuffer, keyBytes, valueBytes)
     val rowKey = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
     val put = new Put(rowKey)

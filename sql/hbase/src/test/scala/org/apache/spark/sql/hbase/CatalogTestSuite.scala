@@ -52,42 +52,42 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   }
 
   test("Bytes Utility") {
-    assert(BytesUtils.create(BooleanType).toBoolean(BytesUtils.create(BooleanType)
+    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
       .toBytes(input = true)) === true)
-    assert(BytesUtils.create(BooleanType).toBoolean(BytesUtils.create(BooleanType)
+    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
       .toBytes(input = false)) === false)
 
-    assert(BytesUtils.create(DoubleType).toDouble(BytesUtils.create(DoubleType).toBytes(12.34d))
+    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(12.34d))
       === 12.34d)
-    assert(BytesUtils.create(DoubleType).toDouble(BytesUtils.create(DoubleType).toBytes(-12.34d))
+    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(-12.34d))
       === -12.34d)
 
-    assert(BytesUtils.create(FloatType).toFloat(BytesUtils.create(FloatType).toBytes(12.34f))
+    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(12.34f))
       === 12.34f)
-    assert(BytesUtils.create(FloatType).toFloat(BytesUtils.create(FloatType).toBytes(-12.34f))
+    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(-12.34f))
       === -12.34f)
 
-    assert(BytesUtils.create(IntegerType).toInt(BytesUtils.create(IntegerType).toBytes(12))
+    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(12))
       === 12)
-    assert(BytesUtils.create(IntegerType).toInt(BytesUtils.create(IntegerType).toBytes(-12))
+    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(-12))
       === -12)
 
-    assert(BytesUtils.create(LongType).toLong(BytesUtils.create(LongType).toBytes(1234l))
+    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(1234l))
       === 1234l)
-    assert(BytesUtils.create(LongType).toLong(BytesUtils.create(LongType).toBytes(-1234l))
+    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(-1234l))
       === -1234l)
 
-    assert(BytesUtils.create(ShortType).toShort(BytesUtils.create(ShortType)
+    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
       .toBytes(12.asInstanceOf[Short])) === 12)
-    assert(BytesUtils.create(ShortType).toShort(BytesUtils.create(ShortType)
+    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
       .toBytes(-12.asInstanceOf[Short])) === -12)
 
-    assert(BytesUtils.create(StringType).toString(BytesUtils.create(StringType).toBytes("abc"))
+    assert(BytesUtils.toString(BytesUtils.create(StringType).toBytes("abc"))
       === "abc")
 
-    assert(BytesUtils.create(ByteType).toByte(BytesUtils.create(ByteType)
+    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
       .toBytes(5.asInstanceOf[Byte])) === 5)
-    assert(BytesUtils.create(ByteType).toByte(BytesUtils.create(ByteType)
+    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
       .toBytes(-5.asInstanceOf[Byte])) === -5)
   }
 
