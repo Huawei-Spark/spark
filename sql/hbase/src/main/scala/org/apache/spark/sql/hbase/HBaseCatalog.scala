@@ -107,7 +107,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
   }
 
-  // Use a single HBaseAdmin throughout this instance instad of creating a new one in
+  // Use a single HBaseAdmin throughout this instance instead of creating a new one in
   // each method
   var hBaseAdmin = new HBaseAdmin(configuration)
   logger.debug(s"HBaseAdmin.configuration zkPort="
@@ -211,8 +211,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
 
     val put = new Put(Bytes.toBytes(tableName))
     val byteArrayOutputStream = new ByteArrayOutputStream()
-    val deflatorOutputStream = new DeflaterOutputStream(byteArrayOutputStream)
-    val objectOutputStream = new ObjectOutputStream(deflatorOutputStream)
+    val deflaterOutputStream = new DeflaterOutputStream(byteArrayOutputStream)
+    val objectOutputStream = new ObjectOutputStream(deflaterOutputStream)
 
     objectOutputStream.writeObject(hbaseRelation)
     objectOutputStream.close()

@@ -76,7 +76,7 @@ private [hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Bo
 }
 
 /**
- * find the critical points in the given expressiona: not really a transformer
+ * find the critical points in the given expression: not really a transformer
  * Must be called before reference binding
  */
 object RangeCriticalPoint {
@@ -308,7 +308,7 @@ object RangeCriticalPoint {
       if (dimIndex < relation.partitionKeys.size - 1) {
         // For point range, generate CPs for the next dim
         qualifiedCPRanges.foreach(cpr => {
-          if (cpr.isPoint) {
+          if (cpr.isPoint && cpr.pred != null) {
             cpr.nextDimCriticalPointRanges = generateCriticalPointRangesHelper(relation,
                 cpr.pred, dimIndex + 1, row, boundPred, predRefs)
           }

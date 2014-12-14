@@ -41,8 +41,8 @@ class JoinsSuite extends JoinsSuiteBase  {
 
     val schema =
       new StructType(
-        StructField("name", StringType, false) ::
-          StructField("age", IntegerType, true) :: Nil)
+        StructField("name", StringType, nullable = false) ::
+          StructField("age", IntegerType, nullable = true) :: Nil)
 
     val people =
       sc.textFile("examples/src/main/resources/people.txt").map(

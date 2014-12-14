@@ -37,11 +37,11 @@ object HBaseSQLCliDriver extends Logging {
   private val EXIT = "EXIT"
   private val HELP = "HELP"
 
-  def getCompletors(): Seq[Completor] = {
+  def getCompletors: Seq[Completor] = {
     val sc: SimpleCompletor = new SimpleCompletor(new Array[String](0))
 
     // add keywords, including lower-cased versions
-    HBaseSQLParser.getKeywords().foreach { kw =>
+    HBaseSQLParser.getKeywords.foreach { kw =>
       sc.addCandidateString(kw)
       sc.addCandidateString(kw.toLowerCase)
     }
@@ -54,7 +54,7 @@ object HBaseSQLCliDriver extends Logging {
 
     val reader = new ConsoleReader()
     reader.setBellEnabled(false)
-    getCompletors().foreach(reader.addCompletor)
+    getCompletors.foreach(reader.addCompletor)
 
     val historyDirectory = System.getProperty("user.home")
 
@@ -129,7 +129,7 @@ object HBaseSQLCliDriver extends Logging {
       case QUIT => System.exit(0)
       case EXIT => System.exit(0)
       case HELP => printHelp(token)
-      case "!" => //TODO: add support for bash command startwith !
+      case "!" => //TODO: add support for bash command start with !
       case _ =>
         logInfo(s"Processing $input")
         hbaseCtx.sql(input).collect().foreach(println)

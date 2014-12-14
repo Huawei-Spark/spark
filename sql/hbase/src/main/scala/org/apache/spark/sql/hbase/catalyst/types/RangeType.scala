@@ -67,6 +67,7 @@ class RangeType[T] extends PartialOrderingDataType {
     // Right now we just support comparisons between a range and a point
     // In the future when more generic range comparisons, these two methods
     // must be functional as expected
+    // return -2 if a < b; -1 if a <= b; 0 if a = b; 1 if a >= b; 2 if a > b
     def tryCompare(a: JvmType, b: JvmType): Option[Int] = {
       val aRange = a.asInstanceOf[Range[T]]
       val aStartInclusive = aRange.startInclusive
@@ -84,18 +85,24 @@ class RangeType[T] extends PartialOrderingDataType {
       if ((aStart != null && bEnd != null)
         && (aRange.dt.ordering.gt(aStart, bEnd)
         || (aRange.dt.ordering.equiv(aStart, bEnd) && !(aStartInclusive && bEndInclusive)))) {
-        Some(1)
+        Some(2)
       } //Vice versa
       else if ((bStart != null && aEnd != null)
         && (aRange.dt.ordering.gt(bStart, aEnd)
         || (aRange.dt.ordering.equiv(bStart, aEnd) && !(bStartInclusive && aEndInclusive)))) {
-        Some(-1)
+        Some(-2)
       } else if (aStart != null && aEnd != null && bStart != null && bEnd != null &&
         aRange.dt.ordering.equiv(bStart, aEnd)
         && aRange.dt.ordering.equiv(aStart, aEnd)
         && aRange.dt.ordering.equiv(bStart, bEnd)
         && (aStartInclusive && aEndInclusive && bStartInclusive && bEndInclusive)) {
         Some(0)
+      } else if (aEnd != null && bStart != null && aRange.dt.ordering.equiv(aEnd, bStart)
+        && aEndInclusive && bStartInclusive) {
+        Some(-1)
+      } else if (aStart != null && bEnd != null && aRange.dt.ordering.equiv(aStart, bEnd)
+        && aStartInclusive && bEndInclusive) {
+        Some(1)
       } else {
         None
       }

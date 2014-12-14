@@ -160,7 +160,7 @@ case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
       val ret = new ArrayBuffer[(ImmutableBytesWritable, KeyValue)]()
       if (iter.hasNext) {
         preKV = iter.next()
-        var cellsIter = preKV._2.toPut().getFamilyCellMap.values().iterator()
+        var cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
         while (cellsIter.hasNext) {
           cellsIter.next().foreach { cell =>
             val kv = KeyValueUtil.ensureKeyValue(cell)
@@ -170,7 +170,7 @@ case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
         while (iter.hasNext) {
           nowKV = iter.next()
           if (0 == (nowKV._1 compareTo preKV._1)) {
-            cellsIter = nowKV._2.toPut().getFamilyCellMap.values().iterator()
+            cellsIter = nowKV._2.toPut.getFamilyCellMap.values().iterator()
             while (cellsIter.hasNext) {
               cellsIter.next().foreach { cell =>
                 val kv = KeyValueUtil.ensureKeyValue(cell)
@@ -178,10 +178,10 @@ case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
               }
             }
           } else {
-            ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable(), _))
+            ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
             preKV = nowKV
             map.clear()
-            cellsIter = preKV._2.toPut().getFamilyCellMap.values().iterator()
+            cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
             while (cellsIter.hasNext) {
               cellsIter.next().foreach { cell =>
                 val kv = KeyValueUtil.ensureKeyValue(cell)
@@ -190,7 +190,7 @@ case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
             }
           }
         }
-        ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable(), _))
+        ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
         map.clear()
         ret.iterator
       } else {
