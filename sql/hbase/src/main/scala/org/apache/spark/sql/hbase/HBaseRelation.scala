@@ -75,7 +75,6 @@ class HBaseSource extends RelationProvider {
         }
     }
     catalog.createTable(tableName, rawNamespace, hbaseTable, allColumns)
-    catalog.lookupRelation(namespace, tableName).asInstanceOf[LogicalRelation].relation
   }
 }
 

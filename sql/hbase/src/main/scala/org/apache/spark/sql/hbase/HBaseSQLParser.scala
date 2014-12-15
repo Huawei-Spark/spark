@@ -159,7 +159,7 @@ class HBaseSQLParser extends SqlParser {
           ("nonKeyCols", nonkeyColsString)
         ).toMap
         
-        CreateTable(tableName, "HBaseSource", opts)
+        CreateTable(tableName, "org.apache.spark.sql.hbase.HBaseSource", opts)
     }
 
   private[hbase] case class CreateTable(

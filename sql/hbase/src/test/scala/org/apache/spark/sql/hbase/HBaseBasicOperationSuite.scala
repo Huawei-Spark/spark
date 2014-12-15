@@ -51,7 +51,7 @@ class HBaseBasicOperationSuite extends QueryTest {
     //    sql("""CREATE TABLE t2 (t2c1 STRING, t2c2 STRING)
     //      MAPPED BY (ht2, KEYS=[t2c1], COLS=[t2c2=cf2.cq21])""".stripMargin
     //    )
-    sql( """INSERT INTO tableName SELECT * FROM TestTable""")
+    sql( """INSERT INTO tableName SELECT * FROM testTable""")
   }
 
   test("Select test 0") {

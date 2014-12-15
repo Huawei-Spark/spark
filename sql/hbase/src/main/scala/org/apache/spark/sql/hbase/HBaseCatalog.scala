@@ -131,7 +131,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
   }
 
   def createTable(tableName: String, hbaseNamespace: String, hbaseTableName: String,
-                  allColumns: Seq[AbstractColumn]): Unit = {
+                  allColumns: Seq[AbstractColumn]): HBaseRelation = {
     if (checkLogicalTableExist(tableName)) {
       throw new Exception(s"The logical table: $tableName already exists")
     }
@@ -172,6 +172,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
       writeObjectToTable(hbaseRelation)
 
       relationMapCache.put(processTableName(tableName), hbaseRelation)
+      hbaseRelation
     }
   }
 
