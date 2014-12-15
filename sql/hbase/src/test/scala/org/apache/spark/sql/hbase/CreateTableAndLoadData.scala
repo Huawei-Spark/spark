@@ -71,16 +71,12 @@ trait CreateTableAndLoadData {
 
     if (hbc.catalog.checkLogicalTableExist(stagingTableName)) {
       val dropSql = s"drop table $stagingTableName"
-      println(dropSql)
-      val execsql = hbc.executeSql(dropSql)
-      execsql.toRdd.collect().foreach(println)
+      runSql(hbc, dropSql)
     }
 
     if (hbc.catalog.checkLogicalTableExist(tableName)) {
       val dropSql = s"drop table $tableName"
-      println(dropSql)
-      val execsql = hbc.executeSql(dropSql)
-      execsql.toRdd.collect().foreach(println)
+      runSql(hbc, dropSql)
     }
 
     val (stagingSql, tabSql) =
@@ -96,19 +92,18 @@ trait CreateTableAndLoadData {
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
           .stripMargin
         )
-    println(stagingSql)
-    var executeSql1 = hbc.executeSql(stagingSql)
-    executeSql1.toRdd.collect().foreach(println)
+    runSql(hbc, stagingSql)
 
     logger.debug(s"Created table $tableName: " +
       s"isTableAvailable= ${hbaseAdmin.isTableAvailable(s2b(hbaseStagingTable))}" +
       s" tableDescriptor= ${hbaseAdmin.getTableDescriptor(s2b(hbaseStagingTable))}")
 
+    runSql(hbc, tabSql)
+  }
 
-    println(tabSql)
-    executeSql1 = hbc.executeSql(tabSql)
-    executeSql1.toRdd.collect().foreach(println)
-
+  def runSql(hbc: HBaseSQLContext, sql: String) = {
+    println(sql)
+    hbc.sql(sql).collect().foreach(println)
   }
 
   def loadData(hbc: HBaseSQLContext, stagingTableName: String, tableName: String,
@@ -116,7 +111,7 @@ trait CreateTableAndLoadData {
     // then load data into table
     val hbaseAdmin = hbc.catalog.hBaseAdmin
     val loadSql = s"LOAD DATA LOCAL INPATH '$loadFile' INTO TABLE $tableName"
-    val result3 = hbc.executeSql(loadSql).toRdd.collect()
+    val result3 = runSql(hbc, loadSql)
     val insertSql = s"""insert into $tableName select cast(strcol as string),
     cast(bytecol as tinyint), cast(shortcol as smallint), cast(intcol as int),
     cast (longcol as bigint), cast(floatcol as float), cast(doublecol as double)

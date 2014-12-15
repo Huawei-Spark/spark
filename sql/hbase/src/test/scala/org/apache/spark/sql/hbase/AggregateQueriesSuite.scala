@@ -25,7 +25,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
 
   var testnm = "Group by with cols in select list and with order by"
   test("Group by with cols in select list and with order by") {
-       val query =
+    val query =
       s"""select count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecol, max(shortcol) shortcol,
          | max(floatcol) floatcolmax, max(doublecol) doublecol, max(longcol) from $tabName
          |  where strcol like '%Row%' and shortcol < 12345 and doublecol > 5678912.345681
@@ -35,7 +35,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
     testGroupBy(testnm, query)
   }
 
-    testnm = "Group by with cols in select list and with having and order by"
+  testnm = "Group by with cols in select list and with having and order by"
   test("Group by with cols in select list and with having and order by") {
     val query = s"""select count(1) as cnt, intcol, floatcol, strcol, max(bytecol) bytecolmax,
          max(shortcol) shortcolmax, max(floatcol) floatcolmax, max(doublecol) doublecolmax,
@@ -50,8 +50,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
   }
 
   def testGroupBy(testName: String, query: String) = {
-    val execQuery1 = hbc.executeSql(query)
-    val result1 = execQuery1.toRdd.collect()
+    val result1 = runQuery(query)
     assert(result1.size == 2, s"$testName failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),
@@ -79,8 +78,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
          | group by intcol, floatcol, strcol having max(doublecol) < 5678912.345684 order by strcol desc"""
         .stripMargin
 
-    val execQuery1 = hbc.executeSql(query1)
-    val result1 = execQuery1.toRdd.collect()
+    val result1 = runQuery(query1)
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),

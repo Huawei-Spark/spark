@@ -17,12 +17,8 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.hbase.{HColumnDescriptor, TableName, HTableDescriptor}
+import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.log4j.Logger
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.types.StructType
-import org.apache.spark.sql.{SQLContext, SchemaRDD}
-import org.scalatest.{Ignore, FunSuite}
 
 case class JoinTable(intcol: Int)
 case class JoinTable2Cols(intcol: Int, strcol: String)
@@ -165,19 +161,19 @@ class JoinsSuite extends JoinsSuiteBase  {
     hbaseAdmin.createTable(hdesc2)
     val sql1 = "CREATE TABLE JoinTableOneCol1 (intcol INTEGER, PRIMARY KEY(intcol)) MAPPED BY" +
       " (HbJoinTableOneCol1, COLS=[])"
-    hbc.executeSql(sql1).toRdd.collect
+    runQuery(sql1)
     val sql2 = "CREATE TABLE JoinTableOneCol2 (intcol  INTEGER, primary key(intcol)) MAPPED BY" +
       " (HbJoinTableOneCol2, COLS=[])"
-    hbc.executeSql(sql2).toRdd.collect
+    runQuery(sql2)
     val query = s"""select t1.intcol t1intcol, t2.intcol t2intcol from JoinTableOneCol1 t1 JOIN
                     JoinTableOneCol2 t2 on t1.intcol = t2.intcol""".stripMargin
 
     val loads1 = s"load data local inpath '$CsvPath/onecoljoin1.csv' overwrite into table" +
       s" JoinTableOneCol1"
-    hbc.executeSql(loads1).toRdd.collect
+    runQuery(loads1)
     val loads2 = s"load data local inpath '$CsvPath/onecoljoin2.csv' into table" +
       s" JoinTableOneCol2"
-    hbc.executeSql(loads2).toRdd.collect
+    runQuery(loads2)
     val exparr = Seq(
       Seq(1, 1),
       Seq(1, 1))
