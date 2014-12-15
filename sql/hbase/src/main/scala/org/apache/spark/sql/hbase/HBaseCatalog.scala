@@ -95,18 +95,6 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
 
   val caseSensitive = true
 
-  //Todo: This function is used to fake the rowkey. Just for test purpose
-  def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]) = {
-    //    val row = new GenericRow(Array(col7, col1, col3))
-    val rawKeyCol = dataTypeOfKeys.zipWithIndex.map {
-      case (dataType, index) =>
-        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType), dataType)
-    }
-
-    val buffer = ListBuffer[Byte]()
-    HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
-  }
-
   // Use a single HBaseAdmin throughout this instance instead of creating a new one in
   // each method
   var hBaseAdmin = new HBaseAdmin(configuration)
@@ -114,24 +102,18 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     + s"${hBaseAdmin.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
 
   private def createHBaseUserTable(tableName: String,
-                                   columns: Seq[NonKeyColumn]): Unit = {
+                                   columns: Seq[NonKeyColumn],
+                                   splitKeys: Array[Array[Byte]]): Unit = {
     val tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName))
     for (column <- columns) {
       tableDescriptor.addFamily(new HColumnDescriptor(column.family))
     }
 
-    //    val splitKeys: Array[Array[Byte]] = Array(
-    //        new GenericRow(Array(1024.0, "Upen", 128: Short)),
-    //        new GenericRow(Array(1024.0, "Upen", 256: Short)),
-    //        new GenericRow(Array(4096.0, "SF", 512: Short))
-    //      ).map(makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
-    //    hBaseAdmin.createTable(tableDescriptor, splitKeys);
-
-    admin.createTable(tableDescriptor, null)
+    admin.createTable(tableDescriptor, splitKeys)
   }
 
   def createTable(tableName: String, hbaseNamespace: String, hbaseTableName: String,
-                  allColumns: Seq[AbstractColumn]): HBaseRelation = {
+                  allColumns: Seq[AbstractColumn], splitKeys: Array[Array[Byte]]): HBaseRelation = {
     if (checkLogicalTableExist(tableName)) {
       throw new Exception(s"The logical table: $tableName already exists")
     }
@@ -140,7 +122,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     val nonKeyColumns = allColumns.filter(_.isInstanceOf[NonKeyColumn])
       .asInstanceOf[Seq[NonKeyColumn]]
     if (!checkHBaseTableExists(hbaseTableName)) {
-      createHBaseUserTable(hbaseTableName, nonKeyColumns)
+      createHBaseUserTable(hbaseTableName, nonKeyColumns, splitKeys)
     }
 
     nonKeyColumns.foreach {

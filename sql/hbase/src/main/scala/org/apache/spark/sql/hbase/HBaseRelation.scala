@@ -74,7 +74,7 @@ class HBaseSource extends RelationProvider {
           )
         }
     }
-    catalog.createTable(tableName, rawNamespace, hbaseTable, allColumns)
+    catalog.createTable(tableName, rawNamespace, hbaseTable, allColumns, null)
   }
 }
 
