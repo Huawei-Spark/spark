@@ -84,7 +84,7 @@ private[hbase] case class HBaseRelation(
     tableName: String,
     hbaseNamespace: String,
     hbaseTableName: String,
-    allColumns: Seq[AbstractColumn])(@transient val context: HBaseSQLContext)
+    allColumns: Seq[AbstractColumn])(@transient var context: HBaseSQLContext)
   extends CatalystScan {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)

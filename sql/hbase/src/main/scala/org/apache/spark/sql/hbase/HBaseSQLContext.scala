@@ -28,15 +28,19 @@ class HBaseSQLContext(sc: SparkContext,
                       val optConfiguration: Option[Configuration] = None)
   extends SQLContext(sc) {
 
+  @transient
   override protected[sql] val sqlParser = {
     val fallback = new HBaseSQLParser
     new SparkSQLParser(fallback(_))
   }
 
+  @transient
   override protected[sql] lazy val catalog: HBaseCatalog =
     new HBaseCatalog(this) with OverrideCatalog
 
+  @transient
   protected[sql] class HBasePlanner extends SparkPlanner with HBaseStrategies
 
-  @transient override protected[sql] val planner = new HBasePlanner
+  @transient
+  override protected[sql] val planner = new HBasePlanner
 }

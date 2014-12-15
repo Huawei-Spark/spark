@@ -21,7 +21,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.sources.LogicalRelation
-import org.apache.spark.sql.catalyst.SqlParser
+import org.apache.spark.sql.catalyst.{SqlLexical, SqlParser}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.util.Utils
 
@@ -65,23 +65,17 @@ class HBaseSQLParser extends SqlParser {
   protected val VALUES = Keyword("VALUES")
   protected val TERMINATED = Keyword("TERMINATED")
 
-  override protected val reservedWords: Array[String] =
+  protected val newReservedWords: Seq[String] =
     this.getClass
       .getMethods
       .filter(_.getReturnType == classOf[Keyword])
       .map(_.invoke(this).asInstanceOf[Keyword].str)
 
-  // Some commands are not DDL per se. They are included for convenience
-  // to use the overriden val of the super class
-  protected lazy val createTable: Parser[LogicalPlan] =
-    (select *
-      (UNION ~ ALL ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Union(q1, q2)}
-        | INTERSECT ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Intersect(q1, q2)}
-        | EXCEPT ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Except(q1, q2)}
-        | UNION ~ DISTINCT.? ^^^ { (q1: LogicalPlan, q2: LogicalPlan) => Distinct(Union(q1, q2))}
-        )
-      | insert | create | drop | alterDrop | alterAdd | load | show | describe
-      )
+  override val lexical = new SqlLexical(newReservedWords)
+
+  override protected lazy val start: Parser[LogicalPlan] =
+    select | insert | create | drop | alterDrop | alterAdd | load | show | describe
+
 
   override protected lazy val insert: Parser[LogicalPlan] =
     (INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {

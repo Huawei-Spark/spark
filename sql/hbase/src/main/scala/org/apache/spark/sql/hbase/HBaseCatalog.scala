@@ -249,6 +249,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     val objectInputStream = new ObjectInputStream(inflaterInputStream)
     val hbaseRelation: HBaseRelation
     = objectInputStream.readObject().asInstanceOf[HBaseRelation]
+    hbaseRelation.context = hbaseContext
     hbaseRelation.setConfig(configuration)
     hbaseRelation
   }
