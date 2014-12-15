@@ -93,7 +93,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     }
   }
 
-  val caseSensitive = false
+  val caseSensitive = true
 
   //Todo: This function is used to fake the rowkey. Just for test purpose
   def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]) = {

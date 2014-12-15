@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.SparkSQLParser
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
 
 class HBaseSQLContext(sc: SparkContext,
@@ -38,9 +38,5 @@ class HBaseSQLContext(sc: SparkContext,
   override protected[sql] lazy val catalog: HBaseCatalog =
     new HBaseCatalog(this) with OverrideCatalog
 
-  @transient
-  protected[sql] class HBasePlanner extends SparkPlanner with HBaseStrategies
-
-  @transient
-  override protected[sql] val planner = new HBasePlanner
+  extraStrategies = Seq((new SparkPlanner with HBaseStrategies).HBaseDataSource)
 }

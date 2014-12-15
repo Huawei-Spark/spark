@@ -87,7 +87,7 @@ class HBaseBasicOperationSuite extends QueryTest {
   }
 
   test("Drop table") {
-    sql( """DROP TABLE ta""")
+    sql( """DROP TABLE tb""")
   }
 
   test("SPARK-3176 Added Parser of SQL ABS()") {
