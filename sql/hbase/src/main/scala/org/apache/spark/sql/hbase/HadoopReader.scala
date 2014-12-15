@@ -41,8 +41,9 @@ class HadoopReader(
     val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
     val buffer = ListBuffer[Byte]()
     val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
+    val allColumns = relation.allColumns
     rdd.map { line =>
-      HBaseKVHelper.string2KV(line.split(splitRegex), relation.allColumns,
+      HBaseKVHelper.string2KV(line.split(splitRegex), allColumns,
         lineBuffer, keyBytes, valueBytes)
       val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
       val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)

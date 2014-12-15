@@ -219,18 +219,20 @@ class HBaseSQLParser extends SqlParser {
   protected lazy val load: Parser[LogicalPlan] =
   (
     (LOAD ~> DATA ~> INPATH ~> stringLit) ~
-    (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation ) ~
+    (opt(OVERWRITE) ~> INTO ~> TABLE ~> ident ) ~
     (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadIntoTableCommand(filePath,
-        table.asInstanceOf[LogicalRelation].relation.asInstanceOf[HBaseRelation],
-        isLocal = false, delimiter)
+      case filePath ~ table ~ delimiter => {
+        BulkLoadIntoTableCommand(filePath,
+          table, isLocal = false, delimiter)
+      }
     }
   | (LOAD ~> DATA ~> LOCAL ~> INPATH ~> stringLit) ~
-      (opt(OVERWRITE) ~> INTO ~> TABLE ~> relation) ~
+      (opt(OVERWRITE) ~> INTO ~> TABLE ~> ident) ~
       (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case filePath ~ table ~ delimiter => BulkLoadIntoTableCommand(filePath,
-        table.asInstanceOf[LogicalRelation].relation.asInstanceOf[HBaseRelation],
-        isLocal = true, delimiter)
+      case filePath ~ table ~ delimiter => {
+        BulkLoadIntoTableCommand(filePath,
+          table, isLocal = true, delimiter)
+      }
     }
   )
 
