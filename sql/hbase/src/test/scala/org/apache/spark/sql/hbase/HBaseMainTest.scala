@@ -32,28 +32,28 @@ with Logging {
   def createTable() = {
     try {
       var allColumns = List[AbstractColumn]()
-      allColumns = allColumns :+ KeyColumn("col7", DoubleType, 0)
       allColumns = allColumns :+ KeyColumn("col1", StringType, 1)
-      allColumns = allColumns :+ KeyColumn("col3", ShortType, 2)
       allColumns = allColumns :+ NonKeyColumn("col2", ByteType, "cf1", "cq11")
+      allColumns = allColumns :+ KeyColumn("col3", ShortType, 2)
       allColumns = allColumns :+ NonKeyColumn("col4", IntegerType, "cf1", "cq12")
       allColumns = allColumns :+ NonKeyColumn("col5", LongType, "cf2", "cq21")
       allColumns = allColumns :+ NonKeyColumn("col6", FloatType, "cf2", "cq22")
+      allColumns = allColumns :+ KeyColumn("col7", DoubleType, 0)
 
       val splitKeys: Array[Array[Byte]] = Array(
         new GenericRow(Array(1024.0, "Upen", 128: Short)),
         new GenericRow(Array(1024.0, "Upen", 256: Short)),
         new GenericRow(Array(4096.0, "SF", 512: Short))
       ).map(HBaseKVHelper.makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
+      // val splitKeys = null
 
       catalog = new HBaseCatalog(hbc)
       catalog.createTable(TabName_a, null, HbaseTabName, allColumns, splitKeys)
 
       hbc.sql( s"""CREATE TABLE $TabName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
           col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
-          MAPPED BY ($HbaseTabName, COLS=[col2=cf1.cq11,
-          col4=cf1.cq12, col5=cf2.cq21, col6=cf2.cq22])"""
-        .stripMargin)
+          MAPPED BY ($HbaseTabName, COLS=[col2=cf1.cq11, col4=cf1.cq12, col5=cf2.cq21,
+          col6=cf2.cq22])""".stripMargin)
 
       if (!hbaseAdmin.tableExists(HbaseTabName)) {
         throw new IllegalArgumentException("where is our table?")
