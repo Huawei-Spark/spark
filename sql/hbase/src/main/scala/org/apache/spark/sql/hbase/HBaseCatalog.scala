@@ -275,7 +275,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
     if (hbaseRelation.isEmpty) {
       sys.error(s"Table Not Found: $tableName")
     } else {
-      val tableWithQualifiers = Subquery(tableName, LogicalRelation(hbaseRelation.get))
+      val tableWithQualifiers = Subquery(tableName, hbaseRelation.get.logicalRelation)
       alias.map(a => Subquery(a.toLowerCase, tableWithQualifiers)).getOrElse(tableWithQualifiers)
     }
   }

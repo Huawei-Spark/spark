@@ -94,8 +94,8 @@ private[hbase] case class HBaseRelation(
   @transient lazy val nonKeyColumns = allColumns.filter(_.isInstanceOf[NonKeyColumn])
     .asInstanceOf[Seq[NonKeyColumn]]
 
-  lazy val partitionKeys: Seq[AttributeReference] = keyColumns.map(col =>
-    AttributeReference(col.sqlName, col.dataType, nullable = false)())
+  lazy val partitionKeys = keyColumns.map(col=>
+                   logicalRelation.output.find(_.name.equals(col.sqlName)).get)
 
   @transient lazy val columnMap = allColumns.map {
     case key: KeyColumn => (key.sqlName, key.order)
@@ -137,7 +137,7 @@ private[hbase] case class HBaseRelation(
   @transient lazy val htable: HTable = new HTable(getConf, hbaseTableName)
 
   lazy val attributes = nonKeyColumns.map(col =>
-    AttributeReference(col.sqlName, col.dataType, nullable = true)())
+    logicalRelation.output.find(_.name.equals(col.sqlName)).get)
 
   //  lazy val colFamilies = nonKeyColumns.map(_.family).distinct
   //  lazy val applyFilters = false
@@ -158,12 +158,17 @@ private[hbase] case class HBaseRelation(
 
   def closeHTable() = htable.close()
 
-  val output: Seq[Attribute] = {
-    allColumns.map {
-      case column =>
-        (partitionKeys union attributes).find(_.name == column.sqlName).get
-    }
-  }
+  // corresponding logical relation
+  lazy val logicalRelation = LogicalRelation(this)
+
+  lazy val output = logicalRelation.output
+
+//  val output: Seq[Attribute] = {
+//    allColumns.map {
+//      case column =>
+//        (partitionKeys union attributes).find(_.name == column.sqlName).get
+//    }
+//  }
 
   // TODO: override sizeInBytes with a reasonable estimate
 
@@ -632,7 +637,10 @@ private[hbase] case class HBaseRelation(
   }
 
   def sqlContext = context
-  def schema: StructType = StructType.fromAttributes(output)
+  def schema: StructType = StructType(allColumns.map(c => c match {
+    case KeyColumn(name, dt, _) => StructField(name, dt, nullable = false)
+    case NonKeyColumn(name, dt, _,_) => StructField(name, dt, nullable = true)
+  }))
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     val filterPredicate = if (filters.isEmpty) None
