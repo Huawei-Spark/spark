@@ -165,30 +165,42 @@ private[hbase] case class HBaseRelation(
     }
   }
 
-  // TODO: override sizeInBytes with a reasonable estimate
-
   lazy val partitions: Seq[HBasePartition] = {
     val regionLocations = htable.getRegionLocations.asScala.toSeq
     logger.info(s"Number of HBase regions for " +
       s"table ${htable.getName.getNameAsString}: ${regionLocations.size}")
     regionLocations.zipWithIndex.map {
       case p =>
+        val start: Option[HBaseRawType] = {
+          if (p._1._1.getStartKey.length == 0)
+          {
+            None
+          } else {
+            Some(p._1._1.getStartKey)
+          }
+        }
+        val end: Option[HBaseRawType] = {
+          if (p._1._1.getEndKey.length == 0) {
+            None
+          } else {
+            Some(p._1._1.getEndKey)
+          }
+        }
         new HBasePartition(
           p._2, p._2, -1,
-          Some(p._1._1.getStartKey),
-          Some(p._1._1.getEndKey),
+          start,
+          end,
           Some(p._1._2.getHostname))
     }
   }
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
-                            index: Int):
-  (PartitionRange[_]) = {
+                            index: Int): (PartitionRange[_]) = {
     def getData(dt: NativeType,
                 buffer: ListBuffer[HBaseRawType],
                 aBuffer: ArrayBuffer[Byte],
                 bound: Option[HBaseRawType]): Option[Any] = {
-      if (Bytes.toStringBinary(bound.get) == "") None
+      if (bound.isEmpty) None
       else {
         Some(DataTypeUtils.bytesToData(
           HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, bound.get, keyColumns)(index),
