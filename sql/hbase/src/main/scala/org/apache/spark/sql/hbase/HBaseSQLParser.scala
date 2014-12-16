@@ -65,7 +65,7 @@ class HBaseSQLParser extends SqlParser {
   protected val VALUES = Keyword("VALUES")
   protected val TERMINATED = Keyword("TERMINATED")
 
-  protected val newReservedWords: Seq[String] =
+  protected val newReservedWords =
     this.getClass
       .getMethods
       .filter(_.getReturnType == classOf[Keyword])

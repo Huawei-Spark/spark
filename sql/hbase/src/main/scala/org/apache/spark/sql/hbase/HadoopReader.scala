@@ -36,22 +36,24 @@ class HadoopReader(
 
     val rdd = sc.textFile(path)
     val splitRegex = delimiter.getOrElse(",")
-    // Todo: use mapPartitions more better
-    val keyBytes = ListBuffer[(Array[Byte], DataType)]()
-    val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
-    val buffer = ListBuffer[Byte]()
-    val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
     val allColumns = relation.allColumns
-    rdd.map { line =>
-      HBaseKVHelper.string2KV(line.split(splitRegex), allColumns,
-        lineBuffer, keyBytes, valueBytes)
-      val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
-      val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
-      val put = new PutWrapper(rowKeyData)
-      valueBytes.foreach { case (family, qualifier, value) =>
-        put.add(family, qualifier, value)
+    val output = relation.output
+    rdd.mapPartitions { iter =>
+      val keyBytes = ListBuffer[(Array[Byte], DataType)]()
+      val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
+      val buffer = ListBuffer[Byte]()
+      val lineBuffer = HBaseKVHelper.createLineBuffer(output)
+      iter.map { line =>
+        HBaseKVHelper.string2KV(line.split(splitRegex), allColumns,
+          lineBuffer, keyBytes, valueBytes)
+        val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
+        val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
+        val put = new PutWrapper(rowKeyData)
+        valueBytes.foreach { case (family, qualifier, value) =>
+          put.add(family, qualifier, value)
+        }
+        (rowKey, put)
       }
-      (rowKey, put)
     }
   }
 }

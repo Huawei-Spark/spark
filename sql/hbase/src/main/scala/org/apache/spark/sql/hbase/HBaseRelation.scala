@@ -160,7 +160,7 @@ private[hbase] case class HBaseRelation(
   def closeHTable() = htable.close()
 
   // corresponding logical relation
-  lazy val logicalRelation = LogicalRelation(this)
+  @transient lazy val logicalRelation = LogicalRelation(this)
 
   lazy val output = logicalRelation.output
 
