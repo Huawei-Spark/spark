@@ -18,7 +18,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
 import org.apache.spark.sql.catalyst.types._
 
 import scala.collection.mutable
@@ -139,6 +139,22 @@ object HBaseKVHelper {
       buffer.append(BytesUtils.create(x.dataType))
     }
     buffer.toArray
+  }
+
+  /**
+   * create a row key
+   * @param row the generic row
+   * @param dataTypeOfKeys sequence of data type
+   * @return the row key
+   */
+  def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]): HBaseRawType = {
+    val rawKeyCol = dataTypeOfKeys.zipWithIndex.map {
+      case (dataType, index) =>
+        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType), dataType)
+    }
+
+    val buffer = ListBuffer[Byte]()
+    encodingRawKeyColumns(buffer, rawKeyCol)
   }
 }
 

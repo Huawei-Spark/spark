@@ -87,7 +87,8 @@ object BytesUtils {
   }
 }
 
-class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
+//TODO: Remove Serializable when release
+class BytesUtils(var buffer: HBaseRawType, dt: DataType) extends Serializable{
 
   val dataType = dt
 

@@ -61,8 +61,7 @@ class SparkSQLJoinSuite extends FunSuite {
   }
 
   def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
-    val execQuery1 = sqlCtx.executeSql(sql)
-    val result1 = execQuery1.toRdd.collect()
+    val result1 = sqlCtx.sql(sql).collect()
     assert(result1.size == exparr.length, s"$testName failed on size")
     verify(testName,
       sql,

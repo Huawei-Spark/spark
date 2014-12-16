@@ -21,6 +21,7 @@ import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.spark._
 import org.apache.spark.sql.catalyst.types._
+import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 //@Ignore
@@ -113,7 +114,13 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column3", BooleanType, family1, "qualifier1")
 
-    catalog.createTable(tableName, namespace, hbaseTableName, allColumns)
+    val splitKeys: Array[Array[Byte]] = Array(
+        new GenericRow(Array(1024.0, "Upen", 128: Short)),
+        new GenericRow(Array(1024.0, "Upen", 256: Short)),
+        new GenericRow(Array(4096.0, "SF", 512: Short))
+      ).map(HBaseKVHelper.makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
+
+    catalog.createTable(tableName, namespace, hbaseTableName, allColumns, splitKeys)
   }
 
   test("Get Table") {

@@ -26,10 +26,13 @@ import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
+import org.apache.spark.sql.catalyst.plans.logical.{Subquery, LogicalPlan}
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase._
+import org.apache.spark.sql.sources.LogicalRelation
 import scala.collection.JavaConversions._
 
 import scala.collection.mutable.{ListBuffer, ArrayBuffer}
@@ -138,9 +141,9 @@ case class InsertValueIntoTableCommand(relation: HBaseRelation, valueSeq: Seq[St
 }
 
 @DeveloperApi
-case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
+case class BulkLoadIntoTableCommand(path: String, tableName: String,
                                     isLocal: Boolean, delimiter: Option[String])
-                              extends RunnableCommand {
+  extends RunnableCommand {
 
   private[hbase] def makeBulkLoadRDD(splitKeys: Array[ImmutableBytesWritableWrapper],
                                      hadoopReader: HadoopReader, job: Job, tmpPath: String) = {
@@ -206,6 +209,10 @@ case class BulkLoadIntoTableCommand(path: String, relation: HBaseRelation,
   }
 
   override def run(sqlContext: SQLContext) = {
+    val solvedRelation = sqlContext.catalog.lookupRelation(None, tableName, None)
+    val relation: HBaseRelation = solvedRelation.asInstanceOf[Subquery]
+      .child.asInstanceOf[LogicalRelation]
+      .relation.asInstanceOf[HBaseRelation]
     val hbContext = sqlContext.asInstanceOf[HBaseSQLContext]
     val logger = Logger.getLogger(getClass.getName)
 

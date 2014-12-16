@@ -46,10 +46,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
     assert(l.path.equals(raw"./usr/file.csv"))
     assert(l.isLocal)
-
-    assert(plan.children(0).isInstanceOf[UnresolvedRelation])
-    val r = plan.children(0).asInstanceOf[UnresolvedRelation]
-    assert(r.tableName.equals("tb"))
+    assert(l.tableName.equals("tb"))
   }
 
   // Test if we can parse 'LOAD DATA INPATH '/usr/hdfsfile.csv' INTO TABLE tb'
@@ -66,9 +63,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
     assert(l.path.equals(raw"/usr/hdfsfile.csv"))
     assert(!l.isLocal)
-    assert(plan.children(0).isInstanceOf[UnresolvedRelation])
-    val r = plan.children(0).asInstanceOf[UnresolvedRelation]
-    assert(r.tableName.equals("tb"))
+    assert(l.tableName.equals("tb"))
   }
 
   test("bulkload parser test, using delimiter") {
@@ -83,31 +78,29 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
     assert(l.path.equals(raw"/usr/hdfsfile.csv"))
     assert(!l.isLocal)
-    assert(plan.children(0).isInstanceOf[UnresolvedRelation])
-    val r = plan.children(0).asInstanceOf[UnresolvedRelation]
-    assert(r.tableName.equals("tb"))
+    assert(l.tableName.equals("tb"))
     assert(l.delimiter.get.equals("|"))
   }
 
-  ignore("write data to HFile") {
-    val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
-    val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
-    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", hbaseRelation, true, Option(","))
-    val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
-      new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
-    }
-    val conf = hbc.sparkContext.hadoopConfiguration
-
-    val job = Job.getInstance(conf)
-
-    val hadoopReader = {
-      val fs = FileSystem.getLocal(conf)
-      val pathString = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
-      new HadoopReader(hbc.sparkContext, pathString, bulkLoad.delimiter)(hbaseRelation)
-    }
-    val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
-    bulkLoad.makeBulkLoadRDD(splitKeys.toArray, hadoopReader, job, tmpPath)
-  }
+//  ignore("write data to HFile") {
+//    val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
+//    val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
+//    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", hbaseRelation, true, Option(","))
+//    val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
+//      new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
+//    }
+//    val conf = hbc.sparkContext.hadoopConfiguration
+//
+//    val job = Job.getInstance(conf)
+//
+//    val hadoopReader = {
+//      val fs = FileSystem.getLocal(conf)
+//      val pathString = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
+//      new HadoopReader(hbc.sparkContext, pathString, bulkLoad.delimiter)(hbaseRelation)
+//    }
+//    val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
+//    bulkLoad.makeBulkLoadRDD(splitKeys.toArray, hadoopReader, job, tmpPath)
+//  }
 
   test("load data into hbase") { // this need to local test with hbase, so here to ignore this
 

@@ -23,7 +23,7 @@ import org.scalatest.ConfigMap
 
 class QueriesSuiteBase() extends HBaseIntegrationTestBase(
   System.getProperty("spark.testing.use-external-hbase", "false") == "false")
-with CreateTableAndLoadData {
+    with CreateTableAndLoadData {
   self: HBaseIntegrationTestBase =>
 
   val tabName = DefaultTableName
@@ -35,9 +35,14 @@ with CreateTableAndLoadData {
     createTableAndLoadData(hbc)
   }
 
+  def runQuery(sql: String) = {
+    val execQuery1 = hbc.sql(sql)
+    execQuery1.collect()
+  }
+
   def run(sqlCtx : SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
     val execQuery1 = sqlCtx.executeSql(sql)
-    val result1 = execQuery1.toRdd.collect()
+    val result1 = runQuery(sql)
     assert(result1.size == exparr.length, s"$testName failed on size")
     verify(testName,
       sql,

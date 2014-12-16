@@ -61,13 +61,17 @@ private[hbase] trait HBaseStrategies {
       val projectSet = AttributeSet(projectList.flatMap(_.references))
       val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
 
-      val pushedFilters = Seq(filterPredicates.map {
-        _ transform {
-          // Match original case of attributes.
-          case a: AttributeReference => relation.attributeMap(a)
-          // We will do HBase-specific predicate pushdown so just use the original predicate here
-        }
-      }.reduceLeft(And))
+      val pushedFilters = if (filterPredicates.nonEmpty) {
+        Seq(filterPredicates.map {
+          _ transform {
+            // Match original case of attributes.
+            case a: AttributeReference => relation.attributeMap(a)
+            // We will do HBase-specific predicate pushdown so just use the original predicate here
+          }
+        }.reduceLeft(And))
+      } else {
+        filterPredicates
+      }
 
       val hbaseRelation = relation.relation.asInstanceOf[HBaseRelation]
       if (projectList.map(_.toAttribute) == projectList &&

@@ -31,10 +31,9 @@ class Range[T](val start: Option[T], // None for open ends
                val end: Option[T], // None for open ends
                val endInclusive: Boolean,
                val dt: NativeType) extends Serializable {
-  require(dt != null && !(start.isDefined && end.isDefined &&
-    ((dt.ordering.eq(start.get, end.get) &&
-      (!startInclusive || !endInclusive)) ||
-      dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType]))),
+  require(dt != null &&
+    !(start.isDefined && end.isDefined &&
+    dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType])),
     "Inappropriate range parameters")
 }
 
