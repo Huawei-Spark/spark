@@ -120,9 +120,13 @@ case class DescribeTableCommand(tableName: String) extends RunnableCommand {
 }
 
 @DeveloperApi
-case class InsertValueIntoTableCommand(relation: HBaseRelation, valueSeq: Seq[String])
+case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
   extends RunnableCommand {
   override def run(sqlContext: SQLContext) = {
+    val solvedRelation = sqlContext.catalog.lookupRelation(None, tableName, None)
+    val relation: HBaseRelation = solvedRelation.asInstanceOf[Subquery]
+      .child.asInstanceOf[LogicalRelation]
+      .relation.asInstanceOf[HBaseRelation]
     val buffer = ListBuffer[Byte]()
     val keyBytes = ListBuffer[(Array[Byte], DataType)]()
     val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()

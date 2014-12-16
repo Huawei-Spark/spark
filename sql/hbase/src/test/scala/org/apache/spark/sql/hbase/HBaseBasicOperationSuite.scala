@@ -47,6 +47,13 @@ class HBaseBasicOperationSuite extends QueryTest {
     )
   }
 
+  test("create table3") {
+    sql( """CREATE TABLE tb3 (column1 INTEGER, column2 STRING,
+        PRIMARY KEY(column2))
+        MAPPED BY (htb3, COLS=[column1=cf.cq])"""
+    )
+  }
+
   test("Insert Into table0") {
         sql( """INSERT INTO testTable SELECT col4,col4,col6,col3 FROM ta""")
   }
@@ -59,6 +66,15 @@ class HBaseBasicOperationSuite extends QueryTest {
     //      MAPPED BY (ht2, KEYS=[t2c1], COLS=[t2c2=cf2.cq21])""".stripMargin
     //    )
     sql( """INSERT INTO tableName SELECT * FROM testTable""")
+  }
+
+  test("Insert Into table1") {
+//    sql( """INSERT INTO testTable VALUES (1024, 2048, 13.6, 2)""")
+    sql( """SELECT * FROM testTable""").foreach(println)
+  }
+
+  test("Insert Into table3") {
+    sql( """INSERT INTO tb3 VALUES (1024, "abc")""")
   }
 
   test("Select test 0") {
@@ -74,7 +90,7 @@ class HBaseBasicOperationSuite extends QueryTest {
   }
 
   test("Select test 3") {
-    sql( """SELECT col6, col6 FROM ta""").foreach(println)
+    sql( """SELECT * FROM tb3""").foreach(println)
   }
 
   test("Select test 4") {
@@ -94,7 +110,7 @@ class HBaseBasicOperationSuite extends QueryTest {
   }
 
   test("Drop table") {
-    sql( """DROP TABLE test""")
+    sql( """DROP TABLE tb3""")
   }
 
   test("SPARK-3176 Added Parser of SQL ABS()") {

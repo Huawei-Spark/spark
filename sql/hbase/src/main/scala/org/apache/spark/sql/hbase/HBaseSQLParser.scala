@@ -18,6 +18,7 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.types.StringType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.sources.LogicalRelation
@@ -82,9 +83,9 @@ class HBaseSQLParser extends SqlParser {
       case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)
     }
       |
-      INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
-        case r ~ valueSeq => InsertValueIntoTableCommand(r.asInstanceOf[LogicalRelation].
-          relation.asInstanceOf[HBaseRelation], valueSeq)
+      INSERT ~> INTO ~> ident ~ (VALUES ~> "(" ~> values <~ ")") ^^ {
+        case tableName ~ valueSeq =>
+          InsertValueIntoTableCommand(tableName, valueSeq.map(_.value.toString))
       }
       )
 
@@ -252,6 +253,8 @@ class HBaseSQLParser extends SqlParser {
   protected lazy val tableCols: Parser[Seq[(String, String)]] = repsep(tableCol, ",")
 
   protected lazy val keys: Parser[Seq[String]] = repsep(ident, ",")
+
+  protected lazy val values: Parser[Seq[Literal]] = repsep(literal, ",")
 
   protected lazy val expressions: Parser[Seq[Expression]] = repsep(expression, ",")
 
