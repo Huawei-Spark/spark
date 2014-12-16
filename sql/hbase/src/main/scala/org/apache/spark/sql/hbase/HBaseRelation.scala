@@ -54,6 +54,7 @@ class HBaseSource extends RelationProvider {
     val keyCols = parameters("keyCols").split(";")
       .map{case c => val cols = c.split(","); (cols(0), cols(1))}
     val nonKeyCols = parameters("nonKeyCols").split(";")
+      .filterNot(_ == "")
       .map{case c => val cols = c.split(","); (cols(0), cols(1), cols(2), cols(3))}
 
     val keyMap:Map[String, String] = keyCols.toMap

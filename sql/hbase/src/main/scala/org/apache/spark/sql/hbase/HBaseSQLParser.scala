@@ -79,12 +79,14 @@ class HBaseSQLParser extends SqlParser {
 
   override protected lazy val insert: Parser[LogicalPlan] =
     (INSERT ~> INTO ~> relation ~ select <~ opt(";") ^^ {
-      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)}
-    |
-     INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
-      case r ~ valueSeq => InsertValueIntoTableCommand(r.asInstanceOf[LogicalRelation].
-        relation.asInstanceOf[HBaseRelation], valueSeq)}
-    )
+      case r ~ s => InsertIntoTable(r, Map[String, Option[String]](), s, overwrite = false)
+    }
+      |
+      INSERT ~> INTO ~> relation ~ (VALUES ~> "(" ~> keys <~ ")") ^^ {
+        case r ~ valueSeq => InsertValueIntoTableCommand(r.asInstanceOf[LogicalRelation].
+          relation.asInstanceOf[HBaseRelation], valueSeq)
+      }
+      )
 
   protected lazy val create: Parser[LogicalPlan] =
     CREATE ~> TABLE ~> ident ~
@@ -146,11 +148,14 @@ class HBaseSQLParser extends SqlParser {
         val keyColsString = keyColsWithDataType
           .map(k => k._1 + "," + k._2)
           .reduceLeft(_ + ";" + _)
-        val nonkeyColsString = nonKeyCols
-          .map(k => k._1 + "," + k._2 + "," + k._3 + "," + k._4)
-          .reduceLeft(_ + ";" + _)
+        val nonkeyColsString = if (nonKeyCols.isEmpty) ""
+        else {
+          nonKeyCols
+            .map(k => k._1 + "," + k._2 + "," + k._3 + "," + k._4)
+            .reduceLeft(_ + ";" + _)
+        }
 
-        val opts:Map[String, String] = Seq(
+        val opts: Map[String, String] = Seq(
           ("tableName", tableName),
           ("namespace", customizedNameSpace),
           ("hbaseTableName", hbaseTableName),
@@ -158,14 +163,14 @@ class HBaseSQLParser extends SqlParser {
           ("keyCols", keyColsString),
           ("nonKeyCols", nonkeyColsString)
         ).toMap
-        
+
         CreateTable(tableName, "org.apache.spark.sql.hbase.HBaseSource", opts)
     }
 
   private[hbase] case class CreateTable(
-      tableName: String,
-      provider: String,
-      options: Map[String, String]) extends RunnableCommand {
+                                         tableName: String,
+                                         provider: String,
+                                         options: Map[String, String]) extends RunnableCommand {
     // create table of persistent metadata
     def run(sqlContext: SQLContext) = {
       val loader = Utils.getContextOrSparkClassLoader
@@ -213,7 +218,7 @@ class HBaseSQLParser extends SqlParser {
         AlterAddColCommand(tableName, tableColumn._1, tableColumn._2,
           familyAndQualifier._1, familyAndQualifier._2)
     }
-    
+
   // Load syntax:
   // LOAD DATA [LOCAL] INPATH filePath [OVERWRITE] INTO TABLE tableName [FIELDS TERMINATED BY char]
   protected lazy val load: Parser[LogicalPlan] =

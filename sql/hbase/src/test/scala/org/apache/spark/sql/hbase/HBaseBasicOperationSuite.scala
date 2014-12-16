@@ -40,6 +40,13 @@ class HBaseBasicOperationSuite extends QueryTest {
     )
   }
 
+  test("create table2") {
+    sql( """CREATE TABLE test (column1 INTEGER,
+        PRIMARY KEY(column1))
+        MAPPED BY (testTable, COLS=[])"""
+    )
+  }
+
   test("Insert Into table0") {
         sql( """INSERT INTO testTable SELECT col4,col4,col6,col3 FROM ta""")
   }
@@ -87,7 +94,7 @@ class HBaseBasicOperationSuite extends QueryTest {
   }
 
   test("Drop table") {
-    sql( """DROP TABLE tb""")
+    sql( """DROP TABLE test""")
   }
 
   test("SPARK-3176 Added Parser of SQL ABS()") {
