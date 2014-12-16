@@ -677,6 +677,7 @@ private[hbase] case class HBaseRelation(
       (hbPartition.lowerBound, hbPartition.upperBound) match {
         case (Some(lb), Some(ub)) => new Scan(lb, ub)
         case (Some(lb), None) => new Scan(lb)
+        case (None, Some(ub)) => new Scan(Array[Byte](), ub)
         case _ => new Scan
       }
     }
