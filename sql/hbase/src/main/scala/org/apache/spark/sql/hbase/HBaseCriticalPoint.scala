@@ -36,7 +36,7 @@ object CriticalPointType extends Enumeration {
 case class CriticalPoint[T](value: T, ctype: CriticalPointType, dt: NativeType) {
   override def hashCode() = value.hashCode()
 
-  val decreteType: Boolean = dt.isInstanceOf[IntegralType]
+  // val decreteType: Boolean = dt.isInstanceOf[IntegralType]
 
   override def equals(other: Any): Boolean = other match {
     case cp: CriticalPoint[T] => value.equals(cp.value)
@@ -348,7 +348,10 @@ object RangeCriticalPoint {
         if (src == null) {
           // open boundary = +/- Infinity
           require(!srcInclusive, "Internal logical error: invalid open boundary")
-          startIndex
+          if (lowBound)
+            startIndex
+          else
+            right - 1
         } else {
           // Binary search for smallest/largest quality
           def binarySearchEquality(eq: Int, limit: Int): Int = {
@@ -474,11 +477,14 @@ object RangeCriticalPoint {
                   prevLarger = i
                   i = i - 1
                   if (srcPartition) {
-                    size = target(i).end.get.size
+                    size = if (target(i).end.isDefined) target(i).end.get.size else 0
                     val cpr = target(i).asInstanceOf[CriticalPointRange[HBaseRawType]]
                     inclusive = cpr.prefixIndex < dimSize - 1 || target(i).endInclusive
                   }
-                  cmp = Bytes.compareTo(target(i).end.get, 0, size, src, 0, size)
+                  if (target(i).end.isDefined)
+                    cmp = Bytes.compareTo(target(i).end.get, 0, size, src, 0, size)
+                  else
+                    cmp = 1
                   tgtInclusive = inclusive
                   if (cmp == 0) {
                     cmp = if (srcInclusive && tgtInclusive) 0
@@ -571,7 +577,7 @@ object RangeCriticalPoint {
       var pStartIndex = 0
       var done = false
       var pIndex = 0
-      val result = Seq[HBasePartition]()
+      var result = Seq[HBasePartition]()
       while (cprStartIndex < cprs.size && pStartIndex < partitions.size && !done) {
         val cpr = cprs(cprStartIndex)
         val qualifiedPartitionIndexes =
@@ -586,13 +592,13 @@ object RangeCriticalPoint {
           // and let the slave to do the partial reduction on the leading dimension
           // only. This is a bit conservative to avoid extra complexity
           // Step 3.3
-          result :+ new HBasePartition(pIndex, p.idx, 0,
+          result = result :+ new HBasePartition(pIndex, p.idx, 0,
             p.lowerBound, p.upperBound, p.server, pred)
           pIndex += 1
           for (i <- pstart + 1 to pend - 1) {
             p = partitions(i)
             // Step 3.2
-            result :+ new HBasePartition(pIndex, p.idx, -1,
+            result = result :+ new HBasePartition(pIndex, p.idx, -1,
               p.lowerBound, p.upperBound, p.server, pred)
             pIndex += 1
           }
@@ -602,7 +608,7 @@ object RangeCriticalPoint {
             // and let the slave to do the partial reduction on the leading dimension
             // only. This is a bit conservative to avoid extra complexity
             // Step 3.3
-            result :+ new HBasePartition(pIndex, p.idx, 0,
+            result = result :+ new HBasePartition(pIndex, p.idx, 0,
               p.lowerBound, p.upperBound, p.server, pred)
             pIndex += 1
           }
