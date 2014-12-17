@@ -95,7 +95,7 @@ case class InsertIntoHBaseTable(
             val rowVal = DataTypeUtils.getRowColumnFromHBaseRawType(
               row, nkc.ordinal, nkc.dataType)
             colIndexInBatch += 1
-            put.add(Bytes.toBytes(nkc.family), Bytes.toBytes(nkc.qualifier), rowVal)
+            put.add(nkc.familyRaw, nkc.qualifierRaw, rowVal)
           }
         )
 

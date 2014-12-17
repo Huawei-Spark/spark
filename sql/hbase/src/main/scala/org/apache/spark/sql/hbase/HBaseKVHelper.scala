@@ -21,7 +21,6 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
 import org.apache.spark.sql.catalyst.types._
 
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object HBaseKVHelper {
@@ -82,36 +81,30 @@ object HBaseKVHelper {
   /**
    * Takes a record, translate it into HBase row key column and value by matching with metadata
    * @param values record that as a sequence of string
-   * @param columns metadata that contains KeyColumn and NonKeyColumn
+   * @param relation HBaseRelation
    * @param keyBytes  output parameter, array of (key column and its type);
    * @param valueBytes array of (column family, column qualifier, value)
    */
   def string2KV(values: Seq[String],
-                columns: Seq[AbstractColumn],
+                relation: HBaseRelation,
                 lineBuffer: Array[BytesUtils],
-                keyBytes: ListBuffer[(Array[Byte], DataType)],
-                valueBytes: ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]) = {
-    assert(values.length == columns.length,
-      s"values length ${values.length} not equals columns length ${columns.length}")
-    keyBytes.clear()
-    valueBytes.clear()
-    val map = mutable.HashMap[Int, (Array[Byte], DataType)]()
-    var index = 0
-    for (i <- 0 until values.length) {
-      val value = values(i)
-      val column = columns(i)
-      assert(column.dataType == lineBuffer(i).dataType)
-      val bytes = string2Bytes(value, lineBuffer(i))
-      if (column.isKeyColumn) {
-        keyBytes += ((bytes, column.dataType))
-      } else {
-        val realCol = column.asInstanceOf[NonKeyColumn]
-        valueBytes += ((Bytes.toBytes(realCol.family), Bytes.toBytes(realCol.qualifier), bytes))
-      }
-    }
+                keyBytes: Array[(Array[Byte], DataType)],
+                valueBytes: Array[(Array[Byte], Array[Byte], Array[Byte])]) = {
+    assert(values.length == relation.output.length,
+      s"values length ${values.length} not equals columns length ${relation.output.length}")
 
-    (0 until index).foreach(k => keyBytes += map.get(k).get)
-    keyBytes
+    relation.keyColumns.foreach(kc => {
+      val ordinal = kc.ordinal
+      keyBytes(kc.order) = (string2Bytes(values(ordinal), lineBuffer(ordinal)),
+                           relation.output(ordinal).dataType)
+    })
+    for (i <- 0 until relation.nonKeyColumns.size) {
+      val nkc = relation.nonKeyColumns(i)
+      val family = nkc.familyRaw
+      val qualifier = nkc.qualifierRaw
+      val bytes = string2Bytes(values(nkc.ordinal), lineBuffer(nkc.ordinal))
+      valueBytes(i) = (family, qualifier, bytes)
+    }
   }
 
   private def string2Bytes(v: String, bu: BytesUtils): Array[Byte] = {

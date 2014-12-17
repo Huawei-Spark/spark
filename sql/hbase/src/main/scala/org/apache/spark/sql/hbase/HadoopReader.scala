@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.types._
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ListBuffer
 
 /**
  * Helper class for scanning files stored in Hadoop - e.g., to read text file when bulk loading.
@@ -30,21 +29,21 @@ private[hbase]
 class HadoopReader(
                     @transient sc: SparkContext,
                     path: String,
-                    delimiter: Option[String])(relation: HBaseRelation) {
+                    delimiter: Option[String])(baseRelation: HBaseRelation) {
   // make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file
   private[hbase] def makeBulkLoadRDDFromTextFile = {
 
     val rdd = sc.textFile(path)
     val splitRegex = delimiter.getOrElse(",")
-    val allColumns = relation.allColumns
-    val output = relation.output
+    val relation = baseRelation
     rdd.mapPartitions { iter =>
-      val keyBytes = ListBuffer[(Array[Byte], DataType)]()
-      val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
+      val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
+      val valueBytes = new Array[(Array[Byte], Array[Byte],
+                          Array[Byte])](relation.nonKeyColumns.size)
       val buffer = ListBuffer[Byte]()
-      val lineBuffer = HBaseKVHelper.createLineBuffer(output)
+      val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
       iter.map { line =>
-        HBaseKVHelper.string2KV(line.split(splitRegex), allColumns,
+        HBaseKVHelper.string2KV(line.split(splitRegex), relation,
           lineBuffer, keyBytes, valueBytes)
         val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
         val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)

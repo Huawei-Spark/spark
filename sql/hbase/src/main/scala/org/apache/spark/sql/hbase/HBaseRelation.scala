@@ -85,7 +85,7 @@ private[hbase] case class HBaseRelation(
     hbaseNamespace: String,
     hbaseTableName: String,
     allColumns: Seq[AbstractColumn])(@transient var context: HBaseSQLContext)
-  extends CatalystScan {
+  extends CatalystScan with Serializable {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -137,14 +137,8 @@ private[hbase] case class HBaseRelation(
 
   @transient lazy val htable: HTable = new HTable(getConf, hbaseTableName)
 
-  lazy val attributes = nonKeyColumns.map(col =>
-    logicalRelation.output.find(_.name.equals(col.sqlName)).get)
-
-  //  lazy val colFamilies = nonKeyColumns.map(_.family).distinct
-  //  lazy val applyFilters = false
-
   def isNonKey(attr: AttributeReference): Boolean = {
-    attributes.exists(_.exprId == attr.exprId)
+    keyIndex(attr) < 0
   }
 
   def keyIndex(attr: AttributeReference): Int = {
@@ -163,13 +157,6 @@ private[hbase] case class HBaseRelation(
   @transient lazy val logicalRelation = LogicalRelation(this)
 
   lazy val output = logicalRelation.output
-
-//  val output: Seq[Attribute] = {
-//    allColumns.map {
-//      case column =>
-//        (partitionKeys union attributes).find(_.name == column.sqlName).get
-//    }
-//  }
 
   lazy val partitions: Seq[HBasePartition] = {
     val regionLocations = htable.getRegionLocations.asScala.toSeq
@@ -387,17 +374,17 @@ private[hbase] case class HBaseRelation(
       val filtersList: List[Filter] = nonKeyColumns.filter {
         case nkc => distinctProjList.exists(nkc.sqlName == _.name)
       }.map {
-        case NonKeyColumn(_, _, family, qualifier) =>
+        case nkc@NonKeyColumn(_, _, family, qualifier) =>
           val columnFilters = new util.ArrayList[Filter]
           columnFilters.add(
             new FamilyFilter(
               CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(Bytes.toBytes(family))
+              new BinaryComparator(nkc.familyRaw)
             ))
           columnFilters.add(
             new QualifierFilter(
               CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(Bytes.toBytes(qualifier))
+              new BinaryComparator(nkc.qualifierRaw)
             ))
           new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
       }.toList
@@ -419,17 +406,17 @@ private[hbase] case class HBaseRelation(
       val filtersList: List[Filter] = nonKeyColumns.filter {
         case nkc => distinctProjList.exists(nkc.sqlName == _.name)
       }.map {
-        case NonKeyColumn(_, _, family, qualifier) =>
+        case nkc@NonKeyColumn(_, _, family, qualifier) =>
           val columnFilters = new util.ArrayList[Filter]
           columnFilters.add(
             new FamilyFilter(
               CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(Bytes.toBytes(family))
+              new BinaryComparator(nkc.familyRaw)
             ))
           columnFilters.add(
             new QualifierFilter(
               CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(Bytes.toBytes(qualifier))
+              new BinaryComparator(nkc.qualifierRaw)
             ))
           new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
       }.toList
@@ -497,8 +484,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
@@ -512,8 +499,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
@@ -527,8 +514,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
@@ -542,8 +529,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
@@ -557,8 +544,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
@@ -572,8 +559,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
@@ -587,8 +574,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
@@ -602,8 +589,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))
@@ -617,8 +604,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
             result = Option(new FilterList(filter))
@@ -632,8 +619,8 @@ private[hbase] case class HBaseRelation(
             result = Option(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
-            val filter = new SingleColumnValueFilter(Bytes.toBytes(column.family),
-              Bytes.toBytes(column.qualifier),
+            val filter = new SingleColumnValueFilter(column.familyRaw,
+              column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
             result = Option(new FilterList(filter))

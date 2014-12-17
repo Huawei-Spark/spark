@@ -128,10 +128,11 @@ case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
       .child.asInstanceOf[LogicalRelation]
       .relation.asInstanceOf[HBaseRelation]
     val buffer = ListBuffer[Byte]()
-    val keyBytes = ListBuffer[(Array[Byte], DataType)]()
-    val valueBytes = ListBuffer[(Array[Byte], Array[Byte], Array[Byte])]()
+    val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
+    val valueBytes = new Array[(Array[Byte], Array[Byte],
+                                Array[Byte])](relation.nonKeyColumns.size)
     val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
-    HBaseKVHelper.string2KV(valueSeq, relation.allColumns, lineBuffer, keyBytes, valueBytes)
+    HBaseKVHelper.string2KV(valueSeq, relation, lineBuffer, keyBytes, valueBytes)
     val rowKey = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
     val put = new Put(rowKey)
     valueBytes.foreach { case (family, qualifier, value) =>
