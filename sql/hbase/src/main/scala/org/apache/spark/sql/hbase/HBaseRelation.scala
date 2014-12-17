@@ -96,7 +96,7 @@ private[hbase] case class HBaseRelation(
     .asInstanceOf[Seq[NonKeyColumn]]
 
   lazy val partitionKeys = keyColumns.map(col=>
-                   logicalRelation.output.find(_.name.equals(col.sqlName)).get)
+                   logicalRelation.output.find(_.name == col.sqlName).get)
 
   @transient lazy val columnMap = allColumns.map {
     case key: KeyColumn => (key.sqlName, key.order)
