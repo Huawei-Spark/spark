@@ -40,7 +40,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     configuration = HBaseConfiguration.create()
   }
 
-  test("Critical Point Step 1") {
+  test("Generate CP Ranges") {
     val namespace = "testNamespace"
     val tableName = "testTable"
     val hbaseTableName = "hbaseTable"
