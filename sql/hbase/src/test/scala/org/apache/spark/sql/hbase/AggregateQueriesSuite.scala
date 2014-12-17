@@ -56,7 +56,7 @@ class AggregateQueriesSuite extends QueriesSuiteBase {
       Array(1, 23456783, 45657.83F, "Row3", 'c', 12343, 45657.83F, 5678912.345683, 3456789012343L),
       Array(1, 23456782, 45657.82F, "Row2", 'b', 12342, 45657.82F, 5678912.345682, 3456789012342L))
 
-    var res = {
+    val res = {
       for (rx <- 0 until exparr.size)
       yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
