@@ -227,10 +227,9 @@ class HBaseSQLParser extends SqlParser {
       (INPATH ~> stringLit) ~
       (opt(OVERWRITE) ~> INTO ~> TABLE ~> ident) ~
       (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case isLocal ~ filePath ~ table ~ delimiter => {
+      case isLocal ~ filePath ~ table ~ delimiter =>
         BulkLoadIntoTableCommand(filePath,
           table, isLocal.isDefined, delimiter)
-      }
     }
 
   // syntax:

@@ -637,10 +637,10 @@ private[hbase] case class HBaseRelation(
   }
 
   def sqlContext = context
-  def schema: StructType = StructType(allColumns.map(c => c match {
+  def schema: StructType = StructType(allColumns.map {
     case KeyColumn(name, dt, _) => StructField(name, dt, nullable = false)
-    case NonKeyColumn(name, dt, _,_) => StructField(name, dt, nullable = true)
-  }))
+    case NonKeyColumn(name, dt, _, _) => StructField(name, dt, nullable = true)
+  })
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     val filterPredicate = if (filters.isEmpty) None
