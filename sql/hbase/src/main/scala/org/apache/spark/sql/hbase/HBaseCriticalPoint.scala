@@ -287,8 +287,11 @@ object RangeCriticalPoint {
   }
 
   private[hbase] def generateCriticalPointRangesHelper(relation: HBaseRelation,
-                                                       predExpr: Expression, dimIndex: Int, row: MutableRow,
-                                                       boundPred: Expression, predRefs: Seq[Attribute])
+                                                       predExpr: Expression,
+                                                       dimIndex: Int,
+                                                       row: MutableRow,
+                                                       boundPred: Expression,
+                                                       predRefs: Seq[Attribute])
   : Seq[CriticalPointRange[_]] = {
     val keyDim = relation.partitionKeys(dimIndex)
     val dt: NativeType = keyDim.dataType.asInstanceOf[NativeType]
@@ -348,10 +351,11 @@ object RangeCriticalPoint {
         if (src == null) {
           // open boundary = +/- Infinity
           require(!srcInclusive, "Internal logical error: invalid open boundary")
-          if (lowBound)
+          if (lowBound) {
             startIndex
-          else
+          } else {
             right - 1
+          }
         } else {
           // Binary search for smallest/largest quality
           def binarySearchEquality(eq: Int, limit: Int): Int = {
@@ -477,14 +481,19 @@ object RangeCriticalPoint {
                   prevLarger = i
                   i = i - 1
                   if (srcPartition) {
-                    size = if (target(i).end.isDefined) target(i).end.get.size else 0
+                    size = if (target(i).end.isDefined) {
+                      target(i).end.get.size
+                    } else {
+                      0
+                    }
                     val cpr = target(i).asInstanceOf[CriticalPointRange[HBaseRawType]]
                     inclusive = cpr.prefixIndex < dimSize - 1 || target(i).endInclusive
                   }
-                  if (target(i).end.isDefined)
+                  if (target(i).end.isDefined) {
                     cmp = Bytes.compareTo(target(i).end.get, 0, size, src, 0, size)
-                  else
+                  } else {
                     cmp = 1
+                  }
                   tgtInclusive = inclusive
                   if (cmp == 0) {
                     cmp = if (srcInclusive && tgtInclusive) 0
