@@ -495,7 +495,7 @@ object RangeCriticalPoint {
                 var i = left
                 cmp = 0
                 prevSmaller = left
-                while (i < right && cmp <= 0) {
+                while (i < right - 1 && cmp <= 0) {
                   prevSmaller = i
                   i = i + 1
                   if (srcPartition) {
