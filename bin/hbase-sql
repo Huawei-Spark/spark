@@ -23,7 +23,7 @@
 # Enter posix mode for bash
 set -o posix
 
-CLASS="org.apache.spark.sql.hbase.HBaseSQLCLIDriver"
+CLASS="org.apache.spark.sql.hbase.HBaseSQLCliDriver"
 
 # Figure out where Spark is installed
 FWDIR="$(cd "`dirname "$0"`"/..; pwd)"
