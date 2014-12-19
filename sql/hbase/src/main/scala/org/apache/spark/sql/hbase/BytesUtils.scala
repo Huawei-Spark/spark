@@ -33,55 +33,55 @@ object BytesUtils {
     }
   }
 
-  def toString(input: HBaseRawType): String = {
-    Bytes.toString(input)
+  def toString(input: HBaseRawType, start:Int, length:Int): String = {
+    Bytes.toString(input, start, length)
   }
 
-  def toByte(input: HBaseRawType): Byte = {
+  def toByte(input: HBaseRawType, start:Int): Byte = {
     // Flip sign bit back
-    val v: Int = input(0) ^ 0x80
+    val v: Int = input(start) ^ 0x80
     v.asInstanceOf[Byte]
   }
 
-  def toBoolean(input: HBaseRawType): Boolean = {
-    input(0) != 0
+  def toBoolean(input: HBaseRawType, start:Int): Boolean = {
+    input(start) != 0
   }
 
-  def toDouble(input: HBaseRawType): Double = {
-    var l: Long = Bytes.toLong(input)
+  def toDouble(input: HBaseRawType, start:Int): Double = {
+    var l: Long = Bytes.toLong(input, start, Bytes.SIZEOF_DOUBLE)
     l = l - 1
     l ^= (~l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE
     java.lang.Double.longBitsToDouble(l)
   }
 
-  def toShort(input: HBaseRawType): Short = {
+  def toShort(input: HBaseRawType, start:Int): Short = {
     // flip sign bit back
-    var v: Int = input(0) ^ 0x80
-    v = (v << 8) + (input(1) & 0xff)
+    var v: Int = input(start) ^ 0x80
+    v = (v << 8) + (input(1+start) & 0xff)
     v.asInstanceOf[Short]
   }
 
-  def toFloat(input: HBaseRawType): Float = {
-    var i = toInt(input)
+  def toFloat(input: HBaseRawType, start:Int): Float = {
+    var i = toInt(input, start)
     i = i - 1
     i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
     java.lang.Float.intBitsToFloat(i)
   }
 
-  def toInt(input: HBaseRawType): Int = {
+  def toInt(input: HBaseRawType, start:Int): Int = {
     // Flip sign bit back
-    var v: Int = input(0) ^ 0x80
+    var v: Int = input(start) ^ 0x80
     for (i <- 1 to Bytes.SIZEOF_INT - 1) {
-      v = (v << 8) + (input(i) & 0xff)
+      v = (v << 8) + (input(i+start) & 0xff)
     }
     v
   }
 
-  def toLong(input: HBaseRawType): Long = {
+  def toLong(input: HBaseRawType, start:Int): Long = {
     // Flip sign bit back
-    var v: Long = input(0) ^ 0x80
+    var v: Long = input(start) ^ 0x80
     for (i <- 1 to Bytes.SIZEOF_LONG - 1) {
-      v = (v << 8) + (input(i) & 0xff)
+      v = (v << 8) + (input(i+start) & 0xff)
     }
     v
   }

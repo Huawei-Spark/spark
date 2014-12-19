@@ -114,13 +114,12 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 
     assert(rowkey.length === 8 + 6 + 1 + 4)
 
-    val keys = HBaseKVHelper.decodingRawKeyColumns(new ListBuffer[HBaseRawType],
-      new ArrayBuffer[Byte], rowkey,
+    val keys = HBaseKVHelper.decodingRawKeyColumns(rowkey,
       Seq(KeyColumn("col1", DoubleType, 0), KeyColumn("col2", StringType, 1),
         KeyColumn("col3", IntegerType, 2)))
 
-    assert(BytesUtils.toDouble(keys(0)) === 123.456)
-    assert(BytesUtils.toString(keys(1)) === "abcdef")
-    assert(BytesUtils.toInt(keys(2)) === 1234)
+    assert(BytesUtils.toDouble(rowkey, keys(0)._1) === 123.456)
+    assert(BytesUtils.toString(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
+    assert(BytesUtils.toInt(rowkey, keys(2)._1) === 1234)
   }
 }

@@ -26,17 +26,16 @@ import org.apache.spark.sql.catalyst.types._
  */
 object DataTypeUtils {
   //  TODO: more data types support?
-  def bytesToData(src: HBaseRawType,
-                  dt: DataType): Any = {
+  def bytesToData(src: HBaseRawType, start: Int, length: Int, dt: DataType): Any = {
     dt match {
-      case StringType => BytesUtils.toString(src)
-      case IntegerType => BytesUtils.toInt(src)
-      case BooleanType => BytesUtils.toBoolean(src)
-      case ByteType => src(0)
-      case DoubleType => BytesUtils.toDouble(src)
-      case FloatType => BytesUtils.toFloat(src)
-      case LongType => BytesUtils.toLong(src)
-      case ShortType => BytesUtils.toShort(src)
+      case StringType => BytesUtils.toString(src, start, length)
+      case IntegerType => BytesUtils.toInt(src, start)
+      case BooleanType => BytesUtils.toBoolean(src, start)
+      case ByteType => src(start)
+      case DoubleType => BytesUtils.toDouble(src, start)
+      case FloatType => BytesUtils.toFloat(src, start)
+      case LongType => BytesUtils.toLong(src, start)
+      case ShortType => BytesUtils.toShort(src, start)
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }
@@ -61,20 +60,22 @@ object DataTypeUtils {
   def setRowColumnFromHBaseRawType(row: MutableRow,
                                    index: Int,
                                    src: HBaseRawType,
+                                   start: Int,
+                                   length: Int,
                                    dt: DataType): Unit = {
     if (src == null) {
       row.setNullAt(index)
       return
     }
     dt match {
-      case StringType => row.setString(index, BytesUtils.toString(src))
-      case IntegerType => row.setInt(index, BytesUtils.toInt(src))
-      case BooleanType => row.setBoolean(index, BytesUtils.toBoolean(src))
-      case ByteType => row.setByte(index, BytesUtils.toByte(src))
-      case DoubleType => row.setDouble(index, BytesUtils.toDouble(src))
-      case FloatType => row.setFloat(index, BytesUtils.toFloat(src))
-      case LongType => row.setLong(index, BytesUtils.toLong(src))
-      case ShortType => row.setShort(index, BytesUtils.toShort(src))
+      case StringType => row.setString(index, BytesUtils.toString(src, start, length))
+      case IntegerType => row.setInt(index, BytesUtils.toInt(src, start))
+      case BooleanType => row.setBoolean(index, BytesUtils.toBoolean(src, start))
+      case ByteType => row.setByte(index, BytesUtils.toByte(src, start))
+      case DoubleType => row.setDouble(index, BytesUtils.toDouble(src, start))
+      case FloatType => row.setFloat(index, BytesUtils.toFloat(src, start))
+      case LongType => row.setLong(index, BytesUtils.toLong(src, start))
+      case ShortType => row.setShort(index, BytesUtils.toShort(src, start))
       case _ => throw new Exception("Unsupported HBase SQL Data Type")
     }
   }

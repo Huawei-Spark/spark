@@ -45,37 +45,58 @@ object HBaseKVHelper {
     listBuffer.toArray
   }
 
-  /**
-   * get the sequence of key columns from the byte array
-   * @param buffer an input buffer
-   * @param rowKey array of bytes
-   * @param keyColumns the sequence of key columns
-   * @return sequence of byte array
-   */
-  def decodingRawKeyColumns(buffer: ListBuffer[HBaseRawType], arrayBuffer: ArrayBuffer[Byte],
-                        rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[HBaseRawType] = {
-    buffer.clear()
+//  /**
+//   * get the sequence of key columns from the byte array
+//   * @param buffer an input buffer
+//   * @param rowKey array of bytes
+//   * @param keyColumns the sequence of key columns
+//   * @return sequence of byte array
+//   */
+//  def decodingRawKeyColumns(buffer: ListBuffer[HBaseRawType], arrayBuffer: ArrayBuffer[Byte],
+//                            rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[HBaseRawType] = {
+//    buffer.clear()
+//    var index = 0
+//    for (keyColumn <- keyColumns) {
+//      arrayBuffer.clear()
+//      val dataType = keyColumn.dataType
+//      if (dataType == StringType) {
+//        while (index < rowKey.length && rowKey(index) != delimiter) {
+//          arrayBuffer += rowKey(index)
+//          index = index + 1
+//        }
+//        index = index + 1
+//      }
+//      else {
+//        val length = NativeType.defaultSizeOf(dataType.asInstanceOf[NativeType])
+//        for (i <- 0 to (length - 1)) {
+//          arrayBuffer += rowKey(index)
+//          index = index + 1
+//        }
+//      }
+//      buffer += arrayBuffer.toArray
+//    }
+//    buffer.toSeq
+//  }
+
+  def decodingRawKeyColumns(rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[(Int, Int)] = {
     var index = 0
-    for (keyColumn <- keyColumns) {
-      arrayBuffer.clear()
-      val dataType = keyColumn.dataType
-      if (dataType == StringType) {
-        while (index < rowKey.length && rowKey(index) != delimiter) {
-          arrayBuffer += rowKey(index)
-          index = index + 1
+    keyColumns.map {
+      case c => {
+        if (index >= rowKey.length) (-1, -1)
+        else {
+          val start = index
+          if (c.dataType == StringType) {
+            val pos = rowKey.indexOf(delimiter, index)
+            index = pos + 1
+            (start, pos - start)
+          } else {
+            val length = NativeType.defaultSizeOf(c.dataType.asInstanceOf[NativeType])
+            index += length
+            (start, length)
+          }
         }
-        index = index + 1
       }
-      else {
-        val length = NativeType.defaultSizeOf(dataType.asInstanceOf[NativeType])
-        for (i <- 0 to (length - 1)) {
-          arrayBuffer += rowKey(index)
-          index = index + 1
-        }
-      }
-      buffer += arrayBuffer.toArray
     }
-    buffer.toSeq
   }
 
   /**
@@ -96,7 +117,7 @@ object HBaseKVHelper {
     relation.keyColumns.foreach(kc => {
       val ordinal = kc.ordinal
       keyBytes(kc.order) = (string2Bytes(values(ordinal), lineBuffer(ordinal)),
-                           relation.output(ordinal).dataType)
+        relation.output(ordinal).dataType)
     })
     for (i <- 0 until relation.nonKeyColumns.size) {
       val nkc = relation.nonKeyColumns(i)

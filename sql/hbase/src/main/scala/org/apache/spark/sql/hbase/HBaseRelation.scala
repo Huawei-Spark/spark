@@ -191,9 +191,8 @@ private[hbase] case class HBaseRelation(
                 bound: Option[HBaseRawType]): Option[Any] = {
       if (bound.isEmpty) None
       else {
-        Some(DataTypeUtils.bytesToData(
-          HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, bound.get, keyColumns)(index),
-          dt).asInstanceOf[dt.JvmType])
+        val (start, length) = HBaseKVHelper.decodingRawKeyColumns(bound.get, keyColumns)(index)
+        Some(DataTypeUtils.bytesToData(bound.get, start, length, dt).asInstanceOf[dt.JvmType])
       }
     }
 
@@ -683,18 +682,18 @@ private[hbase] case class HBaseRelation(
                row: MutableRow): Row = {
     assert(projections.size == row.length, "Projection size and row size mismatched")
     // TODO: replaced with the new Key method
-    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, result.getRow, keyColumns)
+    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach { p =>
       columnMap.get(p._1.name).get match {
         case column: NonKeyColumn =>
           val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
-          DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, colValue,
-            column.dataType)
+          DataTypeUtils.setRowColumnFromHBaseRawType(
+            row, p._2, colValue, 0, colValue.length, column.dataType)
         case ki =>
           val keyIndex = ki.asInstanceOf[Int]
-          val rowKey = rowKeys(keyIndex)
-          DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, rowKey,
-            keyColumns(keyIndex).dataType)
+          val (start, length) = rowKeys(keyIndex)
+          DataTypeUtils.setRowColumnFromHBaseRawType(
+            row, p._2, result.getRow, start, length, keyColumns(keyIndex).dataType)
       }
     }
     row
