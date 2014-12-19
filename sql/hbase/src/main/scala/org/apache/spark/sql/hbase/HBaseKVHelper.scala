@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
 import org.apache.spark.sql.catalyst.types._
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ArrayBuffer
 
 object HBaseKVHelper {
   private val delimiter: Byte = 0
