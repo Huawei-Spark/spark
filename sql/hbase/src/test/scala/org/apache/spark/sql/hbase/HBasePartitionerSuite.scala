@@ -58,25 +58,21 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     val family2 = "family2"
 
     val rowkey1 = HBaseKVHelper.encodingRawKeyColumns(
-      ListBuffer[Byte](),
       Seq((BytesUtils.create(IntegerType).toBytes(1), IntegerType)
         , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
     )
 
     val rowkey2 = HBaseKVHelper.encodingRawKeyColumns(
-      ListBuffer[Byte](),
       Seq((BytesUtils.create(IntegerType).toBytes(9), IntegerType)
         , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
     )
 
     val rowkey3 = HBaseKVHelper.encodingRawKeyColumns(
-      ListBuffer[Byte](),
       Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
         , (BytesUtils.create(IntegerType).toBytes(4), IntegerType))
     )
 
     val rowkey4 = HBaseKVHelper.encodingRawKeyColumns(
-      ListBuffer[Byte](),
       Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
         , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
     )
@@ -106,7 +102,6 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 
   test("row key encode / decode") {
     val rowkey = HBaseKVHelper.encodingRawKeyColumns(
-      ListBuffer[Byte](),
       Seq((BytesUtils.create(DoubleType).toBytes(123.456), DoubleType),
         (BytesUtils.create(StringType).toBytes("abcdef"), StringType),
         (BytesUtils.create(IntegerType).toBytes(1234), IntegerType))

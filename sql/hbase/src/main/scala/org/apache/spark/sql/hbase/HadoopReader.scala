@@ -40,12 +40,11 @@ class HadoopReader(
       val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
       val valueBytes = new Array[(Array[Byte], Array[Byte],
                           Array[Byte])](relation.nonKeyColumns.size)
-      val buffer = ListBuffer[Byte]()
       val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
       iter.map { line =>
         HBaseKVHelper.string2KV(line.split(splitRegex), relation,
           lineBuffer, keyBytes, valueBytes)
-        val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
+        val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(keyBytes)
         val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
         val put = new PutWrapper(rowKeyData)
         valueBytes.foreach { case (family, qualifier, value) =>

@@ -143,7 +143,7 @@ with Logging {
     }
 
     val buffer = ListBuffer[Byte]()
-    HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
+    HBaseKVHelper.encodingRawKeyColumns(rawKeyCol)
   }
 
   def addRowVals(put: Put, rowValue: Any, rowType: DataType,

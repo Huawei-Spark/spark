@@ -77,7 +77,6 @@ case class InsertIntoHBaseTable(
       var colIndexInBatch = 0
 
       var puts = new ListBuffer[Put]()
-      val buffer = ListBuffer[Byte]()
       while (iterator.hasNext) {
         val row = iterator.next()
         val rawKeyCol = relation.keyColumns.map(
@@ -88,7 +87,7 @@ case class InsertIntoHBaseTable(
             (rowColumn, kc.dataType)
           }
         )
-        val key = HBaseKVHelper.encodingRawKeyColumns(buffer, rawKeyCol)
+        val key = HBaseKVHelper.encodingRawKeyColumns(rawKeyCol)
         val put = new Put(key)
         relation.nonKeyColumns.foreach(
           nkc => {

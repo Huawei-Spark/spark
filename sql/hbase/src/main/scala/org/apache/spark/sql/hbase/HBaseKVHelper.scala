@@ -27,21 +27,27 @@ object HBaseKVHelper {
 
   /**
    * create row key based on key columns information
-   * @param buffer an input buffer
+   * for strings, it will add '0x00' as its delimiter
    * @param rawKeyColumns sequence of byte array and data type representing the key columns
    * @return array of bytes
    */
-  def encodingRawKeyColumns(buffer: ListBuffer[Byte],
-                            rawKeyColumns: Seq[(HBaseRawType, DataType)]): HBaseRawType = {
-    var listBuffer = buffer
-    listBuffer.clear()
+  def encodingRawKeyColumns(rawKeyColumns: Seq[(HBaseRawType, DataType)]): HBaseRawType = {
+    val length = rawKeyColumns
+      .foldLeft(0)((b, a) => {
+      val len = b + a._1.length
+      if (a._2 == StringType) len + 1 else len
+    })
+    val result = new HBaseRawType(length)
+    var index = 0
     for (rawKeyColumn <- rawKeyColumns) {
-      listBuffer = listBuffer ++ rawKeyColumn._1
+      Array.copy(rawKeyColumn._1, 0, result, index, rawKeyColumn._1.length)
+      index += rawKeyColumn._1.length
       if (rawKeyColumn._2 == StringType) {
-        listBuffer += delimiter
+        result(index) = delimiter
+        index += 1
       }
     }
-    listBuffer.toArray
+    result
   }
 
   /**
@@ -138,7 +144,6 @@ object HBaseKVHelper {
         (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType), dataType)
     }
 
-    val buffer = ListBuffer[Byte]()
-    encodingRawKeyColumns(buffer, rawKeyCol)
+    encodingRawKeyColumns(rawKeyCol)
   }
 }
