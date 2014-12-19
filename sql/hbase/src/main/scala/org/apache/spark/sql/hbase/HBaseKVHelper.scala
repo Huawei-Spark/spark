@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
 import org.apache.spark.sql.catalyst.types._
 
@@ -45,57 +44,29 @@ object HBaseKVHelper {
     listBuffer.toArray
   }
 
-//  /**
-//   * get the sequence of key columns from the byte array
-//   * @param buffer an input buffer
-//   * @param rowKey array of bytes
-//   * @param keyColumns the sequence of key columns
-//   * @return sequence of byte array
-//   */
-//  def decodingRawKeyColumns(buffer: ListBuffer[HBaseRawType], arrayBuffer: ArrayBuffer[Byte],
-//                            rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[HBaseRawType] = {
-//    buffer.clear()
-//    var index = 0
-//    for (keyColumn <- keyColumns) {
-//      arrayBuffer.clear()
-//      val dataType = keyColumn.dataType
-//      if (dataType == StringType) {
-//        while (index < rowKey.length && rowKey(index) != delimiter) {
-//          arrayBuffer += rowKey(index)
-//          index = index + 1
-//        }
-//        index = index + 1
-//      }
-//      else {
-//        val length = NativeType.defaultSizeOf(dataType.asInstanceOf[NativeType])
-//        for (i <- 0 to (length - 1)) {
-//          arrayBuffer += rowKey(index)
-//          index = index + 1
-//        }
-//      }
-//      buffer += arrayBuffer.toArray
-//    }
-//    buffer.toSeq
-//  }
-
+  /**
+   * generate the sequence information of key columns from the byte array
+   * @param rowKey array of bytes
+   * @param keyColumns the sequence of key columns
+   * @return sequence of information in (offset, length) tuple
+   */
   def decodingRawKeyColumns(rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[(Int, Int)] = {
     var index = 0
     keyColumns.map {
-      case c => {
+      case c =>
         if (index >= rowKey.length) (-1, -1)
         else {
-          val start = index
+          val offset = index
           if (c.dataType == StringType) {
             val pos = rowKey.indexOf(delimiter, index)
             index = pos + 1
-            (start, pos - start)
+            (offset, pos - offset)
           } else {
             val length = NativeType.defaultSizeOf(c.dataType.asInstanceOf[NativeType])
             index += length
-            (start, length)
+            (offset, length)
           }
         }
-      }
     }
   }
 
@@ -171,4 +142,3 @@ object HBaseKVHelper {
     encodingRawKeyColumns(buffer, rawKeyCol)
   }
 }
-
