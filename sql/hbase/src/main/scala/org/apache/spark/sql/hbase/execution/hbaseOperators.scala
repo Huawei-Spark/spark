@@ -18,7 +18,6 @@
 package org.apache.spark.sql.hbase.execution
 
 import org.apache.hadoop.hbase.client.Put
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD

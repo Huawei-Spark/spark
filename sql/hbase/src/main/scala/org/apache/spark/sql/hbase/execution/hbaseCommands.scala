@@ -34,7 +34,7 @@ import org.apache.spark.sql.hbase._
 import org.apache.spark.sql.sources.LogicalRelation
 import scala.collection.JavaConversions._
 
-import scala.collection.mutable.{ListBuffer, ArrayBuffer}
+import scala.collection.mutable.ArrayBuffer
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {
