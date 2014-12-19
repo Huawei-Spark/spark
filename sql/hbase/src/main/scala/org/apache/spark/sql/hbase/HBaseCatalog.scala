@@ -353,9 +353,5 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
 object HBaseCatalog {
   private final val MetaData = "metadata"
   private final val ColumnFamily = Bytes.toBytes("colfam")
-  //  private final val QualKeyColumns = Bytes.toBytes("keyColumns")
-  //  private final val QualNonKeyColumns = Bytes.toBytes("nonKeyColumns")
-  //  private final val QualHbaseName = Bytes.toBytes("hbaseName")
-  //  private final val QualAllColumns = Bytes.toBytes("allColumns")
   private final val QualData = Bytes.toBytes("data")
 }
