@@ -18,15 +18,12 @@
 package org.apache.spark.sql.hbase
 
 import java.io._
-import java.util.zip.{InflaterInputStream, DeflaterOutputStream}
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.{DeflaterOutputStream, InflaterInputStream}
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, FileSystem}
-import java.util.concurrent.atomic.AtomicInteger
-
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.hadoop.hbase.client.Put
-import org.apache.hadoop.hbase.util.Bytes
 
 object Util {
   val iteration = new AtomicInteger(0)

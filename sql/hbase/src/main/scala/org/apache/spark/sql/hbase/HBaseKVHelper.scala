@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Row}
 import org.apache.spark.sql.catalyst.types._
 
 import scala.collection.mutable.ArrayBuffer

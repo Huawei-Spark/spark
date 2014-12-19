@@ -16,24 +16,24 @@
  */
 package org.apache.spark.sql.hbase.execution
 
-import org.apache.hadoop.fs.{Path, FileSystem}
-import org.apache.hadoop.hbase.mapreduce.{LoadIncrementalHFiles, HFileOutputFormat2}
-import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
+import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
 import org.apache.hadoop.mapreduce.Job
 import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Row}
 import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase._
 import org.apache.spark.sql.sources.LogicalRelation
-import scala.collection.JavaConversions._
 
+import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
 
 @DeveloperApi

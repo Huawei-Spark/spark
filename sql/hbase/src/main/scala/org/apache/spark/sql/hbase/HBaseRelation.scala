@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
-import org.apache.spark.sql.sources.{LogicalRelation, CatalystScan, RelationProvider, BaseRelation}
+import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation, RelationProvider}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}

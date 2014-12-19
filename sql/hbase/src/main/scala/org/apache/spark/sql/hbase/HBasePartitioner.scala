@@ -19,10 +19,10 @@ package org.apache.spark.sql.hbase
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
-import org.apache.spark.{Partitioner, SparkEnv}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.util.{CollectionsUtils, Utils}
+import org.apache.spark.{Partitioner, SparkEnv}
 
 import scala.reflect.ClassTag
 
