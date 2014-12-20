@@ -222,6 +222,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
         result = Some(getRelationFromResult(values))
       }
     }
+    result.get.fetchPartitions
     result
   }
 
