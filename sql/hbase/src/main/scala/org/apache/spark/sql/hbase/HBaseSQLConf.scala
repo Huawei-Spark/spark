@@ -17,26 +17,19 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.conf.Configuration
+import org.apache.spark.sql.SQLConf
 
-import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.SparkSQLParser
-import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+private[hbase] object HBaseSQLConf {
+  val PARTITION_EXPIRATION = "spark.sql.hbase.partition"
+}
 
-class HBaseSQLContext(sc: SparkContext,
-                      val optConfiguration: Option[Configuration] = None)
-  extends SQLContext(sc) with HBaseSQLConf {
+/**
+ * A trait that enables the setting and getting of mutable config parameters/hints.
+ *
+ **/
+private[hbase] trait HBaseSQLConf extends SQLConf {
+  import HBaseSQLConf._
 
-  @transient
-  override protected[sql] val sqlParser = {
-    val fallback = new HBaseSQLParser
-    new SparkSQLParser(fallback(_))
-  }
-
-  @transient
-  override protected[sql] lazy val catalog: HBaseCatalog =
-    new HBaseCatalog(this) with OverrideCatalog
-
-  extraStrategies = Seq((new SparkPlanner with HBaseStrategies).HBaseDataSource)
+  /** The expiration of cached partition (i.e., region) info; defaults to 10 minutes . */
+  private[spark] def partitionExpiration: Long = getConf(PARTITION_EXPIRATION, "600").toLong
 }

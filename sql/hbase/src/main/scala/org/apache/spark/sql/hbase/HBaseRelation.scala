@@ -163,33 +163,38 @@ private[hbase] case class HBaseRelation(
   /**
    * partitions are updated per table lookup to keep the info reasonably updated
    */
+  @transient lazy val partitionExpiration = context.partitionExpiration * 1000
+  @transient var partitionTS: Long = _
+
   private[hbase] def fetchPartitions: Unit = {
-    partitions = {
-      val regionLocations = htable.getRegionLocations.asScala.toSeq
-      logger.info(s"Number of HBase regions for " +
-        s"table ${htable.getName.getNameAsString}: ${regionLocations.size}")
-      regionLocations.zipWithIndex.map {
-        case p =>
-          val start: Option[HBaseRawType] = {
-            if (p._1._1.getStartKey.length == 0)
-            {
-              None
-            } else {
-              Some(p._1._1.getStartKey)
+    if (System.currentTimeMillis - partitionTS >= partitionExpiration) {
+      partitionTS = System.currentTimeMillis
+      partitions = {
+        val regionLocations = htable.getRegionLocations.asScala.toSeq
+        logger.info(s"Number of HBase regions for " +
+          s"table ${htable.getName.getNameAsString}: ${regionLocations.size}")
+        regionLocations.zipWithIndex.map {
+          case p =>
+            val start: Option[HBaseRawType] = {
+              if (p._1._1.getStartKey.length == 0) {
+                None
+              } else {
+                Some(p._1._1.getStartKey)
+              }
             }
-          }
-          val end: Option[HBaseRawType] = {
-            if (p._1._1.getEndKey.length == 0) {
-              None
-            } else {
-              Some(p._1._1.getEndKey)
+            val end: Option[HBaseRawType] = {
+              if (p._1._1.getEndKey.length == 0) {
+                None
+              } else {
+                Some(p._1._1.getEndKey)
+              }
             }
-          }
-          new HBasePartition(
-            p._2, p._2, -1,
-            start,
-            end,
-            Some(p._1._2.getHostname))
+            new HBasePartition(
+              p._2, p._2, -1,
+              start,
+              end,
+              Some(p._1._2.getHostname))
+        }
       }
     }
   }
