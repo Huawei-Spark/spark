@@ -17,7 +17,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.sql.{BooleanType, ByteType, DataType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType}
+import org.apache.spark.sql._
 
 object BytesUtils {
   def create(dataType: DataType): BytesUtils = {
@@ -33,55 +33,55 @@ object BytesUtils {
     }
   }
 
-  def toString(input: HBaseRawType): String = {
-    Bytes.toString(input)
+  def toString(input: HBaseRawType, offset: Int, length: Int): String = {
+    Bytes.toString(input, offset, length)
   }
 
-  def toByte(input: HBaseRawType): Byte = {
+  def toByte(input: HBaseRawType, offset: Int): Byte = {
     // Flip sign bit back
-    val v: Int = input(0) ^ 0x80
+    val v: Int = input(offset) ^ 0x80
     v.asInstanceOf[Byte]
   }
 
-  def toBoolean(input: HBaseRawType): Boolean = {
-    input(0) != 0
+  def toBoolean(input: HBaseRawType, offset: Int): Boolean = {
+    input(offset) != 0
   }
 
-  def toDouble(input: HBaseRawType): Double = {
-    var l: Long = Bytes.toLong(input)
+  def toDouble(input: HBaseRawType, offset: Int): Double = {
+    var l: Long = Bytes.toLong(input, offset, Bytes.SIZEOF_DOUBLE)
     l = l - 1
     l ^= (~l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE
     java.lang.Double.longBitsToDouble(l)
   }
 
-  def toShort(input: HBaseRawType): Short = {
+  def toShort(input: HBaseRawType, offset: Int): Short = {
     // flip sign bit back
-    var v: Int = input(0) ^ 0x80
-    v = (v << 8) + (input(1) & 0xff)
+    var v: Int = input(offset) ^ 0x80
+    v = (v << 8) + (input(1 + offset) & 0xff)
     v.asInstanceOf[Short]
   }
 
-  def toFloat(input: HBaseRawType): Float = {
-    var i = toInt(input)
+  def toFloat(input: HBaseRawType, offset: Int): Float = {
+    var i = toInt(input, offset)
     i = i - 1
     i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
     java.lang.Float.intBitsToFloat(i)
   }
 
-  def toInt(input: HBaseRawType): Int = {
+  def toInt(input: HBaseRawType, offset: Int): Int = {
     // Flip sign bit back
-    var v: Int = input(0) ^ 0x80
+    var v: Int = input(offset) ^ 0x80
     for (i <- 1 to Bytes.SIZEOF_INT - 1) {
-      v = (v << 8) + (input(i) & 0xff)
+      v = (v << 8) + (input(i + offset) & 0xff)
     }
     v
   }
 
-  def toLong(input: HBaseRawType): Long = {
+  def toLong(input: HBaseRawType, offset: Int): Long = {
     // Flip sign bit back
-    var v: Long = input(0) ^ 0x80
+    var v: Long = input(offset) ^ 0x80
     for (i <- 1 to Bytes.SIZEOF_LONG - 1) {
-      v = (v << 8) + (input(i) & 0xff)
+      v = (v << 8) + (input(i + offset) & 0xff)
     }
     v
   }
@@ -89,7 +89,6 @@ object BytesUtils {
 
 //TODO: Remove Serializable when release
 class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
-
   val dataType = dt
 
   def toBytes(input: String): HBaseRawType = {

@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.log4j.Logger
 import org.apache.spark.Partition
 import org.apache.spark.rdd.RDD
@@ -32,7 +31,7 @@ import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
-import org.apache.spark.sql.sources.{LogicalRelation, CatalystScan, RelationProvider, BaseRelation}
+import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation, RelationProvider}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -96,7 +95,7 @@ private[hbase] case class HBaseRelation(
     .asInstanceOf[Seq[NonKeyColumn]]
 
   lazy val partitionKeys = keyColumns.map(col=>
-                   logicalRelation.output.find(_.name.equals(col.sqlName)).get)
+                   logicalRelation.output.find(_.name == col.sqlName).get)
 
   @transient lazy val columnMap = allColumns.map {
     case key: KeyColumn => (key.sqlName, key.order)
@@ -211,9 +210,8 @@ private[hbase] case class HBaseRelation(
                 bound: Option[HBaseRawType]): Option[Any] = {
       if (bound.isEmpty) None
       else {
-        Some(DataTypeUtils.bytesToData(
-          HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, bound.get, keyColumns)(index),
-          dt).asInstanceOf[dt.JvmType])
+        val (start, length) = HBaseKVHelper.decodingRawKeyColumns(bound.get, keyColumns)(index)
+        Some(DataTypeUtils.bytesToData(bound.get, start, length, dt).asInstanceOf[dt.JvmType])
       }
     }
 
@@ -653,10 +651,10 @@ private[hbase] case class HBaseRelation(
   }
 
   def sqlContext = context
-  def schema: StructType = StructType(allColumns.map(c => c match {
+  def schema: StructType = StructType(allColumns.map {
     case KeyColumn(name, dt, _) => StructField(name, dt, nullable = false)
-    case NonKeyColumn(name, dt, _,_) => StructField(name, dt, nullable = true)
-  }))
+    case NonKeyColumn(name, dt, _, _) => StructField(name, dt, nullable = true)
+  })
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     val filterPredicate = if (filters.isEmpty) None
@@ -703,18 +701,18 @@ private[hbase] case class HBaseRelation(
                row: MutableRow): Row = {
     assert(projections.size == row.length, "Projection size and row size mismatched")
     // TODO: replaced with the new Key method
-    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(buffer, aBuffer, result.getRow, keyColumns)
+    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach { p =>
       columnMap.get(p._1.name).get match {
         case column: NonKeyColumn =>
           val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
-          DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, colValue,
-            column.dataType)
+          DataTypeUtils.setRowColumnFromHBaseRawType(
+            row, p._2, colValue, 0, colValue.length, column.dataType)
         case ki =>
           val keyIndex = ki.asInstanceOf[Int]
-          val rowKey = rowKeys(keyIndex)
-          DataTypeUtils.setRowColumnFromHBaseRawType(row, p._2, rowKey,
-            keyColumns(keyIndex).dataType)
+          val (start, length) = rowKeys(keyIndex)
+          DataTypeUtils.setRowColumnFromHBaseRawType(
+            row, p._2, result.getRow, start, length, keyColumns(keyIndex).dataType)
       }
     }
     row
@@ -730,9 +728,9 @@ private[hbase] case class HBaseRelation(
     else {
       val lBuffer = ListBuffer[HBaseRawType]()
       val aBuffer = ArrayBuffer[Byte]()
-      HBaseKVHelper.decodingRawKeyColumns(lBuffer, aBuffer, rawKey.get, keyColumns).
-        zipWithIndex.map(pi => DataTypeUtils.bytesToData(pi._1,
-        keyColumns(pi._2).dataType))
+      HBaseKVHelper.decodingRawKeyColumns(rawKey.get, keyColumns).
+        zipWithIndex.map(pi => DataTypeUtils.bytesToData(rawKey.get,
+        pi._1._1, pi._1._2, keyColumns(pi._2).dataType))
     }
   }
 }

@@ -18,12 +18,10 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.types.StringType
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.catalyst.{SqlLexical, SqlParser}
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.sources.LogicalRelation
-import org.apache.spark.sql.catalyst.{SqlLexical, SqlParser}
-import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.util.Utils
 
 object HBaseSQLParser {
@@ -227,10 +225,9 @@ class HBaseSQLParser extends SqlParser {
       (INPATH ~> stringLit) ~
       (opt(OVERWRITE) ~> INTO ~> TABLE ~> ident) ~
       (FIELDS ~> TERMINATED ~> BY ~> stringLit).? <~ opt(";") ^^ {
-      case isLocal ~ filePath ~ table ~ delimiter => {
+      case isLocal ~ filePath ~ table ~ delimiter =>
         BulkLoadIntoTableCommand(filePath,
           table, isLocal.isDefined, delimiter)
-      }
     }
 
   // syntax:

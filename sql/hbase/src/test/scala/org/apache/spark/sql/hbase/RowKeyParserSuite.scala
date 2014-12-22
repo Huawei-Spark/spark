@@ -82,33 +82,33 @@ class RowKeyParserSuite extends FunSuite with ShouldMatchers {
     }
     rowKeyList
   }
-
-  test("CreateKeyFromCatalystRow") {
-    val row = Row(12345678, "myUserId1", "tower1,tower9,tower3", 22.toByte, 111223445L, 12345678.90123)
-    val allColumnsWithIndex = allColumns.zipWithIndex
-    val rawKeyColsWithKeyIndex: Seq[(HBaseRawType, Int)] = {
-      for {
-        (column, index) <- allColumnsWithIndex
-        if column.isInstanceOf[KeyColumn]
-        key = column.asInstanceOf[KeyColumn]
-      } yield (
-        DataTypeUtils.getRowColumnFromHBaseRawType(row, index, column.dataType),
-        key.order)
-    }
-
-    val rawKeyCols = rawKeyColsWithKeyIndex.sortBy(_._2).map(_._1)
-    val rowkeyA = encodingRawKeyColumns(rawKeyCols)
-    val parsedKey = decodingRawKeyColumns(rowkeyA)
-
-    val mr = new GenericMutableRow(allColumns.length)
-    parsedKey.zipWithIndex.foreach{
-      case (rawkey, keyIndex) =>
-        val key = keyColumns(keyIndex)
-        val index = allColumns.indexOf(key)
-        setRowColumnFromHBaseRawType(
-          mr, index, rawkey, key.dataType)
-    }
-
-    println(mr.getLong(4))
-  }
+//
+//  test("CreateKeyFromCatalystRow") {
+//    val row = Row(12345678, "myUserId1", "tower1,tower9,tower3", 22.toByte, 111223445L, 12345678.90123)
+//    val allColumnsWithIndex = allColumns.zipWithIndex
+//    val rawKeyColsWithKeyIndex: Seq[(HBaseRawType, Int)] = {
+//      for {
+//        (column, index) <- allColumnsWithIndex
+//        if column.isInstanceOf[KeyColumn]
+//        key = column.asInstanceOf[KeyColumn]
+//      } yield (
+//        DataTypeUtils.getRowColumnFromHBaseRawType(row, index, column.dataType),
+//        key.order)
+//    }
+//
+//    val rawKeyCols = rawKeyColsWithKeyIndex.sortBy(_._2).map(_._1)
+//    val rowkeyA = encodingRawKeyColumns(rawKeyCols)
+//    val parsedKey = decodingRawKeyColumns(rowkeyA)
+//
+//    val mr = new GenericMutableRow(allColumns.length)
+//    parsedKey.zipWithIndex.foreach{
+//      case (rawkey, keyIndex) =>
+//        val key = keyColumns(keyIndex)
+//        val index = allColumns.indexOf(key)
+//        setRowColumnFromHBaseRawType(
+//          mr, index, rawkey, key.dataType)
+//    }
+//
+//    println(mr.getLong(4))
+//  }
 }

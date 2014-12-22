@@ -16,26 +16,25 @@
  */
 package org.apache.spark.sql.hbase.execution
 
-import org.apache.hadoop.fs.{Path, FileSystem}
-import org.apache.hadoop.hbase.mapreduce.{LoadIncrementalHFiles, HFileOutputFormat}
-import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
+import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
 import org.apache.hadoop.mapreduce.Job
 import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
-import org.apache.spark.sql.catalyst.expressions.{Row, Attribute}
-import org.apache.spark.sql.catalyst.plans.logical.{Subquery, LogicalPlan}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Row}
+import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase._
 import org.apache.spark.sql.sources.LogicalRelation
-import scala.collection.JavaConversions._
 
-import scala.collection.mutable.{ListBuffer, ArrayBuffer}
+import scala.collection.JavaConversions._
+import scala.collection.mutable.ArrayBuffer
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {
@@ -127,13 +126,12 @@ case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
     val relation: HBaseRelation = solvedRelation.asInstanceOf[Subquery]
       .child.asInstanceOf[LogicalRelation]
       .relation.asInstanceOf[HBaseRelation]
-    val buffer = ListBuffer[Byte]()
     val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
     val valueBytes = new Array[(Array[Byte], Array[Byte],
                                 Array[Byte])](relation.nonKeyColumns.size)
     val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
     HBaseKVHelper.string2KV(valueSeq, relation, lineBuffer, keyBytes, valueBytes)
-    val rowKey = HBaseKVHelper.encodingRawKeyColumns(buffer, keyBytes)
+    val rowKey = HBaseKVHelper.encodingRawKeyColumns(keyBytes)
     val put = new Put(rowKey)
     valueBytes.foreach { case (family, qualifier, value) =>
       put.add(family, qualifier, value)
@@ -208,7 +206,7 @@ case class BulkLoadIntoTableCommand(path: String, tableName: String,
 
     job.setOutputKeyClass(classOf[ImmutableBytesWritable])
     job.setOutputValueClass(classOf[KeyValue])
-    job.setOutputFormatClass(classOf[HFileOutputFormat])
+    job.setOutputFormatClass(classOf[HFileOutputFormat2])
     job.getConfiguration.set("mapred.output.dir", tmpPath)
     bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
   }

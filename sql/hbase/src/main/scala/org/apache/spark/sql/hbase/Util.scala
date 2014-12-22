@@ -17,12 +17,12 @@
 
 package org.apache.spark.sql.hbase
 
-import java.io.{ByteArrayOutputStream, DataOutputStream, DataInputStream, ByteArrayInputStream}
+import java.io._
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.{DeflaterOutputStream, InflaterInputStream}
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, FileSystem}
-import java.util.concurrent.atomic.AtomicInteger
-
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase.HBaseConfiguration
 
 object Util {
@@ -39,15 +39,16 @@ object Util {
 
   def serializeHBaseConfiguration(configuration: Configuration): Array[Byte] = {
     val bos = new ByteArrayOutputStream
-    val dos = new DataOutputStream(bos)
+    val deflaterOutputStream = new DeflaterOutputStream(bos)
+    val dos = new DataOutputStream(deflaterOutputStream)
     configuration.write(dos)
+    dos.close()
     bos.toByteArray
   }
 
   def deserializeHBaseConfiguration(arr: Array[Byte]) = {
     val conf = HBaseConfiguration.create
-    conf.readFields(new DataInputStream(new ByteArrayInputStream(arr)))
+    conf.readFields(new DataInputStream(new InflaterInputStream(new ByteArrayInputStream(arr))))
     conf
   }
-
 }

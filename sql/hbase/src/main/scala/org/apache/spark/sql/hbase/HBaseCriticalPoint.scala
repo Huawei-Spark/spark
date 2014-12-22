@@ -369,8 +369,10 @@ object RangeCriticalPoint {
   }
 
   private[hbase] def generateCriticalPointRangesHelper(relation: HBaseRelation,
-                                                       predExpr: Expression, dimIndex: Int,
-                                                       row: MutableRow, boundPred: Expression,
+                                                       predExpr: Expression,
+                                                       dimIndex: Int,
+                                                       row: MutableRow,
+                                                       boundPred: Expression,
                                                        predRefs: Seq[Attribute])
   : Seq[CriticalPointRange[_]] = {
     val keyDim = relation.partitionKeys(dimIndex)

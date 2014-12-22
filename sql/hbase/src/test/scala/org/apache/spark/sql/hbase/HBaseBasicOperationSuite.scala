@@ -90,7 +90,7 @@ class HBaseBasicOperationSuite extends QueryTest {
   }
 
   test("Select test 3") {
-    sql( """SELECT * FROM tb3""").foreach(println)
+    sql( """SELECT * FROM tb""").foreach(println)
   }
 
   test("Select test 4") {
