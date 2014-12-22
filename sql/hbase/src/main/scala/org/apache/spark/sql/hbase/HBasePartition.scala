@@ -25,18 +25,18 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 private[hbase] class HBasePartition(
     val idx: Int, val mappedIndex: Int,
     val keyPartialEvalIndex: Int = -1,
-    val lowerBound: Option[HBaseRawType] = None,
-    val upperBound: Option[HBaseRawType] = None,
+    start: Option[HBaseRawType] = None,
+    end: Option[HBaseRawType] = None,
     val server: Option[String] = None,
     val filterPred: Option[Expression] = None,
-    @transient relation: HBaseRelation = null) extends Range[HBaseRawType](lowerBound, true,
-               upperBound, false, BinaryType) with Partition with IndexMappable {
+    @transient relation: HBaseRelation = null) extends Range[HBaseRawType](start, true,
+               end, false, BinaryType) with Partition with IndexMappable {
 
   override def index: Int = idx
 
   override def hashCode(): Int = idx
 
-  @transient lazy val startNative: Seq[Any] = relation.nativeKeysConvert(lowerBound)
+  @transient lazy val startNative: Seq[Any] = relation.nativeKeysConvert(start)
 
-  @transient lazy val endNative: Seq[Any] = relation.nativeKeysConvert(upperBound)
+  @transient lazy val endNative: Seq[Any] = relation.nativeKeysConvert(end)
 }

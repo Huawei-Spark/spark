@@ -462,7 +462,7 @@ object RangeCriticalPoint {
                                               upperBound: Boolean, comp: (S, T) => Int): Int = {
     val threshold = 10  // linear search threshold
     var left = startIndex
-    var right = tgt.size
+    var right = tgt.size-1
     var prevLarger = -1
     var prevSmaller = -1
     var mid = -1
@@ -475,7 +475,7 @@ object RangeCriticalPoint {
           // tighter upper bound
           var i = right
           prevLarger = right
-          while (i >= left && cmp >= 0) {
+          while (i >= left+1 && cmp <= 0) {
             prevLarger = i
             i = i - 1
             cmp = comp(src, tgt(i))
@@ -484,7 +484,7 @@ object RangeCriticalPoint {
           // tight lower bound
           var i = left
           prevSmaller = left
-          while (i <= right && cmp <= 0) {
+          while (i <= right-1 && cmp >= 0) {
             prevSmaller = i
             i = i + 1
             cmp = comp(src, tgt(i))
@@ -533,10 +533,10 @@ object RangeCriticalPoint {
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
         mdpr.compareWithPartition(startOrEnd=false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
-        smallestEnd > largestStart) {
+        smallestEnd < largestStart) {
       null
     } // no overlapping
-    else { (smallestEnd, largestStart) }
+    else { (largestStart, smallestEnd) }
   }
 
   /**
@@ -587,13 +587,13 @@ object RangeCriticalPoint {
           // only. This is a bit conservative to avoid extra complexity
           // Step 3.3
           result = result :+ new HBasePartition(pIndex, p.idx, 0,
-            p.lowerBound, p.upperBound, p.server, pred)
+            p.start, p.end, p.server, pred)
           pIndex += 1
           for (i <- pstart + 1 to pend - 1) {
             p = partitions(i)
             // Step 3.2
             result = result :+ new HBasePartition(pIndex, p.idx, -1,
-              p.lowerBound, p.upperBound, p.server, pred)
+              p.start, p.end, p.server, pred)
             pIndex += 1
           }
           if (pend > pstart) {
@@ -603,7 +603,7 @@ object RangeCriticalPoint {
             // only. This is a bit conservative to avoid extra complexity
             // Step 3.3
             result = result :+ new HBasePartition(pIndex, p.idx, 0,
-              p.lowerBound, p.upperBound, p.server, pred)
+              p.start, p.end, p.server, pred)
             pIndex += 1
           }
           pStartIndex = pend + 1
@@ -611,7 +611,7 @@ object RangeCriticalPoint {
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
           if (qualifiedCPRIndexes == null) done = true
-          else cprStartIndex = qualifiedPartitionIndexes._2 + 1
+          else cprStartIndex = qualifiedCPRIndexes._2
         }
       }
       result

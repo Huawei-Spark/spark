@@ -192,7 +192,7 @@ private[hbase] case class HBaseRelation(
               p._2, p._2, -1,
               start,
               end,
-              Some(p._1._2.getHostname))
+              Some(p._1._2.getHostname), relation = this)
         }
       }
     }
@@ -219,8 +219,8 @@ private[hbase] case class HBaseRelation(
     val isLastKeyIndex = index == (keyColumns.size - 1)
     val buffer = ListBuffer[HBaseRawType]()
     val aBuffer = ArrayBuffer[Byte]()
-    val start = getData(dt, buffer, aBuffer, partition.lowerBound)
-    val end = getData(dt, buffer, aBuffer, partition.upperBound)
+    val start = getData(dt, buffer, aBuffer, partition.start)
+    val end = getData(dt, buffer, aBuffer, partition.end)
     val startInclusive = start.nonEmpty
     val endInclusive = end.nonEmpty && !isLastKeyIndex
     new PartitionRange(start, startInclusive, end, endInclusive, partition.index, dt, pred)
@@ -285,9 +285,9 @@ private[hbase] case class HBaseRelation(
           val par = partitions(p.id)
           idx = idx + 1
           if (p.pred == null) {
-            new HBasePartition(idx, par.mappedIndex, -1, par.lowerBound, par.upperBound, par.server)
+            new HBasePartition(idx, par.mappedIndex, -1, par.start, par.end, par.server)
           } else {
-            new HBasePartition(idx, par.mappedIndex, -1, par.lowerBound, par.upperBound,
+            new HBasePartition(idx, par.mappedIndex, -1, par.start, par.end,
               par.server, Some(p.pred))
           }
         }))
@@ -342,7 +342,7 @@ private[hbase] case class HBaseRelation(
       case Some(pred) => if (pred.references.intersect(AttributeSet(partitionKeys)).isEmpty) {
         // the predicate does not apply to the partitions at all; just push down the filtering
         Some(partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.keyPartialEvalIndex,
-          p.lowerBound, p.upperBound, p.server, Some(pred))))
+          p.start, p.end, p.server, Some(pred))))
       } else {
         val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
         var idx: Int = -1
@@ -352,11 +352,11 @@ private[hbase] case class HBaseRelation(
           // pruned partitions have the same "physical" partition index, but different
           // "canonical" index
           if (p.pred == null) {
-            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.lowerBound,
-              par.upperBound, par.server, None)
+            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.start,
+              par.end, par.server, None)
           } else {
-            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.lowerBound,
-              par.upperBound, par.server, Some(p.pred))
+            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.start,
+              par.end, par.server, Some(p.pred))
           }
         }))
         result
@@ -675,7 +675,7 @@ private[hbase] case class HBaseRelation(
                  projList: Seq[NamedExpression]): Scan = {
     val hbPartition = split.asInstanceOf[HBasePartition]
     val scan = {
-      (hbPartition.lowerBound, hbPartition.upperBound) match {
+      (hbPartition.start, hbPartition.end) match {
         case (Some(lb), Some(ub)) => new Scan(lb, ub)
         case (Some(lb), None) => new Scan(lb)
         case (None, Some(ub)) => new Scan(Array[Byte](), ub)
@@ -726,8 +726,6 @@ private[hbase] case class HBaseRelation(
   def nativeKeysConvert(rawKey: Option[HBaseRawType]): Seq[Any] = {
     if (rawKey.isEmpty) Nil
     else {
-      val lBuffer = ListBuffer[HBaseRawType]()
-      val aBuffer = ArrayBuffer[Byte]()
       HBaseKVHelper.decodingRawKeyColumns(rawKey.get, keyColumns).
         zipWithIndex.map(pi => DataTypeUtils.bytesToData(rawKey.get,
         pi._1._1, pi._1._2, keyColumns(pi._2).dataType))
