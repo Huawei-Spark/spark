@@ -31,6 +31,13 @@ object CriticalPointType extends Enumeration {
   val bothInclusive = Value("Both Inclusive: (...)[](...)")
 }
 
+/**
+ *
+ * @param value value of this critical point
+ * @param ctype type of this critical point
+ * @param dt the runtime data type of this critical point
+ * @tparam T the data type parameter of this critical point
+ */
 case class CriticalPoint[T](value: T, ctype: CriticalPointType.CriticalPointType, dt: NativeType) {
   override def hashCode() = value.hashCode()
 
@@ -63,6 +70,11 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
   lazy val isPoint: Boolean = start.isDefined && end.isDefined &&
                               startInclusive && endInclusive && start.get.equals(end.get)
 
+  /**
+   * expand on nested critical point ranges of sub-dimensions
+   * @param prefix the buffer to build prefix on all leading dimensions
+   * @return a list of Multiple dimensional critical point ranges
+   */
   private[hbase] def flatten(prefix: ArrayBuffer[(Any, NativeType)])
   : Seq[MDCriticalPointRange[_]] = {
     if (nextDimCriticalPointRanges.isEmpty) {
@@ -77,6 +89,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
 }
 
 /**
+ * Multidimensional critical point range. It uses native data types of the dimensions for comparison
  *
  * @param prefix prefix values and their native types of the leading dimensions;
  *               Nil for the first dimension ranges
@@ -84,6 +97,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
  *                  table but just in this invocation!)
  * @param dt the data type of the range of the last dimension
  * @param pred associated predicate
+ * @tparam T the type parameter of the range of the last dimension
  */
 private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)],
                                                lastRange: CriticalPointRange[T], dt: NativeType,
@@ -164,6 +178,13 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
  * Must be called before reference binding
  */
 object RangeCriticalPoint {
+  /**
+   * collect all critical points from an expression on a specific dimension key
+   * @param expression the expression from here the critical points will be identified
+   * @param key the dimension key for which the critical points will be identified
+   * @tparam T type parameter of the critical points
+   * @return
+   */
   private[hbase] def collect[T](expression: Expression, key: AttributeReference)
   : Seq[CriticalPoint[T]] = {
     if (key.references.subsetOf(expression.references)) {
@@ -222,8 +243,13 @@ object RangeCriticalPoint {
   }
 
 
-  /*
+  /**
    * create partition ranges on a *sorted* list of critical points
+   * @param cps a sorted list of critical points
+   * @param dimIndex the dimension index for this set of critical points
+   * @param dt the runtime data type of this set of critical points
+   * @tparam T the type parameter of this set of critical points
+   * @return a list of generated critical point ranges
    */
   private[hbase] def generateCriticalPointRange[T](cps: Seq[CriticalPoint[T]],
                                                    dimIndex: Int, dt: NativeType)
@@ -353,7 +379,13 @@ object RangeCriticalPoint {
     }
   }
 
-  // Step 1
+  /**
+   * Step 1: generate critical point ranges for a particular dimension
+   * @param relation the HBase relation
+   * @param pred the predicate expression to work on
+   * @param dimIndex the dimension index
+   * @return a list of critical point ranges
+   */
   private[hbase] def generateCriticalPointRanges(relation: HBaseRelation,
                                                  pred: Option[Expression], dimIndex: Int)
   : Seq[CriticalPointRange[_]] = {
@@ -368,6 +400,16 @@ object RangeCriticalPoint {
     }
   }
 
+  /**
+   * The workhorse method to generate critical points
+   * @param relation the hbase relation
+   * @param predExpr the predicate to work on
+   * @param dimIndex the dimension index
+   * @param row a row for partial reduction
+   * @param boundPred bound expression
+   * @param predRefs the references in the predicate expression
+   * @return a list of critical point ranges
+   */
   private[hbase] def generateCriticalPointRangesHelper(relation: HBaseRelation,
                                                        predExpr: Expression,
                                                        dimIndex: Int,
@@ -475,7 +517,7 @@ object RangeCriticalPoint {
           // tighter upper bound
           var i = right
           prevLarger = right
-          while (i >= left+1 && cmp <= 0) {
+          while (i >= left + 1 && cmp <= 0) {
             prevLarger = i
             i = i - 1
             cmp = comp(src, tgt(i))
@@ -484,7 +526,7 @@ object RangeCriticalPoint {
           // tight lower bound
           var i = left
           prevSmaller = left
-          while (i <= right-1 && cmp >= 0) {
+          while (i <= right - 1 && cmp >= 0) {
             prevSmaller = i
             i = i + 1
             cmp = comp(src, tgt(i))
