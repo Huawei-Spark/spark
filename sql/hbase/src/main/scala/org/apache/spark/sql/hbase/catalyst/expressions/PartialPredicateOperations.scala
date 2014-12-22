@@ -340,7 +340,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get == -1, null)
+              (cmp.get <= 0, null)
             } else {
               (null, LessThanOrEqual(evalL._2, evalR._2))
             }
@@ -374,7 +374,7 @@ object PartialPredicateOperations {
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
             if (cmp.isDefined) {
-              (cmp.get == 1, null)
+              (cmp.get >= 0, null)
             } else {
               (null, GreaterThanOrEqual(evalL._2, evalR._2))
             }

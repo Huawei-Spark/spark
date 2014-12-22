@@ -17,10 +17,9 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.client.HBaseAdmin
-import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
+import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.spark._
-import org.apache.spark.sql.catalyst.expressions.GenericRow
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
@@ -48,12 +47,33 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val family2 = "family2"
 
     var allColumns = List[AbstractColumn]()
-    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
-    allColumns = allColumns :+ KeyColumn("column1", StringType, 0)
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", StringType, 1)
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column3", BooleanType, family1, "qualifier1")
 
-    val pred = None
+    val lll = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val llr = Literal(1023, IntegerType)
+    val ll = GreaterThan(lll, llr)
+
+    val lrl = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val lrr = Literal(1025, IntegerType)
+    val lr = LessThan(lrl, lrr)
+
+    val l = And(ll, lr)
+
+    val rll = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val rlr = Literal(2048, IntegerType)
+    val rl = GreaterThanOrEqual(rll, rlr)
+
+    val rrl = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val rrr = Literal(512, IntegerType)
+    val rr = LessThanOrEqual(rrl, rrr)
+
+    val r = Or(rl, rr)
+
+    val mid = Or(l, r)
+    val pred = Some(mid)
 
     val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
     RangeCriticalPoint.generateCriticalPointRanges(relation, pred, 0)
