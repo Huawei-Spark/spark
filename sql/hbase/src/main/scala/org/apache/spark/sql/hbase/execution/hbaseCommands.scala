@@ -143,20 +143,20 @@ case class InsertValueIntoTableCommand(tableName: String, valueSeq: Seq[String])
 }
 
 @DeveloperApi
-case class BulkLoadIntoTableCommand(path: String, tableName: String,
-                                    isLocal: Boolean, delimiter: Option[String])
-  extends RunnableCommand {
+case class BulkLoadIntoTableCommand(
+    path: String,
+    tableName: String,
+    isLocal: Boolean,
+    delimiter: Option[String]) extends RunnableCommand {
 
-  private[hbase] def makeBulkLoadRDD(splitKeys: Array[ImmutableBytesWritableWrapper],
-                                     hadoopReader: HadoopReader, job: Job, tmpPath: String,
-                                      relation: HBaseRelation) = {
+  private[hbase] def makeBulkLoadRDD(
+      splitKeys: Array[ImmutableBytesWritableWrapper],
+      hadoopReader: HadoopReader,
+      job: Job,
+      tmpPath: String,
+      relation: HBaseRelation) = {
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(splitKeys)
-    // Todo: fix issues with HBaseShuffledRDD
-//    val shuffled =
-//      new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
-//        .setKeyOrdering(ordering)
-    //.setHbasePartitions(relation.partitions)
     val shuffled =
         new HBaseShuffledRDD(rdd, partitioner, relation.partitions)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
@@ -237,6 +237,112 @@ case class BulkLoadIntoTableCommand(path: String, tableName: String,
     val splitKeys = relation.getRegionStartKeys.toArray
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
     makeBulkLoadRDD(splitKeys, hadoopReader, job, tmpPath, relation)
+    val tablePath = new Path(tmpPath)
+    val load = new LoadIncrementalHFiles(conf)
+    logger.debug(s"Starting doBulkLoad on table ${relation.htable.getName} ...")
+    load.doBulkLoad(tablePath, relation.htable)
+    Seq.empty[Row]
+  }
+
+  override def output = Nil
+}
+
+@DeveloperApi
+case class OptimizedBulkLoadIntoTableCommand(
+     path: String,
+     tableName: String,
+     isLocal: Boolean,
+     delimiter: Option[String],
+     relation: HBaseRelation) extends RunnableCommand {
+
+  private[hbase] def makeBulkLoadRDD(
+      splitKeys: Array[ImmutableBytesWritableWrapper],
+      hadoopReader: HadoopReader,
+      job: Job,
+      tmpPath: String) = {
+    val ordering = implicitly[Ordering[ImmutableBytesWritableWrapper]]
+    val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
+    val partitioner = new HBasePartitioner(splitKeys)
+    val shuffled =
+      new HBaseShuffledRDD(rdd, partitioner, relation.partitions)
+    val bulkLoadRDD = shuffled.mapPartitions { iter =>
+    // the rdd now already sort by key, to sort by value
+      val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
+      var preKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
+      var nowKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
+      val ret = new ArrayBuffer[(ImmutableBytesWritable, KeyValue)]()
+      if (iter.hasNext) {
+        preKV = iter.next()
+        var cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
+        while (cellsIter.hasNext) {
+          cellsIter.next().foreach { cell =>
+            val kv = KeyValueUtil.ensureKeyValue(cell)
+            map.add(kv)
+          }
+        }
+        while (iter.hasNext) {
+          nowKV = iter.next()
+          if (0 == (nowKV._1 compareTo preKV._1)) {
+            cellsIter = nowKV._2.toPut.getFamilyCellMap.values().iterator()
+            while (cellsIter.hasNext) {
+              cellsIter.next().foreach { cell =>
+                val kv = KeyValueUtil.ensureKeyValue(cell)
+                map.add(kv)
+              }
+            }
+          } else {
+            ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
+            preKV = nowKV
+            map.clear()
+            cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
+            while (cellsIter.hasNext) {
+              cellsIter.next().foreach { cell =>
+                val kv = KeyValueUtil.ensureKeyValue(cell)
+                map.add(kv)
+              }
+            }
+          }
+        }
+        ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
+        map.clear()
+        ret.iterator
+      } else {
+        Iterator.empty
+      }
+    }
+
+    job.setOutputKeyClass(classOf[ImmutableBytesWritable])
+    job.setOutputValueClass(classOf[KeyValue])
+    job.setOutputFormatClass(classOf[HFileOutputFormat2])
+    job.getConfiguration.set("mapred.output.dir", tmpPath)
+    bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
+  }
+
+  override def run(sqlContext: SQLContext) = {
+    val solvedRelation = sqlContext.catalog.lookupRelation(None, tableName, None)
+    val relation: HBaseRelation = solvedRelation.asInstanceOf[Subquery]
+      .child.asInstanceOf[LogicalRelation]
+      .relation.asInstanceOf[HBaseRelation]
+    val hbContext = sqlContext.asInstanceOf[HBaseSQLContext]
+    val logger = Logger.getLogger(getClass.getName)
+
+    val conf = hbContext.sparkContext.hadoopConfiguration
+
+    val job = Job.getInstance(conf)
+
+    val hadoopReader = if (isLocal) {
+      val fs = FileSystem.getLocal(conf)
+      val pathString = fs.pathToFile(new Path(path)).getCanonicalPath
+      new HadoopReader(hbContext.sparkContext, pathString, delimiter)(relation)
+    } else {
+      new HadoopReader(hbContext.sparkContext, path, delimiter)(relation)
+    }
+
+    // tmp path for storing HFile
+    val tmpPath = Util.getTempFilePath(conf, relation.tableName)
+    val splitKeys = relation.getRegionStartKeys.toArray
+    logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
+    makeBulkLoadRDD(splitKeys, hadoopReader, job, tmpPath)
     val tablePath = new Path(tmpPath)
     val load = new LoadIncrementalHFiles(conf)
     logger.debug(s"Starting doBulkLoad on table ${relation.htable.getName} ...")

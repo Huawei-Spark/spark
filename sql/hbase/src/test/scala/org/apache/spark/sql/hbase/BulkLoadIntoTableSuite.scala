@@ -26,6 +26,9 @@ import org.apache.spark.{SparkContext, Logging}
 import org.apache.spark.sql.catalyst.types.IntegerType
 import org.apache.spark.sql.hbase.execution.BulkLoadIntoTableCommand
 import org.apache.hadoop.hbase.util.Bytes
+import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.rdd.ShuffledRDD
+import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2
 
 class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Logging{
 
@@ -82,25 +85,116 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     assert(l.delimiter.get.equals("|"))
   }
 
-//  ignore("write data to HFile") {
-//    val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
-//    val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
-//    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", hbaseRelation, true, Option(","))
-//    val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
-//      new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
-//    }
-//    val conf = hbc.sparkContext.hadoopConfiguration
-//
-//    val job = Job.getInstance(conf)
-//
-//    val hadoopReader = {
-//      val fs = FileSystem.getLocal(conf)
-//      val pathString = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
-//      new HadoopReader(hbc.sparkContext, pathString, bulkLoad.delimiter)(hbaseRelation)
-//    }
-//    val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
-//    bulkLoad.makeBulkLoadRDD(splitKeys.toArray, hadoopReader, job, tmpPath)
-//  }
+  ignore("write data to HFile") {
+    val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
+    val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
+    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", "hbasetablename", true, Option(","))
+    val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
+      new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
+    }
+    val conf = hbc.sparkContext.hadoopConfiguration
+
+    val job = Job.getInstance(conf)
+
+    val hadoopReader = {
+      val fs = FileSystem.getLocal(conf)
+      val pathString = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
+      new HadoopReader(hbc.sparkContext, pathString, bulkLoad.delimiter)(hbaseRelation)
+    }
+    val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
+    bulkLoad.makeBulkLoadRDD(splitKeys.toArray, hadoopReader, job, tmpPath, hbaseRelation)
+  }
+
+  test("hfile output format, delete me when ready") {
+    import org.apache.spark.sql.catalyst.types._
+    val splitRegex = ","
+    val rdd = sc.textFile("./sql/hbase/src/test/resources/test.csv").mapPartitions { iter =>
+      val keyBytes = new Array[(Array[Byte], DataType)](1)
+      val valueBytes = new Array[(Array[Byte], Array[Byte], Array[Byte])](1)
+      val bytesUtils = BytesUtils.create(IntegerType)
+      val family = Bytes.toBytes("cf")
+      val qualyfier = Bytes.toBytes("c1")
+
+      iter.map { line =>
+        val splits = line.split(splitRegex)
+        keyBytes(0) = (bytesUtils.toBytes(splits(0).toInt), IntegerType)
+        valueBytes(0) = (family, qualyfier, bytesUtils.toBytes(splits(1).toInt))
+        val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(keyBytes)
+        val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
+        val put = new PutWrapper(rowKeyData)
+        valueBytes.foreach { case (family, qualifier, value) =>
+          put.add(family, qualifier, value)
+        }
+        (rowKey, put)
+      }
+    }
+
+    import org.apache.hadoop.hbase._
+    import org.apache.hadoop.hbase.io._
+    import scala.collection.JavaConversions._
+    val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
+      println(r)
+      new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
+    }.toBuffer
+//    splitKeys += (new ImmutableBytesWritableWrapper(Bytes.toBytes(100)))
+    val ordering = implicitly[Ordering[ImmutableBytesWritableWrapper]]
+    val partitioner = new HBasePartitioner(splitKeys.toArray)
+    val shuffled =
+      new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
+        .setKeyOrdering(ordering)
+
+    val bulkLoadRDD = shuffled.mapPartitions { iter =>
+    // the rdd now already sort by key, to sort by value
+      val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
+      var preKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
+      var nowKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
+      val ret = new ArrayBuffer[(ImmutableBytesWritable, KeyValue)]()
+      if (iter.hasNext) {
+        preKV = iter.next()
+        var cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
+        while (cellsIter.hasNext) {
+          cellsIter.next().foreach { cell =>
+            val kv = KeyValueUtil.ensureKeyValue(cell)
+            map.add(kv)
+          }
+        }
+        while (iter.hasNext) {
+          nowKV = iter.next()
+          if (0 == (nowKV._1 compareTo preKV._1)) {
+            cellsIter = nowKV._2.toPut.getFamilyCellMap.values().iterator()
+            while (cellsIter.hasNext) {
+              cellsIter.next().foreach { cell =>
+                val kv = KeyValueUtil.ensureKeyValue(cell)
+                map.add(kv)
+              }
+            }
+          } else {
+            ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
+            preKV = nowKV
+            map.clear()
+            cellsIter = preKV._2.toPut.getFamilyCellMap.values().iterator()
+            while (cellsIter.hasNext) {
+              cellsIter.next().foreach { cell =>
+                val kv = KeyValueUtil.ensureKeyValue(cell)
+                map.add(kv)
+              }
+            }
+          }
+        }
+        ret ++= map.iterator().map((preKV._1.toImmutableBytesWritable, _))
+        map.clear()
+        ret.iterator
+      } else {
+        Iterator.empty
+      }
+    }
+    val job = Job.getInstance(sc.hadoopConfiguration)
+    job.setOutputKeyClass(classOf[ImmutableBytesWritable])
+    job.setOutputValueClass(classOf[KeyValue])
+    job.setOutputFormatClass(classOf[HFileOutputFormat2])
+    job.getConfiguration.set("mapred.output.dir", "./hfileoutput")
+    bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
+  }
 
   test("load data into hbase") { // this need to local test with hbase, so here to ignore this
 

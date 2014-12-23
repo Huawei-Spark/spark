@@ -55,6 +55,9 @@ class HBasePartitioner (var splitKeys: Array[ImmutableBytesWritableWrapper])
         partition = splitKeys.length
       }
     }
+    println(s"####### $partition")
+    println(s"####### ${BytesUtils.toInt(k.asInstanceOf[ImmutableBytesWritableWrapper].toImmutableBytesWritable.get(), 0)}")
+
     partition
   }
 
