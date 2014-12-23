@@ -352,30 +352,27 @@ object RangeCriticalPoint {
       if (discreteType) {
         result.map ( r => {
             var gotNew = false
+            val numeric = dt.asInstanceOf[IntegralType]
+              .numeric.asInstanceOf[Integral[T]]
 
             val (start, startInclusive) = {
               if (r.start.isDefined && !r.startInclusive) {
                 gotNew = true
-                (Some(dt.asInstanceOf[IntegralType]
-                  .numeric.asInstanceOf[Integral[T]]
-                  .plus(r.start.get, 1.asInstanceOf[T])),true)
+                (Some(numeric.plus(r.start.get, numeric.one)),true)
               } else (r.start, r.startInclusive)
             }
 
             val (end, endInclusive) = {
               if (r.end.isDefined && !r.endInclusive) {
                 gotNew = true
-                (Some(dt.asInstanceOf[IntegralType]
-                  .numeric.asInstanceOf[Integral[T]]
-                  .minus(r.end.get, 1.asInstanceOf[T])),true)
+                (Some(numeric.minus(r.end.get, numeric.one)),true)
               } else (r.end, r.endInclusive)
             }
 
             if (gotNew) {
               if (start.isDefined
                 && end.isDefined
-                && (start.get == dt.asInstanceOf[IntegralType]
-                .numeric.asInstanceOf[Integral[T]].plus(end.get, 1.asInstanceOf[T]))) {
+                && (start.get == numeric.plus(end.get, numeric.one))) {
                 null
               } else new CriticalPointRange[T](start, startInclusive, end, endInclusive,
                 dimIndex, r.dt, null)
