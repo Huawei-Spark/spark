@@ -585,8 +585,8 @@ object RangeCriticalPoint {
         mdpr.compareWithPartition(startOrEnd = false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
       smallestEnd < largestStart) {
-      null
-    } // no overlapping
+      null // no overlapping
+    }
     else {
       (largestStart, smallestEnd)
     }
@@ -611,11 +611,11 @@ object RangeCriticalPoint {
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
         -mdpr.compareWithPartition(startOrEnd = false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
-      smallestEnd > largestStart) {
-      null
-    } // no overlapping
+      smallestEnd < largestStart) {
+      null // no overlapping
+    }
     else {
-      (smallestEnd, largestStart)
+      (largestStart, smallestEnd)
     }
   }
 

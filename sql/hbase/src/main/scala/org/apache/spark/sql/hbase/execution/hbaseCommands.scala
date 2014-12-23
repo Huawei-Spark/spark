@@ -264,7 +264,6 @@ case class OptimizedBulkLoadIntoTableCommand(
       hadoopReader: HadoopReader,
       conf: Configuration,
       tmpPath: String) = {
-    val ordering = implicitly[Ordering[ImmutableBytesWritableWrapper]]
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(splitKeys)
     val shuffled =
@@ -324,20 +323,20 @@ case class OptimizedBulkLoadIntoTableCommand(
       val context = TaskContext.get
       val outfmt = job.getOutputFormatClass
       val jobFormat = outfmt.newInstance
-      if (SparkEnv.get.conf.getBoolean("spark.hadoop.validateOutputSpecs", true)) {
+      if (SparkEnv.get.conf.getBoolean("spark.hadoop.validateOutputSpecs", defaultValue = true)) {
         // FileOutputFormat ignores the filesystem parameter
         jobFormat.checkOutputSpecs(job)
       }
       val config = wrappedConf.value
-      config.set("mapred.output.dir", tmpPath+index)
+      config.set("mapred.output.dir", tmpPath + index)
 
       def writeShard(iterator: Iterator[(ImmutableBytesWritable, KeyValue)]) = {
         // Hadoop wants a 32-bit task attempt ID, so if ours is bigger than Int.MaxValue, roll it
         // around by taking a mod. We expect that no task will be attempted 2 billion times.
         val attemptNumber = (context.attemptId % Int.MaxValue).toInt
         /* "reduce task" <split #> <attempt # = spark task #> */
-        val attemptId = newTaskAttemptID(bulkLoadRDD.name, context.stageId, isMap = false, context.partitionId,
-          attemptNumber)
+        val attemptId = newTaskAttemptID(bulkLoadRDD.name, context.stageId,
+           isMap = false, context.partitionId, attemptNumber)
         val hadoopContext = newTaskAttemptContext(config, attemptId)
         val format = outfmt.newInstance
         format match {
@@ -346,7 +345,8 @@ case class OptimizedBulkLoadIntoTableCommand(
         }
         val committer = format.getOutputCommitter(hadoopContext)
         committer.setupTask(hadoopContext)
-        val writer = format.getRecordWriter(hadoopContext).asInstanceOf[RecordWriter[ImmutableBytesWritable, KeyValue]]
+        val writer = format.getRecordWriter(hadoopContext).
+          asInstanceOf[RecordWriter[ImmutableBytesWritable, KeyValue]]
         try {
           var recordsWritten = 0L
           while (iterator.hasNext) {
