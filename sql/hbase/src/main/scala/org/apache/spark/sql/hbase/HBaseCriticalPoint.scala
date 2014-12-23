@@ -484,7 +484,7 @@ object RangeCriticalPoint {
           cmp = comp(src, tgt(mid))
         }
       } else {
-        mid = (prevEq + mid) / 2
+        mid = (prevEq + newLimit) / 2
         cmp = comp(src, tgt(mid))
         if (cmp == 0) prevEq = mid
         else newLimit = mid
@@ -518,7 +518,7 @@ object RangeCriticalPoint {
         // linear search
         cmp = 0
         if (upperBound) {
-          // tighter upper bound
+          // tight upper bound
           var i = right
           prevLarger = right
           while (i >= left + 1 && cmp <= 0) {
@@ -548,7 +548,7 @@ object RangeCriticalPoint {
             prevSmaller = binarySearchEquality(mid, prevLarger, src, tgt, threshold, comp)
           }
           right = left // break the outer loop
-        } else if (cmp > 0) {
+        } else if (cmp < 0) {
           prevLarger = mid
           right = mid - 1
         } else {
