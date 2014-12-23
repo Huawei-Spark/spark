@@ -24,7 +24,6 @@ import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFi
 import org.apache.hadoop.mapreduce.Job
 import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Row}
 import org.apache.spark.sql.catalyst.plans.logical.Subquery
@@ -149,15 +148,17 @@ case class BulkLoadIntoTableCommand(path: String, tableName: String,
   extends RunnableCommand {
 
   private[hbase] def makeBulkLoadRDD(splitKeys: Array[ImmutableBytesWritableWrapper],
-                                     hadoopReader: HadoopReader, job: Job, tmpPath: String) = {
-    val ordering = implicitly[Ordering[ImmutableBytesWritableWrapper]]
+                                     hadoopReader: HadoopReader, job: Job, tmpPath: String,
+                                      relation: HBaseRelation) = {
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
-    val partitioner = new HBasePartitioner(rdd)(splitKeys)
+    val partitioner = new HBasePartitioner(splitKeys)
     // Todo: fix issues with HBaseShuffledRDD
-    val shuffled =
-      new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
-        .setKeyOrdering(ordering)
+//    val shuffled =
+//      new ShuffledRDD[ImmutableBytesWritableWrapper, PutWrapper, PutWrapper](rdd, partitioner)
+//        .setKeyOrdering(ordering)
     //.setHbasePartitions(relation.partitions)
+    val shuffled =
+        new HBaseShuffledRDD(rdd, partitioner, relation.partitions)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
       // the rdd now already sort by key, to sort by value
       val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
@@ -235,7 +236,7 @@ case class BulkLoadIntoTableCommand(path: String, tableName: String,
     val tmpPath = Util.getTempFilePath(conf, relation.tableName)
     val splitKeys = relation.getRegionStartKeys.toArray
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
-    makeBulkLoadRDD(splitKeys, hadoopReader, job, tmpPath)
+    makeBulkLoadRDD(splitKeys, hadoopReader, job, tmpPath, relation)
     val tablePath = new Path(tmpPath)
     val load = new LoadIncrementalHFiles(conf)
     logger.debug(s"Starting doBulkLoad on table ${relation.htable.getName} ...")

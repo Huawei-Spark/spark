@@ -26,43 +26,41 @@ import org.apache.spark.{Partitioner, SparkEnv}
 
 import scala.reflect.ClassTag
 
-class HBasePartitioner [K : Ordering : ClassTag, V](
-    @transient rdd: RDD[_ <: Product2[K,V]])(splitKeys: Array[K])
+class HBasePartitioner (var splitKeys: Array[ImmutableBytesWritableWrapper])
   extends Partitioner {
 
-  private var ordering = implicitly[Ordering[K]]
+  type t = ImmutableBytesWritableWrapper
 
-  private var rangeBounds: Array[K] = splitKeys
+  def numPartitions = splitKeys.length
 
-  def numPartitions = rangeBounds.length
-
-  private var binarySearch: ((Array[K], K) => Int) = CollectionsUtils.makeBinarySearch[K]
+  @transient private val binarySearch: ((Array[t], t) => Int) = CollectionsUtils.makeBinarySearch[t]
 
   def getPartition(key: Any): Int = {
-    val k = key.asInstanceOf[K]
+    val k = key.asInstanceOf[t]
     var partition = 0
-    if (rangeBounds.length <= 128) {
+    if (splitKeys.length <= 128) {
       // If we have less than 128 partitions naive search
-      while (partition < rangeBounds.length && ordering.gt(k, rangeBounds(partition))) {
+      val ordering = implicitly[Ordering[t]]
+      while (partition < splitKeys.length && ordering.gt(k, splitKeys(partition))) {
         partition += 1
       }
     } else {
       // Determine which binary search method to use only once.
-      partition = binarySearch(rangeBounds, k)
+      partition = binarySearch(splitKeys, k)
       // binarySearch either returns the match location or -[insertion point]-1
       if (partition < 0) {
         partition = -partition - 1
       }
-      if (partition > rangeBounds.length) {
-        partition = rangeBounds.length
+      if (partition > splitKeys.length) {
+        partition = splitKeys.length
       }
     }
     partition
   }
 
   override def equals(other: Any): Boolean = other match {
-    case r: HBasePartitioner[_, _] =>
-      r.rangeBounds.sameElements(rangeBounds)
+    case r: HBasePartitioner =>
+      r.splitKeys.sameElements(splitKeys)
     case _ =>
       false
   }
@@ -71,8 +69,8 @@ class HBasePartitioner [K : Ordering : ClassTag, V](
     val prime = 31
     var result = 1
     var i = 0
-    while (i < rangeBounds.length) {
-      result = prime * result + rangeBounds(i).hashCode
+    while (i < splitKeys.length) {
+      result = prime * result + splitKeys(i).hashCode
       i += 1
     }
     result = prime * result
@@ -85,13 +83,11 @@ class HBasePartitioner [K : Ordering : ClassTag, V](
     sfactory match {
       case js: JavaSerializer => out.defaultWriteObject()
       case _ =>
-        out.writeObject(ordering)
         out.writeObject(binarySearch)
 
         val ser = sfactory.newInstance()
         Utils.serializeViaNestedStream(out, ser) { stream =>
-          stream.writeObject(scala.reflect.classTag[Array[K]])
-          stream.writeObject(rangeBounds)
+          stream.writeObject(splitKeys)
         }
     }
   }
@@ -102,13 +98,9 @@ class HBasePartitioner [K : Ordering : ClassTag, V](
     sfactory match {
       case js: JavaSerializer => in.defaultReadObject()
       case _ =>
-        ordering = in.readObject().asInstanceOf[Ordering[K]]
-        binarySearch = in.readObject().asInstanceOf[(Array[K], K) => Int]
-
         val ser = sfactory.newInstance()
         Utils.deserializeViaNestedStream(in, ser) { ds =>
-          implicit val classTag = ds.readObject[ClassTag[Array[K]]]()
-          rangeBounds = ds.readObject[Array[K]]()
+          splitKeys = ds.readObject[Array[ImmutableBytesWritableWrapper]]()
         }
     }
   }

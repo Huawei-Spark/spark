@@ -36,7 +36,7 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     val splitKeys = (1 to 40).filter(_ % 5 == 0).filter(_ != 40).map { r =>
       new ImmutableBytesWritableWrapper(Bytes.toBytes(r))
     }
-    val partitioner = new HBasePartitioner(rdd)(splitKeys.toArray)
+    val partitioner = new HBasePartitioner(splitKeys.toArray)
     val shuffled =
       new ShuffledRDD[ImmutableBytesWritableWrapper, Int, Int](rdd, partitioner)
 
