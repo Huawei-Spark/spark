@@ -255,6 +255,7 @@ case class OptimizedBulkLoadIntoTableCommand(
      delimiter: Option[String],
      relation: HBaseRelation) extends RunnableCommand {
 
+  // todo: change me to parallize bulk loading
   private[hbase] def makeBulkLoadRDD(
       splitKeys: Array[ImmutableBytesWritableWrapper],
       hadoopReader: HadoopReader,
