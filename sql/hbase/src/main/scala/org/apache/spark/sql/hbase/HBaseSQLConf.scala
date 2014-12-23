@@ -26,7 +26,7 @@ private[hbase] object HBaseSQLConf {
 /**
  * A trait that enables the setting and getting of mutable config parameters/hints.
  *
- **/
+ */
 private[hbase] trait HBaseSQLConf extends SQLConf {
   import HBaseSQLConf._
 

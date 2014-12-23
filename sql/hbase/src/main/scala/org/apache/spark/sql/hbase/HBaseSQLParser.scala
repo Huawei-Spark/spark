@@ -96,9 +96,9 @@ class HBaseSQLParser extends SqlParser {
       (COLS ~> "=" ~> "[" ~> expressions <~ "]" <~ ")") <~ opt(";") ^^ {
 
       case tableName ~ tableColumns ~ keySeq ~ tableNameSpace ~ hbaseTableName ~ mappingInfo =>
-        //Since the lexical can not recognize the symbol "=" as we expected,
-        //we compose it to expression first and then translate it into Map[String, (String, String)]
-        //TODO: Now get the info by hacking, need to change it into normal way if possible
+        // Since the lexical can not recognize the symbol "=" as we expected, we compose it
+        // to expression first and then translate it into Map[String, (String, String)].
+        // TODO: Now get the info by hacking, need to change it into normal way if possible
         val infoMap: Map[String, (String, String)] =
           mappingInfo.map { case EqualTo(e1, e2) =>
             val info = e2.toString.substring(1).split('.')
@@ -107,7 +107,7 @@ class HBaseSQLParser extends SqlParser {
           }.toMap
 
 
-        //Check whether the column info are correct or not
+        // Check whether the column info are correct or not
         val tableColSet = tableColumns.unzip._1.toSet
         val keySet = keySeq.toSet
         if (tableColSet.size != tableColumns.length ||
@@ -128,7 +128,7 @@ class HBaseSQLParser extends SqlParser {
         val dataTypeOfKeyCols = divideTableColsByKeyOrNonkey._1
         val dataTypeOfNonkeyCols = divideTableColsByKeyOrNonkey._2
 
-        //Get Key Info
+        // Get Key Info
         val keyColsWithDataType = keySeq.map {
           key => {
             val typeOfKey = dataTypeOfKeyCols.find(_._1 == key).get._2
@@ -136,7 +136,7 @@ class HBaseSQLParser extends SqlParser {
           }
         }
 
-        //Get Nonkey Info
+        // Get Nonkey Info
         val nonKeyCols = dataTypeOfNonkeyCols.map {
           case (name, typeOfData) =>
             val infoElem = infoMap.get(name).get
@@ -203,9 +203,9 @@ class HBaseSQLParser extends SqlParser {
       (ADD ~> tableCol) ~
       (MAPPED ~> BY ~> "(" ~> expressions <~ ")") ^^ {
       case tableName ~ tableColumn ~ mappingInfo =>
-        //Since the lexical can not recognize the symbol "=" as we expected,
-        //we compose it to expression first and then translate it into Map[String, (String, String)]
-        //TODO: Now get the info by hacking, need to change it into normal way if possible
+        // Since the lexical can not recognize the symbol "=" as we expected, we compose it
+        // to expression first and then translate it into Map[String, (String, String)]
+        // TODO: Now get the info by hacking, need to change it into normal way if possible
         val infoMap: Map[String, (String, String)] =
           mappingInfo.map { case EqualTo(e1, e2) =>
             val info = e2.toString.substring(1).split('.')

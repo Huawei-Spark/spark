@@ -90,8 +90,8 @@ object PartialPredicateOperations {
             hset.contains(evaluatedValue)
           }
         case l: LeafExpression => l.eval(input)
-        case b: BoundReference => b.eval(input) //Really a LeafExpression but not declared as such
-        case n: NamedExpression => n.eval(input) //Really a LeafExpression but not declared as such
+        case b: BoundReference => b.eval(input) // Really a LeafExpression but not declared as such
+        case n: NamedExpression => n.eval(input) // Really a LeafExpression but not declared as such
         case IsNull(child) =>
           if (child.partialEval(input) == null) {
             // In partial evaluation, null indicates MAYBE

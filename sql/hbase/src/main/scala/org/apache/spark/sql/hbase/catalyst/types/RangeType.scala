@@ -86,7 +86,7 @@ class RangeType[T] extends PartialOrderingDataType {
         && (aRange.dt.ordering.gt(aStart, bEnd)
         || (aRange.dt.ordering.equiv(aStart, bEnd) && !(aStartInclusive && bEndInclusive)))) {
         Some(2)
-      } //Vice versa
+      } // Vice versa
       else if ((bStart != null && aEnd != null)
         && (aRange.dt.ordering.gt(bStart, aEnd)
         || (aRange.dt.ordering.equiv(bStart, aEnd) && !(bStartInclusive && aEndInclusive)))) {

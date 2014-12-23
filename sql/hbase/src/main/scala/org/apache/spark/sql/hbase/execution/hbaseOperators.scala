@@ -65,7 +65,7 @@ case class InsertIntoHBaseTable(
   override def output = child.output
 
   private def saveAsHbaseFile(rdd: RDD[Row]): Unit = {
-    //TODO:make the BatchMaxSize configurable
+    // TODO:make the BatchMaxSize configurable
     val BatchMaxSize = 100
 
     relation.context.sparkContext.runJob(rdd, writeToHbase _)
