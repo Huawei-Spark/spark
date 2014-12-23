@@ -108,7 +108,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   test("hfile output format, delete me when ready") {
     import org.apache.spark.sql.catalyst.types._
     val splitRegex = ","
-    val rdd = sc.textFile("./sql/hbase/src/test/resources/test.csv").mapPartitions { iter =>
+    val rdd = sc.textFile("./sql/hbase/src/test/resources/test.csv", 1).mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](1)
       val valueBytes = new Array[(Array[Byte], Array[Byte], Array[Byte])](1)
       val bytesUtils = BytesUtils.create(IntegerType)

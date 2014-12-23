@@ -18,25 +18,29 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark._
-import org.apache.spark.rdd.{RDD, ShuffledRDD}
-import org.apache.spark.serializer.Serializer
+import org.apache.spark.rdd.{ShuffledRDDPartition, RDD, ShuffledRDD}
 
 class HBaseShuffledRDD (
     prevRdd: RDD[(ImmutableBytesWritableWrapper, PutWrapper)],
     part: Partitioner,
-    @transient hbPartitions: Seq[HBasePartition] = Nil)
-    extends ShuffledRDD(prevRdd, part){
+    @transient hbPartitions: Seq[HBasePartition] = Nil) extends ShuffledRDD(prevRdd, part){
 
   override def getPartitions: Array[Partition] = {
-    // only to be invoked by clients
-    hbPartitions.toArray
+    if (hbPartitions.isEmpty) {
+      Array.tabulate[Partition](part.numPartitions)(i => new ShuffledRDDPartition(i))
+    } else {
+      // only to be invoked by clients
+      hbPartitions.toArray
+    }
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
-    split.asInstanceOf[HBasePartition].server.map {
-      identity[String]
-    }.toSeq
+    if (hbPartitions.isEmpty) {
+      Seq.empty
+    } else {
+      split.asInstanceOf[HBasePartition].server.map {
+        identity[String]
+      }.toSeq
+    }
   }
-
-
 }
