@@ -68,7 +68,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
   extends Range[T](start, startInclusive, end, endInclusive, dt) {
   var nextDimCriticalPointRanges: Seq[CriticalPointRange[_]] = Nil
   lazy val isPoint: Boolean = start.isDefined && end.isDefined &&
-                              startInclusive && endInclusive && start.get.equals(end.get)
+    startInclusive && endInclusive && start.get.equals(end.get)
 
   /**
    * expand on nested critical point ranges of sub-dimensions
@@ -100,8 +100,8 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
  * @tparam T the type parameter of the range of the last dimension
  */
 private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)],
-                                               lastRange: CriticalPointRange[T], dt: NativeType,
-                                               var pred: Expression) {
+                                                  lastRange: CriticalPointRange[T], dt: NativeType,
+                                                  var pred: Expression) {
   /**
    * Compare this range's start/end with the partition's end/start
    * @param startOrEnd TRUE if compare this start with the partition's end;
@@ -118,7 +118,7 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
           case (None, Some(_)) => (null, false, part.endNative, part.endInclusive)
           case (Some(start), None) => (start, lastRange.startInclusive, null, false)
           case (Some(start), Some(_)) => (start, lastRange.startInclusive,
-                                          part.endNative, part.endInclusive)
+            part.endNative, part.endInclusive)
         }
       } else {
         (lastRange.end, part.start) match {
@@ -145,30 +145,50 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
         if (i < zippedPairs.size) {
           val ((prefixPoint, dt), pPoint) = zippedPairs(i)
           if (dt.ordering.gt(prefixPoint.asInstanceOf[dt.JvmType],
-                             pPoint.asInstanceOf[dt.JvmType])) { 1 }
-          else { -1 }
+            pPoint.asInstanceOf[dt.JvmType])) {
+            1
+          }
+          else {
+            -1
+          }
         } else {
           // if the dimension size of this MD Critical Point range is larger than that of
           // the partition, the comparison is equal irrespective of inclusiveness
           if (prefix.size > comparePPoint.size - 1) 0
           else {
             (comparePoint, comparePPoint(i)) match {
-              case (null, _) => if (startOrEnd) { -1 }  else { 1 }
+              case (null, _) => if (startOrEnd) {
+                -1
+              } else {
+                1
+              }
               case (_, pend) =>
                 if (dt.ordering.gt(comparePoint.asInstanceOf[dt.JvmType],
-                  pend.asInstanceOf[dt.JvmType])) { 1 }
+                  pend.asInstanceOf[dt.JvmType])) {
+                  1
+                }
                 else if (dt.ordering.lt(comparePoint.asInstanceOf[dt.JvmType],
-                  pend.asInstanceOf[dt.JvmType])) { -1 }
+                  pend.asInstanceOf[dt.JvmType])) {
+                  -1
+                }
                 else {
                   // dimension size mismatch, return 0 irrespective of inclusiveness
-                  if (prefix.size + 1 < comparePPoint.size) { 0 }
-                  else if (comparePointInclusive && comparePPointInclusive) { 0 }
-                  else if (startOrEnd) { 1 }
-                  else { -1 }
+                  if (prefix.size + 1 < comparePPoint.size) {
+                    0
+                  }
+                  else if (comparePointInclusive && comparePPointInclusive) {
+                    0
+                  }
+                  else if (startOrEnd) {
+                    1
+                  }
+                  else {
+                    -1
+                  }
                 }
             }
           }
-      }
+        }
     }
   }
 }
@@ -238,7 +258,7 @@ object RangeCriticalPoint {
           a
       }
       pointSet.toSeq.sortWith((a: CriticalPoint[T], b: CriticalPoint[T])
-        => dt.ordering.lt(a.value.asInstanceOf[dt.JvmType], b.value.asInstanceOf[dt.JvmType]))
+      => dt.ordering.lt(a.value.asInstanceOf[dt.JvmType], b.value.asInstanceOf[dt.JvmType]))
     } else Nil
   }
 
@@ -330,51 +350,35 @@ object RangeCriticalPoint {
       }
       // remove any redundant ranges for integral type
       if (discreteType) {
-        var prev: CriticalPointRange[T] = null
-        var prevChanged = false
-        var thisChangedUp = false
-        var thisChangedDown = false
-        var newRange: CriticalPointRange[T] = null
-        val newResult = new ArrayBuffer[CriticalPointRange[T]](result.size)
-        result.foreach(r => {
-          thisChangedDown = false
-          thisChangedUp = false
-          if (r.startInclusive && !r.endInclusive && r.end.isDefined
-            && r.start.get ==
-            dt.ordering.asInstanceOf[Integral[T]].minus(r.end.get, 1.asInstanceOf[T])) {
-            thisChangedDown = true
-            if (prev != null && prev.startInclusive && prev.endInclusive
-              && prev.start.get == prev.end.get && prev.start.get == r.start.get) {
-              // the previous range is a equivalent point range => merge it with current one
-              newRange = null
-            } else {
-              newRange = new CriticalPointRange[T](r.start, true, r.start, true,
-                dimIndex, r.dt, null)
-            }
-          } else if (!r.startInclusive && r.endInclusive && r.end.isDefined
-            && r.start.get ==
-            dt.ordering.asInstanceOf[Integral[T]].minus(r.end.get, 1.asInstanceOf[T])) {
-            newRange = new CriticalPointRange[T](r.end, true, r.end, true,
-              dimIndex, r.dt, null)
-            thisChangedUp = true
-          } else newRange = r
+        result.map ( r => {
+            var gotNew = false
+            val numeric = dt.asInstanceOf[IntegralType]
+              .numeric.asInstanceOf[Integral[T]]
 
-          // the previous range has been changed up and this one has not changed =>
-          // check whether this is mergeable with the (changed) previous
-          if (newRange != null && !thisChangedDown && !thisChangedUp && prevChanged) {
-            if (r.startInclusive && r.endInclusive && r.start.get == r.end.get &&
-              prev.startInclusive && prev.endInclusive
-              && prev.start.get == prev.end.get && prev.start.get == r.start.get) {
-              newRange = null // merged with the previous range
+            val (start, startInclusive) = {
+              if (r.start.isDefined && !r.startInclusive) {
+                gotNew = true
+                (Some(numeric.plus(r.start.get, numeric.one)),true)
+              } else (r.start, r.startInclusive)
             }
+
+            val (end, endInclusive) = {
+              if (r.end.isDefined && !r.endInclusive) {
+                gotNew = true
+                (Some(numeric.minus(r.end.get, numeric.one)),true)
+              } else (r.end, r.endInclusive)
+            }
+
+            if (gotNew) {
+              if (start.isDefined
+                && end.isDefined
+                && (start.get == numeric.plus(end.get, numeric.one))) {
+                null
+              } else new CriticalPointRange[T](start, startInclusive, end, endInclusive,
+                dimIndex, r.dt, null)
+            } else r
           }
-          if (newRange != null) {
-            newResult += newRange
-            prev = newRange
-            prevChanged = thisChangedUp
-          }
-        })
-        newResult
+        ).filter(r => r != null)
       } else result
     }
   }
@@ -463,14 +467,14 @@ object RangeCriticalPoint {
    * @tparam T the type of the target elements
    * @return the index of the target element
    */
-  private def binarySearchEquality[S, T](eq: Int, limit: Int, src: S, tgt:Seq[T], threshold: Int,
-                                         comp: (S, T) => Int): Int  = {
-    val incr = if (eq > limit) -1 else 1  // search direction
+  private def binarySearchEquality[S, T](eq: Int, limit: Int, src: S, tgt: Seq[T], threshold: Int,
+                                         comp: (S, T) => Int): Int = {
+    val incr = if (eq > limit) -1 else 1 // search direction
     var mid = limit
     var newLimit = limit
     var cmp = 0
     var prevEq = eq
-    while (incr*(newLimit - prevEq) > 0) {
+    while (incr * (newLimit - prevEq) > 0) {
       if (incr * (newLimit - prevEq) < threshold) {
         // linear search
         mid = prevEq + incr
@@ -502,9 +506,9 @@ object RangeCriticalPoint {
    */
   private def binarySearchForTightBound[S, T](src: S, tgt: Seq[T], startIndex: Int,
                                               upperBound: Boolean, comp: (S, T) => Int): Int = {
-    val threshold = 10  // linear search threshold
+    val threshold = 10 // linear search threshold
     var left = startIndex
-    var right = tgt.size-1
+    var right = tgt.size - 1
     var prevLarger = -1
     var prevSmaller = -1
     var mid = -1
@@ -535,7 +539,7 @@ object RangeCriticalPoint {
         right = left // break the outer while loop
       } else {
         // binary search
-        mid = left + (right - left)/2
+        mid = left + (right - left) / 2
         cmp = comp(src, tgt(mid))
         if (cmp == 0) {
           if (upperBound) {
@@ -553,8 +557,12 @@ object RangeCriticalPoint {
         }
       }
     }
-    if (upperBound) { prevLarger }
-    else { prevSmaller }
+    if (upperBound) {
+      prevLarger
+    }
+    else {
+      prevSmaller
+    }
   }
 
   /**
@@ -565,20 +573,23 @@ object RangeCriticalPoint {
    * @return the start and end index of the qualified partitions, inclusive on both boundaries
    */
   private[hbase] def getQualifiedPartitions[T](cpr: MDCriticalPointRange[T],
-                               partitions: Seq[HBasePartition], pStartIndex: Int): (Int, Int) = {
+                                               partitions: Seq[HBasePartition],
+                                               pStartIndex: Int): (Int, Int) = {
     val largestStart = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
-    cpr, partitions, pStartIndex, upperBound = true,
-        (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
-          mdpr.compareWithPartition(startOrEnd=true, p))
+      cpr, partitions, pStartIndex, upperBound = true,
+      (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
+        mdpr.compareWithPartition(startOrEnd = true, p))
     val smallestEnd = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
       cpr, partitions, pStartIndex, upperBound = false,
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
-        mdpr.compareWithPartition(startOrEnd=false, p))
+        mdpr.compareWithPartition(startOrEnd = false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
-        smallestEnd < largestStart) {
+      smallestEnd < largestStart) {
       null
     } // no overlapping
-    else { (largestStart, smallestEnd) }
+    else {
+      (largestStart, smallestEnd)
+    }
   }
 
   /**
@@ -590,18 +601,22 @@ object RangeCriticalPoint {
    */
   private[hbase] def getQualifiedCRRanges(partition: HBasePartition,
                                           crps: Seq[MDCriticalPointRange[_]], startIndex: Int):
-                                         (Int, Int) = {
+  (Int, Int) = {
     val largestStart = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
       partition, crps, startIndex, upperBound = true,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
-        -mdpr.compareWithPartition(startOrEnd=true, p))
+        -mdpr.compareWithPartition(startOrEnd = true, p))
     val smallestEnd = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
       partition, crps, startIndex, upperBound = false,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
-        -mdpr.compareWithPartition(startOrEnd=false, p))
+        -mdpr.compareWithPartition(startOrEnd = false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
-      smallestEnd > largestStart) { null } // no overlapping
-    else { (smallestEnd, largestStart) }
+      smallestEnd > largestStart) {
+      null
+    } // no overlapping
+    else {
+      (smallestEnd, largestStart)
+    }
   }
 
   private[hbase] def prunePartitions(cprs: Seq[MDCriticalPointRange[_]],
