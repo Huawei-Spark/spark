@@ -32,8 +32,7 @@ object HBaseKVHelper {
    * @return array of bytes
    */
   def encodingRawKeyColumns(rawKeyColumns: Seq[(HBaseRawType, DataType)]): HBaseRawType = {
-    val length = rawKeyColumns
-      .foldLeft(0)((b, a) => {
+    val length = rawKeyColumns.foldLeft(0)((b, a) => {
       val len = b + a._1.length
       if (a._2 == StringType) len + 1 else len
     })

@@ -26,7 +26,7 @@ class HBaseShuffledRDD (
     @transient hbPartitions: Seq[HBasePartition] = Nil) extends ShuffledRDD(prevRdd, part){
 
   override def getPartitions: Array[Partition] = {
-    if (hbPartitions.isEmpty) {
+    if (hbPartitions==null || hbPartitions.isEmpty) {
       Array.tabulate[Partition](part.numPartitions)(i => new ShuffledRDDPartition(i))
     } else {
       // only to be invoked by clients
@@ -35,7 +35,7 @@ class HBaseShuffledRDD (
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
-    if (hbPartitions.isEmpty) {
+    if (hbPartitions==null || hbPartitions.isEmpty) {
       Seq.empty
     } else {
       split.asInstanceOf[HBasePartition].server.map {

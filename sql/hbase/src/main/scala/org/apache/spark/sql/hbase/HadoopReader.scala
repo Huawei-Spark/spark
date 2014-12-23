@@ -25,9 +25,9 @@ import org.apache.spark.sql.catalyst.types._
  */
 private[hbase]
 class HadoopReader(
-                    @transient sc: SparkContext,
-                    path: String,
-                    delimiter: Option[String])(baseRelation: HBaseRelation) {
+    @transient sc: SparkContext,
+    path: String,
+    delimiter: Option[String])(baseRelation: HBaseRelation) {
   // make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file
   private[hbase] def makeBulkLoadRDDFromTextFile = {
 
@@ -36,8 +36,8 @@ class HadoopReader(
     val relation = baseRelation
     rdd.mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
-      val valueBytes = new Array[(Array[Byte], Array[Byte],
-                          Array[Byte])](relation.nonKeyColumns.size)
+      val valueBytes =
+        new Array[(Array[Byte], Array[Byte],Array[Byte])](relation.nonKeyColumns.size)
       val lineBuffer = HBaseKVHelper.createLineBuffer(relation.output)
       iter.map { line =>
         HBaseKVHelper.string2KV(line.split(splitRegex), relation,

@@ -19,15 +19,11 @@ package org.apache.spark.sql.hbase
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.util.{CollectionsUtils, Utils}
 import org.apache.spark.{Partitioner, SparkEnv}
 
-import scala.reflect.ClassTag
-
-class HBasePartitioner (var splitKeys: Array[ImmutableBytesWritableWrapper])
-  extends Partitioner {
+class HBasePartitioner (var splitKeys: Array[ImmutableBytesWritableWrapper]) extends Partitioner {
 
   type t = ImmutableBytesWritableWrapper
 
@@ -55,9 +51,6 @@ class HBasePartitioner (var splitKeys: Array[ImmutableBytesWritableWrapper])
         partition = splitKeys.length
       }
     }
-    println(s"####### $partition")
-    println(s"####### ${BytesUtils.toInt(k.asInstanceOf[ImmutableBytesWritableWrapper].toImmutableBytesWritable.get(), 0)}")
-
     partition
   }
 

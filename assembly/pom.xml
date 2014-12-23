@@ -210,7 +210,7 @@
       </dependencies>
     </profile>
     <profile>
-      <id>hbase-hadoop2</id>
+      <id>hbase</id>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
