@@ -21,7 +21,7 @@ import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
-import org.apache.hadoop.mapreduce.Job
+import org.apache.hadoop.mapreduce.{RecordWriter, Job}
 import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
@@ -34,6 +34,9 @@ import org.apache.spark.sql.sources.LogicalRelation
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
+import org.apache.hadoop.conf.{Configurable, Configuration}
+import org.apache.spark.{TaskContext, SparkEnv, SerializableWritable}
+import org.apache.spark.mapreduce.SparkHadoopMapReduceUtil
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {
@@ -253,13 +256,13 @@ case class OptimizedBulkLoadIntoTableCommand(
      tableName: String,
      isLocal: Boolean,
      delimiter: Option[String],
-     relation: HBaseRelation) extends RunnableCommand {
+     relation: HBaseRelation) extends RunnableCommand with SparkHadoopMapReduceUtil {
 
   // todo: change me to parallize bulk loading
   private[hbase] def makeBulkLoadRDD(
       splitKeys: Array[ImmutableBytesWritableWrapper],
       hadoopReader: HadoopReader,
-      job: Job,
+      conf: Configuration,
       tmpPath: String) = {
     val ordering = implicitly[Ordering[ImmutableBytesWritableWrapper]]
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
@@ -311,12 +314,61 @@ case class OptimizedBulkLoadIntoTableCommand(
         Iterator.empty
       }
     }
-
+    val job = Job.getInstance(conf)
     job.setOutputKeyClass(classOf[ImmutableBytesWritable])
     job.setOutputValueClass(classOf[KeyValue])
     job.setOutputFormatClass(classOf[HFileOutputFormat2])
-    job.getConfiguration.set("mapred.output.dir", tmpPath)
-    bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
+    val wrappedConf = new SerializableWritable(job.getConfiguration)
+
+    bulkLoadRDD.mapPartitionsWithIndex { (index, iter)  =>
+      val context = TaskContext.get
+      val outfmt = job.getOutputFormatClass
+      val jobFormat = outfmt.newInstance
+      if (SparkEnv.get.conf.getBoolean("spark.hadoop.validateOutputSpecs", true)) {
+        // FileOutputFormat ignores the filesystem parameter
+        jobFormat.checkOutputSpecs(job)
+      }
+      val config = wrappedConf.value
+      config.set("mapred.output.dir", tmpPath+index)
+
+      def writeShard(iterator: Iterator[(ImmutableBytesWritable, KeyValue)]) = {
+        // Hadoop wants a 32-bit task attempt ID, so if ours is bigger than Int.MaxValue, roll it
+        // around by taking a mod. We expect that no task will be attempted 2 billion times.
+        val attemptNumber = (context.attemptId % Int.MaxValue).toInt
+        /* "reduce task" <split #> <attempt # = spark task #> */
+        val attemptId = newTaskAttemptID(bulkLoadRDD.name, context.stageId, isMap = false, context.partitionId,
+          attemptNumber)
+        val hadoopContext = newTaskAttemptContext(config, attemptId)
+        val format = outfmt.newInstance
+        format match {
+          case c: Configurable => c.setConf(config)
+          case _ => ()
+        }
+        val committer = format.getOutputCommitter(hadoopContext)
+        committer.setupTask(hadoopContext)
+        val writer = format.getRecordWriter(hadoopContext).asInstanceOf[RecordWriter[ImmutableBytesWritable, KeyValue]]
+        try {
+          var recordsWritten = 0L
+          while (iterator.hasNext) {
+            val pair = iterator.next()
+            writer.write(pair._1, pair._2)
+            recordsWritten += 1
+          }
+        } finally {
+          writer.close(hadoopContext)
+        }
+        committer.commitTask(hadoopContext)
+        Seq(tmpPath + index).toIterator // return the output path
+      }
+
+      val jobAttemptId = newTaskAttemptID(bulkLoadRDD.name, bulkLoadRDD.id, isMap = true, index, 0)
+      val jobTaskContext = newTaskAttemptContext(wrappedConf.value, jobAttemptId)
+      val jobCommitter = jobFormat.getOutputCommitter(jobTaskContext)
+      jobCommitter.setupJob(jobTaskContext)
+      jobCommitter.commitJob(jobTaskContext)
+
+      writeShard(iter)
+    }
   }
 
   override def run(sqlContext: SQLContext) = {
@@ -326,10 +378,7 @@ case class OptimizedBulkLoadIntoTableCommand(
       .relation.asInstanceOf[HBaseRelation]
     val hbContext = sqlContext.asInstanceOf[HBaseSQLContext]
     val logger = Logger.getLogger(getClass.getName)
-
     val conf = hbContext.sparkContext.hadoopConfiguration
-
-    val job = Job.getInstance(conf)
 
     val hadoopReader = if (isLocal) {
       val fs = FileSystem.getLocal(conf)
@@ -343,7 +392,7 @@ case class OptimizedBulkLoadIntoTableCommand(
     val tmpPath = Util.getTempFilePath(conf, relation.tableName)
     val splitKeys = relation.getRegionStartKeys.toArray
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
-    makeBulkLoadRDD(splitKeys, hadoopReader, job, tmpPath)
+    makeBulkLoadRDD(splitKeys, hadoopReader, conf, tmpPath)
     val tablePath = new Path(tmpPath)
     val load = new LoadIncrementalHFiles(conf)
     logger.debug(s"Starting doBulkLoad on table ${relation.htable.getName} ...")
