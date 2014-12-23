@@ -28,7 +28,8 @@ class HadoopReader(
     @transient sc: SparkContext,
     path: String,
     delimiter: Option[String])(baseRelation: HBaseRelation) {
-  // make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file
+
+  /** make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file. */
   private[hbase] def makeBulkLoadRDDFromTextFile = {
 
     val rdd = sc.textFile(path)

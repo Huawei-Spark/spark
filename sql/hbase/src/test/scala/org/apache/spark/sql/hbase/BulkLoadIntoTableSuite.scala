@@ -99,7 +99,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
     val hadoopReader = {
       val fs = FileSystem.getLocal(conf)
-      val pathStgiring = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
+      val pathString = fs.pathToFile(new Path(bulkLoad.path)).getCanonicalPath
       new HadoopReader(hbc.sparkContext, pathString, bulkLoad.delimiter)(hbaseRelation)
     }
     val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
@@ -118,13 +118,12 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
       iter.map { line =>
         val splits = line.split(splitRegex)
-        println(s"line of text file $line")
         keyBytes(0) = (bytesUtils.toBytes(splits(0).toInt), IntegerType)
-        println("test1 " + BytesUtils.toInt(bytesUtils.toBytes(splits(0).toInt), 0)) // here revert 1 is 1
+        //println("test1 " + BytesUtils.toInt(bytesUtils.toBytes(splits(0).toInt), 0)) // here revert 1 is 1
         valueBytes(0) = (family, qualyfier, bytesUtils.toBytes(splits(1).toInt))
         //val rowKeyData = HBaseKVHelper.encodingRawKeyColumns(keyBytes) // here revert 1 is 6
         val rowKeyData = bytesUtils.toBytes(splits(0).toInt)
-        println("test2 " + BytesUtils.toInt(rowKeyData, 0))
+        //println("test2 " + BytesUtils.toInt(rowKeyData, 0))
 
         val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
         val put = new PutWrapper(rowKeyData)
@@ -200,7 +199,6 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     job.setOutputFormatClass(classOf[HFileOutputFormat])
     job.getConfiguration.set("mapred.output.dir", "./hfileoutput")
     bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
-//    bulkLoadRDD.count
   }
 
   test("load data into hbase") {
