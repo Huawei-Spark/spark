@@ -83,7 +83,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
     } else {
       prefix += ((start.get, dt))
       require(isPoint, "Internal Logical Error: point range expected")
-      nextDimCriticalPointRanges.map(_.flatten(prefix += ((start.get, dt)))).reduceLeft(_ ++ _)
+      nextDimCriticalPointRanges.map(_.flatten(prefix)).reduceLeft(_ ++ _)
     }
   }
 }
@@ -387,20 +387,18 @@ object RangeCriticalPoint {
    * Step 1: generate critical point ranges for a particular dimension
    * @param relation the HBase relation
    * @param pred the predicate expression to work on
-   * @param dimIndex the dimension index
    * @return a list of critical point ranges
    */
   private[hbase] def generateCriticalPointRanges(relation: HBaseRelation,
-                                                 pred: Option[Expression], dimIndex: Int)
+                                                 pred: Option[Expression])
   : Seq[CriticalPointRange[_]] = {
     if (!pred.isDefined) Nil
     else {
       val predExpr = pred.get
       val predRefs = predExpr.references.toSeq
-      val boundPred = BindReferences.bindReference(predExpr, predRefs)
       val row = new GenericMutableRow(predRefs.size)
       // Step 1
-      generateCriticalPointRangesHelper(relation, predExpr, dimIndex, row, boundPred, predRefs)
+      generateCriticalPointRangesHelper(relation, predExpr, 0, row, predRefs)
     }
   }
 
@@ -410,7 +408,6 @@ object RangeCriticalPoint {
    * @param predExpr the predicate to work on
    * @param dimIndex the dimension index
    * @param row a row for partial reduction
-   * @param boundPred bound expression
    * @param predRefs the references in the predicate expression
    * @return a list of critical point ranges
    */
@@ -418,10 +415,10 @@ object RangeCriticalPoint {
                                                        predExpr: Expression,
                                                        dimIndex: Int,
                                                        row: MutableRow,
-                                                       boundPred: Expression,
                                                        predRefs: Seq[Attribute])
   : Seq[CriticalPointRange[_]] = {
     val keyDim = relation.partitionKeys(dimIndex)
+    val boundPred = BindReferences.bindReference(predExpr, predRefs)
     val dt: NativeType = keyDim.dataType.asInstanceOf[NativeType]
     // Step 1.1
     val criticalPoints: Seq[CriticalPoint[dt.JvmType]]
@@ -445,10 +442,13 @@ object RangeCriticalPoint {
         qualifiedCPRanges.foreach(cpr => {
           if (cpr.isPoint && cpr.pred != null) {
             cpr.nextDimCriticalPointRanges = generateCriticalPointRangesHelper(relation,
-              cpr.pred, dimIndex + 1, row, boundPred, predRefs)
+              cpr.pred, dimIndex + 1, row, predRefs)
           }
         })
       }
+      // Update row(keyIndex) to null for future use
+      row.update(keyIndex, null)
+
       qualifiedCPRanges
     }
   }
@@ -699,7 +699,7 @@ object RangeCriticalPoint {
     if (pred.isEmpty) relation.partitions
     else {
       // Step 1
-      val cprs: Seq[CriticalPointRange[_]] = generateCriticalPointRanges(relation, pred, 0)
+      val cprs: Seq[CriticalPointRange[_]] = generateCriticalPointRanges(relation, pred)
 
       // Step 2
       val expandedCPRs: Seq[MDCriticalPointRange[_]] =

@@ -23,6 +23,8 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
+import scala.collection.mutable.ArrayBuffer
+
 //@Ignore
 class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   var sparkConf: SparkConf = _
@@ -74,7 +76,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val pred = Some(mid)
 
     val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
-    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred, 0)
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 3)
     assert(result(0).start.get == 512 && result(0).startInclusive == true
@@ -111,7 +113,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val pred = Some(mid)
 
     val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
-    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred, 0)
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 2)
     assert(result(0).start.get == 513L && result(0).startInclusive == true
@@ -123,9 +125,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
   test("Generate CP Ranges 2") {
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column1", StringType, 0)
-    allColumns = allColumns :+ KeyColumn("column2", StringType, 1)
-    allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
-    allColumns = allColumns :+ NonKeyColumn("column3", BooleanType, family1, "qualifier1")
+    allColumns = allColumns :+ NonKeyColumn("column2", BooleanType, family1, "qualifier1")
 
     val lll = AttributeReference("column1", StringType)(ExprId(0L), Seq("testTable"))
     val llr = Literal("aaa", StringType)
@@ -145,10 +145,92 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val pred = Some(mid)
 
     val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
-    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred, 0)
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 1)
     assert(result(0).start.get == "aaa" && result(0).startInclusive == true
       && result(0).end.get == "aaa" && result(0).endInclusive == true)
+  }
+
+  test("Generate CP Ranges for Multi-Dimension 0") {
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", StringType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ KeyColumn("column3", ShortType, 2)
+    allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
+
+    val lll = AttributeReference("column3", ShortType)(ExprId(2L), Seq("testTable"))
+    val llr = Literal(8.toShort, ShortType)
+    val ll = GreaterThan(lll, llr)
+
+    val lrl = AttributeReference("column2", IntegerType)(ExprId(1L), Seq("testTable"))
+    val lrr = Literal(2048, IntegerType)
+    val lr = EqualTo(lrl, lrr)
+
+    val l = And(ll, lr)
+
+    val rll = AttributeReference("column1", StringType)(ExprId(0L), Seq("testTable"))
+    val rlr = Literal("abc", StringType)
+    val rl = EqualTo(rll, rlr)
+
+    val rrl = AttributeReference("column1", StringType)(ExprId(0L), Seq("testTable"))
+    val rrr = Literal("cba", StringType)
+    val rr = EqualTo(rrl, rrr)
+
+    val r = Or(rl, rr)
+
+    val mid = And(l, r)
+    val pred = Some(mid)
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+      result.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+
+    assert(result.size == 2)
+    assert(expandedCPRs.size == 2)
+    assert(expandedCPRs(0).prefix.size == 2)
+    assert(expandedCPRs(1).prefix.size == 2)
+  }
+
+  test("Generate CP Ranges for Multi-Dimension 1") {
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", StringType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
+
+    val lll = AttributeReference("column2", IntegerType)(ExprId(1L), Seq("testTable"))
+    val llr = Literal(8, IntegerType)
+    val ll = EqualTo(lll, llr)
+
+    val lrl = AttributeReference("column2", IntegerType)(ExprId(1L), Seq("testTable"))
+    val lrr = Literal(2048, IntegerType)
+    val lr = EqualTo(lrl, lrr)
+
+    val l = Or(ll, lr)
+
+    val rll = AttributeReference("column1", StringType)(ExprId(0L), Seq("testTable"))
+    val rlr = Literal("abc", StringType)
+    val rl = EqualTo(rll, rlr)
+
+    val rrl = AttributeReference("column1", StringType)(ExprId(0L), Seq("testTable"))
+    val rrr = Literal("cba", StringType)
+    val rr = EqualTo(rrl, rrr)
+
+    val r = Or(rl, rr)
+
+    val mid = And(l, r)
+    val pred = Some(mid)
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+      result.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+
+    assert(result.size == 4)
   }
 }
