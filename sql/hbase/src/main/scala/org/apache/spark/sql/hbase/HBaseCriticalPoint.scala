@@ -200,7 +200,7 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
 object RangeCriticalPoint {
   /**
    * collect all critical points from an expression on a specific dimension key
-   * @param expression the expression from here the critical points will be identified
+   * @param expression the expression from where the critical points will be identified
    * @param key the dimension key for which the critical points will be identified
    * @tparam T type parameter of the critical points
    * @return
@@ -389,8 +389,7 @@ object RangeCriticalPoint {
    * @param pred the predicate expression to work on
    * @return a list of critical point ranges
    */
-  private[hbase] def generateCriticalPointRanges(relation: HBaseRelation,
-                                                 pred: Option[Expression])
+  private[hbase] def generateCriticalPointRanges(relation: HBaseRelation, pred: Option[Expression])
   : Seq[CriticalPointRange[_]] = {
     if (!pred.isDefined) Nil
     else {
@@ -446,7 +445,7 @@ object RangeCriticalPoint {
           }
         })
       }
-      // Update row(keyIndex) to null for future use
+      // Update row(keyIndex) to null for future reuse
       row.update(keyIndex, null)
 
       qualifiedCPRanges
@@ -683,16 +682,16 @@ object RangeCriticalPoint {
    *    1.1 collect the critical points and their sorted ranges
    *    1.2 For each range, partial reduce to qualify and generate associated filter predicates
    *    1.3 For each "point range", repeat Step 1 for the next key dimension
-   * 2. For each critical point based range, convert to its byte[] representation,
-   *    basically collapse multi-dim boundaries into a universal byte[] and potential
-   *    expand the original top-level critical point ranges into ones incorporated
-   *    lower level nested critical point ranges
+   * 2. For each critical point based range,
+   *    potentially expand the original top-level critical point ranges into multidimensional
+   *    critical point ranges incorporating
+   *    lower level nested critical point ranges for next key dimension(s)
    * 3. For each converted critical point based range, map them to partitions to partitions
-    *   3.1 start the binary search from the last mapped partition
-    *   3.2 For each partition mapped to only one critical point range, assign the latter's filter
-    *       predicate to the partition
-    *   3.3 For each partition mapped to multiple critical point ranges, use the original
-    *       predicate so the slave will
+   *    3.1 start the binary search from the last mapped partition
+   *    3.2 For each partition mapped to only one critical point range, assign the latter's filter
+   *        predicate to the partition
+   *    3.3 For each partition mapped to multiple critical point ranges, use the original
+   *        predicate so the slave will do their own partial reduction
    */
   private[hbase] def generatePrunedPartitions(relation: HBaseRelation, pred: Option[Expression])
   : Seq[HBasePartition] = {
