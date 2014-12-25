@@ -35,6 +35,8 @@ class HadoopReader(
     val rdd = sc.textFile(path)
     val splitRegex = delimiter.getOrElse(",")
     val relation = baseRelation
+    // todo(wf): we should not resue the buffer in bulkloading ortherwise it will lead to
+    // corrupted as we are reusing same buffer
     rdd.mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)
       val valueBytes =
