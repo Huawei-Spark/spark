@@ -364,7 +364,8 @@ case class ParallelizedBulkLoadIntoTableCommand(
         committer.commitTask(hadoopContext)
         committer.commitJob(hadoopContext)
         var path = new Path(tmpPath + index)
-        Seq(path.getFileSystem(config).makeQualified(path).toString).toIterator // return the output path
+        // return the output path
+        Seq(path.getFileSystem(config).makeQualified(path).toString).toIterator
       }
       writeShard(iter)
     }
@@ -393,7 +394,11 @@ case class ParallelizedBulkLoadIntoTableCommand(
     val htableName = relation.htable.getName.getNameAsString
     val wrappedConf = new SerializableWritable(conf)
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
-    makeBulkLoadRDD(splitKeys, hadoopReader, wrappedConf, tmpPath)(relation).foreachPartition { iter =>
+    makeBulkLoadRDD(
+      splitKeys,
+      hadoopReader,
+      wrappedConf,
+      tmpPath)(relation).foreachPartition { iter =>
       val conf = wrappedConf.value
       val load = new LoadIncrementalHFiles(conf)
       val htable = new HTable(conf, htableName)
