@@ -390,7 +390,7 @@ case class ParallelizedBulkLoadIntoTableCommand(
     // tmp path for storing HFile
     val tmpPath = Util.getTempFilePath(conf, relation.tableName)
     val splitKeys = relation.getRegionStartKeys.toArray
-    lazy val htableName = relation.htable.getName
+    val htableName = relation.htable.getName.getNameAsString
     val wrappedConf = new SerializableWritable(conf)
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
     makeBulkLoadRDD(splitKeys, hadoopReader, wrappedConf, tmpPath)(relation).foreachPartition { iter =>
