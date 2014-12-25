@@ -520,19 +520,19 @@ object RangeCriticalPoint {
           // tight upper bound
           var i = right
           prevLarger = right
-          while (i >= left + 1 && cmp <= 0) {
+          while (i >= left && cmp <= 0) {
             prevLarger = i
-            i = i - 1
             cmp = comp(src, tgt(i))
+            i = i - 1
           }
         } else {
           // tight lower bound
           var i = left
           prevSmaller = left
-          while (i <= right - 1 && cmp >= 0) {
+          while (i <= right && cmp >= 0) {
             prevSmaller = i
-            i = i + 1
             cmp = comp(src, tgt(i))
+            i = i + 1
           }
         }
         right = left // break the outer while loop
@@ -575,15 +575,14 @@ object RangeCriticalPoint {
                                                partitions: Seq[HBasePartition],
                                                pStartIndex: Int): (Int, Int) = {
     val largestStart = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
-      cpr, partitions, pStartIndex, upperBound = true,
-      (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
-        mdpr.compareWithPartition(startOrEnd = true, p))
-    val smallestEnd = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
       cpr, partitions, pStartIndex, upperBound = false,
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
         mdpr.compareWithPartition(startOrEnd = false, p))
-    if (largestStart == -1 || smallestEnd == -1 ||
-      smallestEnd < largestStart) {
+    val smallestEnd = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
+      cpr, partitions, pStartIndex, upperBound = true,
+      (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
+        mdpr.compareWithPartition(startOrEnd = true, p))
+    if (largestStart == -1 || smallestEnd == -1 || smallestEnd < largestStart) {
       null // no overlapping
     }
     else {
@@ -602,11 +601,11 @@ object RangeCriticalPoint {
                                           crps: Seq[MDCriticalPointRange[_]], startIndex: Int):
   (Int, Int) = {
     val largestStart = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
-      partition, crps, startIndex, upperBound = true,
+      partition, crps, startIndex, upperBound = false,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
         -mdpr.compareWithPartition(startOrEnd = true, p))
     val smallestEnd = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
-      partition, crps, startIndex, upperBound = false,
+      partition, crps, startIndex, upperBound = true,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
         -mdpr.compareWithPartition(startOrEnd = false, p))
     if (largestStart == -1 || smallestEnd == -1 ||
@@ -626,15 +625,13 @@ object RangeCriticalPoint {
     } else {
       var cprStartIndex = 0
       var pStartIndex = 0
-      var done = false
       var pIndex = 0
       var result = Seq[HBasePartition]()
-      while (cprStartIndex < cprs.size && pStartIndex < partitions.size && !done) {
+      while (cprStartIndex < cprs.size && pStartIndex < partitions.size) {
         val cpr = cprs(cprStartIndex)
         val qualifiedPartitionIndexes =
           getQualifiedPartitions(cpr, partitions, pStartIndex)
-        if (qualifiedPartitionIndexes == null) done = true
-        else {
+        if (qualifiedPartitionIndexes != null) {
           val (pstart, pend) = qualifiedPartitionIndexes
           var p = partitions(pstart)
           val pred = if (cpr.pred == null) None else Some(cpr.pred)
@@ -666,8 +663,7 @@ object RangeCriticalPoint {
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
-          if (qualifiedCPRIndexes == null) done = true
-          else cprStartIndex = qualifiedCPRIndexes._2
+          if (qualifiedCPRIndexes != null) cprStartIndex = qualifiedCPRIndexes._2
         }
       }
       result

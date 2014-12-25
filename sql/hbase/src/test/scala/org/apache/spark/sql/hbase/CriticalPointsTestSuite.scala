@@ -35,7 +35,7 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
   val namespace = "testNamespace"
   val tableName = "testTable"
-  val hbaseTableName = "hbaseTable"
+  val hbaseTableName = "ht"
   val family1 = "family1"
   val family2 = "family2"
 
@@ -237,5 +237,163 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       result.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
     assert(expandedCPRs.size == 4)
+  }
+
+  test("Get partitions 0") {
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+
+    val lll = relation.output.find(_.name == "column2").get
+    val llr = Literal(8, IntegerType)
+    val ll = EqualTo(lll, llr)
+
+    val lrl = lll
+    val lrr = Literal(2048, IntegerType)
+    val lr = EqualTo(lrl, lrr)
+
+    val l = Or(ll, lr)
+
+    val rll = relation.output.find(_.name == "column1").get
+    val rlr = Literal(32, IntegerType)
+    val rl = EqualTo(rll, rlr)
+
+    val rrl = rll
+    val rrr = Literal(1024, IntegerType)
+    val rr = EqualTo(rrl, rrr)
+
+    val r = Or(rl, rr)
+
+    val mid = And(l, r)
+    val pred = Some(mid)
+
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    assert(result.size == 2)
+
+    val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+      result.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+
+    assert(expandedCPRs.size == 4)
+
+    val rowkey0 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(0), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(7), IntegerType))
+    )
+
+    val rowkey1 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(1), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
+    )
+
+    val rowkey2 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
+    )
+
+    val rowkey3 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(4), IntegerType))
+    )
+
+    val rowkey4 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(3), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
+    )
+
+    val p1 = new HBasePartition(0, 0, -1, None, Some(rowkey0), relation = relation)
+    val p2 = new HBasePartition(1, 1, -1, Some(rowkey0), Some(rowkey1), relation = relation)
+    val p3 = new HBasePartition(2, 2, -1, Some(rowkey1), Some(rowkey2), relation = relation)
+    val p4 = new HBasePartition(3, 3, -1, Some(rowkey2), Some(rowkey3), relation = relation)
+    val p5 = new HBasePartition(4, 4, -1, Some(rowkey3), Some(rowkey4), relation = relation)
+    val p6 = new HBasePartition(5, 5, -1, Some(rowkey4), None, relation = relation)
+
+    relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
+
+    RangeCriticalPoint.prunePartitions(
+      expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
+  }
+
+  test("Get partitions 1") {
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+
+    val lll = relation.output.find(_.name == "column2").get
+    val llr = Literal(8, IntegerType)
+    val ll = EqualTo(lll, llr)
+
+    val lrl = lll
+    val lrr = Literal(2048, IntegerType)
+    val lr = EqualTo(lrl, lrr)
+
+    val l = Or(ll, lr)
+
+    val rll = relation.output.find(_.name == "column1").get
+    val rlr = Literal(32, IntegerType)
+    val rl = EqualTo(rll, rlr)
+
+    val rrl = rll
+    val rrr = Literal(1024, IntegerType)
+    val rr = EqualTo(rrl, rrr)
+
+    val r = Or(rl, rr)
+
+    val mid = And(l, r)
+    val pred = Some(mid)
+
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    assert(result.size == 2)
+
+    val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+      result.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+
+    assert(expandedCPRs.size == 4)
+
+    val rowkey0 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(1), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(1), IntegerType))
+    )
+
+    val rowkey1 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(2), IntegerType))
+    )
+
+    val rowkey2 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(32), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(16), IntegerType))
+    )
+
+    val rowkey3 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(64), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(128), IntegerType))
+    )
+
+    val rowkey4 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(1024), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(256), IntegerType))
+    )
+
+    val p1 = new HBasePartition(0, 0, -1, None, Some(rowkey0), relation = relation)
+    val p2 = new HBasePartition(1, 1, -1, Some(rowkey0), Some(rowkey1), relation = relation)
+    val p3 = new HBasePartition(2, 2, -1, Some(rowkey1), Some(rowkey2), relation = relation)
+    val p4 = new HBasePartition(3, 3, -1, Some(rowkey2), Some(rowkey3), relation = relation)
+    val p5 = new HBasePartition(4, 4, -1, Some(rowkey3), Some(rowkey4), relation = relation)
+    val p6 = new HBasePartition(5, 5, -1, Some(rowkey4), None, relation = relation)
+
+    relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
+
+    RangeCriticalPoint.prunePartitions(
+      expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
   }
 }
