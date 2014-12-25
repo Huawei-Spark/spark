@@ -473,7 +473,7 @@ object RangeCriticalPoint {
     var newLimit = limit
     var cmp = 0
     var prevEq = eq
-    while (incr * (newLimit - prevEq) > 0) {
+    while (incr * (newLimit - prevEq) >= 0) {
       if (incr * (newLimit - prevEq) < threshold) {
         // linear search
         mid = prevEq + incr
@@ -512,30 +512,30 @@ object RangeCriticalPoint {
     var prevSmaller = -1
     var mid = -1
     var cmp: Int = 0
-    while (right > left) {
+    while (right >= left) {
       if (right - left < threshold) {
         // linear search
         cmp = 0
         if (upperBound) {
           // tight upper bound
-          var i = right
-          prevLarger = right
-          while (i >= left && cmp <= 0) {
-            prevLarger = i
-            cmp = comp(src, tgt(i))
+          var i = right + 1
+          while (i > left && cmp <= 0) {
             i = i - 1
+            cmp = comp(src, tgt(i))
           }
+          prevLarger = if (i == left && cmp <= 0) i
+                       else i + 1
         } else {
           // tight lower bound
-          var i = left
-          prevSmaller = left
-          while (i <= right && cmp >= 0) {
-            prevSmaller = i
-            cmp = comp(src, tgt(i))
+          var i = left - 1
+          while (i < right && cmp >= 0) {
             i = i + 1
+            cmp = comp(src, tgt(i))
           }
+          prevSmaller = if (i ==  right && cmp >= 0) i
+                        else i - 1
         }
-        right = left // break the outer while loop
+        right = left - 1 // break the outer while loop
       } else {
         // binary search
         mid = left + (right - left) / 2
@@ -582,11 +582,11 @@ object RangeCriticalPoint {
       cpr, partitions, pStartIndex, upperBound = true,
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
         mdpr.compareWithPartition(startOrEnd = true, p))
-    if (largestStart == -1 || smallestEnd == -1 || smallestEnd < largestStart) {
+    if (largestStart == -1 || smallestEnd == -1 || smallestEnd > largestStart) {
       null // no overlapping
     }
     else {
-      (largestStart, smallestEnd)
+      (smallestEnd, largestStart)
     }
   }
 
@@ -608,12 +608,11 @@ object RangeCriticalPoint {
       partition, crps, startIndex, upperBound = true,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
         -mdpr.compareWithPartition(startOrEnd = false, p))
-    if (largestStart == -1 || smallestEnd == -1 ||
-      smallestEnd < largestStart) {
+    if (largestStart == -1 || smallestEnd == -1 | largestStart < smallestEnd) {
       null // no overlapping
     }
     else {
-      (largestStart, smallestEnd)
+      (smallestEnd, largestStart)
     }
   }
 
@@ -629,8 +628,9 @@ object RangeCriticalPoint {
       var cprStartIndex = 0
       var pStartIndex = 0
       var pIndex = 0
+      var done = false
       var result = Seq[HBasePartition]()
-      while (cprStartIndex < cprs.size && pStartIndex < partitions.size) {
+      while (cprStartIndex < cprs.size && pStartIndex < partitions.size && !done) {
         val cpr = cprs(cprStartIndex)
         val qualifiedPartitionIndexes =
           getQualifiedPartitions(cpr, partitions, pStartIndex)
@@ -666,8 +666,9 @@ object RangeCriticalPoint {
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
-          if (qualifiedCPRIndexes != null) cprStartIndex = qualifiedCPRIndexes._2
-        }
+          cprStartIndex = if (qualifiedCPRIndexes == null) cprs.size
+                         else qualifiedCPRIndexes._2
+        } else done = true
       }
       result
     }
