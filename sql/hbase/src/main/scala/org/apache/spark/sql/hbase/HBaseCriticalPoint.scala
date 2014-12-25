@@ -622,8 +622,11 @@ object RangeCriticalPoint {
   private[hbase] def prunePartitions(cprs: Seq[MDCriticalPointRange[_]],
                                      pred: Option[Expression], partitions: Seq[HBasePartition],
                                      dimSize: Int): Seq[HBasePartition] = {
-    if (cprs.isEmpty) {
-      Nil
+    // no need to prune as hbase partitions size is 1. Generally for single hbase partition there 
+    // will not be any lowerBound and upperBound key.
+    if (cprs.isEmpty || partitions.length == 1) {
+      partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, 0,
+        p.start, p.end, p.server, pred))
     } else {
       var cprStartIndex = 0
       var pStartIndex = 0
