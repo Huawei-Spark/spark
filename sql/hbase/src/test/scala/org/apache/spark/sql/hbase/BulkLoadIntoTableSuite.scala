@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.apache.spark.{SerializableWritable, SparkContext, Logging}
 import org.apache.spark.sql.catalyst.types.IntegerType
-import org.apache.spark.sql.hbase.execution.{OptimizedBulkLoadIntoTableCommand, BulkLoadIntoTableCommand}
+import org.apache.spark.sql.hbase.execution.{ParallelizedBulkLoadIntoTableCommand, BulkLoadIntoTableCommand}
 import org.apache.hadoop.hbase.util.Bytes
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.rdd.ShuffledRDD
@@ -110,7 +110,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
     val bulkLoad =
-      OptimizedBulkLoadIntoTableCommand(
+      ParallelizedBulkLoadIntoTableCommand(
       "./sql/hbase/src/test/resources/test.csv",
       "hbasetablename",
       true,

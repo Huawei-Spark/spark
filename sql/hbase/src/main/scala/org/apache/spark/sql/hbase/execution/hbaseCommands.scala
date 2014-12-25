@@ -253,7 +253,7 @@ case class BulkLoadIntoTableCommand(
 }
 
 @DeveloperApi
-case class OptimizedBulkLoadIntoTableCommand(
+case class ParallelizedBulkLoadIntoTableCommand(
      path: String,
      tableName: String,
      isLocal: Boolean,
