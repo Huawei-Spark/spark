@@ -93,13 +93,13 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
 
   def toBytes(input: String): HBaseRawType = {
     buffer = Bytes.toBytes(input)
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Byte): HBaseRawType = {
     // Flip sign bit so that Byte is binary comparable
     buffer(0) = (input ^ 0x80).asInstanceOf[Byte]
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Boolean): HBaseRawType = {
@@ -108,20 +108,20 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     } else {
       buffer(0) = 0.asInstanceOf[Byte]
     }
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Double): HBaseRawType = {
     var l: Long = java.lang.Double.doubleToLongBits(input)
     l = (l ^ ((l >> java.lang.Long.SIZE - 1) | java.lang.Long.MIN_VALUE)) + 1
     Bytes.putLong(buffer, 0, l)
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Short): HBaseRawType = {
     buffer(0) = ((input >> 8) ^ 0x80).asInstanceOf[Byte]
     buffer(1) = input.asInstanceOf[Byte]
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Float): HBaseRawType = {
@@ -136,7 +136,7 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(1) = (input >> 16).asInstanceOf[Byte]
     buffer(2) = (input >> 8).asInstanceOf[Byte]
     buffer(3) = input.asInstanceOf[Byte]
-    buffer.clone
+    buffer
   }
 
   def toBytes(input: Long): HBaseRawType = {
@@ -148,6 +148,6 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(5) = (input >> 16).asInstanceOf[Byte]
     buffer(6) = (input >> 8).asInstanceOf[Byte]
     buffer(7) = input.asInstanceOf[Byte]
-    buffer.clone
+    buffer
   }
 }

@@ -47,7 +47,7 @@ class HadoopReader(
         val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
         val put = new PutWrapper(rowKeyData)
         valueBytes.foreach { case (family, qualifier, value) =>
-          put.add(family, qualifier, value)
+          put.add(family, qualifier, value.clone)
         }
         (rowKey, put)
       }
