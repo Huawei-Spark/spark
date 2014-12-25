@@ -114,8 +114,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
       "./sql/hbase/src/test/resources/test.csv",
       "hbasetablename",
       true,
-      Option(","),
-      hbaseRelation)
+      Option(","))
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
       new ImmutableBytesWritableWrapper(bytesUtils.toBytes(r))
@@ -130,7 +129,12 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val tmpPath = Util.getTempFilePath(conf, hbaseRelation.tableName)
     val wrappedConf = new SerializableWritable(conf)
 
-    val result = bulkLoad.makeBulkLoadRDD(splitKeys.toArray, hadoopReader, wrappedConf, "./hfileoutput")
+    val result = bulkLoad.makeBulkLoadRDD(
+      splitKeys.toArray,
+      hadoopReader,
+      wrappedConf,
+      "./hfileoutput")(hbaseRelation)
+
     result.foreach(println)
   }
 

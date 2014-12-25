@@ -257,14 +257,13 @@ case class ParallelizedBulkLoadIntoTableCommand(
      path: String,
      tableName: String,
      isLocal: Boolean,
-     delimiter: Option[String],
-     relation: HBaseRelation) extends RunnableCommand with SparkHadoopMapReduceUtil {
+     delimiter: Option[String]) extends RunnableCommand with SparkHadoopMapReduceUtil {
 
   private[hbase] def makeBulkLoadRDD(
       splitKeys: Array[ImmutableBytesWritableWrapper],
       hadoopReader: HadoopReader,
       wrappedConf: SerializableWritable[Configuration],
-      tmpPath: String) = {
+      tmpPath: String)(relation: HBaseRelation) = {
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(splitKeys)
     val shuffled =
@@ -391,10 +390,10 @@ case class ParallelizedBulkLoadIntoTableCommand(
     // tmp path for storing HFile
     val tmpPath = Util.getTempFilePath(conf, relation.tableName)
     val splitKeys = relation.getRegionStartKeys.toArray
-    val htableName = relation.htable.getName
+    lazy val htableName = relation.htable.getName
     val wrappedConf = new SerializableWritable(conf)
     logger.debug(s"Starting makeBulkLoad on table ${relation.htable.getName} ...")
-    makeBulkLoadRDD(splitKeys, hadoopReader, wrappedConf, tmpPath).foreachPartition { iter =>
+    makeBulkLoadRDD(splitKeys, hadoopReader, wrappedConf, tmpPath)(relation).foreachPartition { iter =>
       val conf = wrappedConf.value
       val load = new LoadIncrementalHFiles(conf)
       val htable = new HTable(conf, htableName)
