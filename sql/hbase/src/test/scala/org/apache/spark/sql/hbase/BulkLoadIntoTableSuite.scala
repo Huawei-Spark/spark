@@ -17,18 +17,18 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.fs.{Path, FileSystem}
-import org.apache.hadoop.mapreduce.Job
-import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
-import org.apache.spark.{SerializableWritable, SparkContext, Logging}
-import org.apache.spark.sql.catalyst.types.IntegerType
-import org.apache.spark.sql.hbase.execution.{ParallelizedBulkLoadIntoTableCommand, BulkLoadIntoTableCommand}
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2
 import org.apache.hadoop.hbase.util.Bytes
-import scala.collection.mutable.ArrayBuffer
+import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.rdd.ShuffledRDD
-import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat, HFileOutputFormat2}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.types.IntegerType
+import org.apache.spark.sql.hbase.execution.{BulkLoadIntoTableCommand, ParallelizedBulkLoadIntoTableCommand}
+import org.apache.spark.{Logging, SerializableWritable, SparkContext}
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
+
+import scala.collection.mutable.ArrayBuffer
 
 class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Logging{
 
@@ -88,7 +88,8 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   test("write data to HFile") {
     val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
-    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", "hbasetablename", true, Option(","))
+    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", "hbasetablename",
+      isLocal = true, Option(","))
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
       new ImmutableBytesWritableWrapper(bytesUtils.toBytes(r))
@@ -168,7 +169,8 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
     import org.apache.hadoop.hbase._
     import org.apache.hadoop.hbase.io._
-    import scala.collection.JavaConversions._
+
+import scala.collection.JavaConversions._
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
       new ImmutableBytesWritableWrapper(bytesUtils.toBytes(r))
@@ -228,7 +230,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val job = Job.getInstance(sc.hadoopConfiguration)
     job.setOutputKeyClass(classOf[ImmutableBytesWritable])
     job.setOutputValueClass(classOf[KeyValue])
-    job.setOutputFormatClass(classOf[HFileOutputFormat])
+    job.setOutputFormatClass(classOf[HFileOutputFormat2])
     job.getConfiguration.set("mapred.output.dir", "./hfileoutput")
     bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
   }
@@ -272,5 +274,4 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   override def afterAll() {
     sc.stop()
   }
-
 }

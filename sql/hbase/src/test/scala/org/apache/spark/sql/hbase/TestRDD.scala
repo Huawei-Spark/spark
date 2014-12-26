@@ -57,7 +57,7 @@ object TestRdd {
     println(s"Collector class is ${collector.getClass.getName}")
     println("%s".format(collector.getClass.getMethods.mkString("Methods: [",",","]")))
     println(s"Collector is ${collector.toDebugString}")
-    println(s"Collect output: ${collector.collect}")
+    println(s"Collect output: ${collector.collect()}")
     myNewSerializedRdd
   }
 }

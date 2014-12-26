@@ -72,9 +72,9 @@ with Logging {
     }
   }
 
-  def checkHBaseTableExists(hbaseTable: String) = {
-    val tname = TableName.valueOf(hbaseTable)
-    hbaseAdmin.tableExists(tname)
+  def checkHBaseTableExists(hbaseTable: String): Boolean = {
+    val tableName = TableName.valueOf(hbaseTable)
+    hbaseAdmin.tableExists(tableName)
   }
 
   def insertTestData() = {
@@ -153,7 +153,6 @@ with Logging {
           dataType)
     }
 
-    val buffer = ListBuffer[Byte]()
     HBaseKVHelper.encodingRawKeyColumns(rawKeyCol)
   }
 

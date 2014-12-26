@@ -38,12 +38,12 @@ class SparkSQLJoinSuite extends FunSuite {
     val rdd1 = sc.parallelize((1 to 2).map { ix => JoinTable2Cols(ix, s"valA$ix")})
     rdd1.registerTempTable("SparkJoinTable1")
     println("Table1 Contents:")
-    val q1 = ssc.sql("select * from SparkJoinTable1").collect.foreach(println)
+    val q1 = ssc.sql("select * from SparkJoinTable1").collect().foreach(println)
     val ids = Seq((1, 1), (1, 2), (2, 3), (2, 4))
     val rdd2 = sc.parallelize(ids.map { case (ix, is) => JoinTable2Cols(ix, s"valB$is")})
     val table2 = rdd2.registerTempTable("SparkJoinTable2")
     println("Table2 Contents:")
-    val q2 = ssc.sql("select * from SparkJoinTable2").collect.foreach(println)
+    val q2 = ssc.sql("select * from SparkJoinTable2").collect().foreach(println)
     val query = s"""select t1.intcol t1intcol, t2.intcol t2intcol, t1.strcol t1strcol,
                 t2.strcol t2strcol from SparkJoinTable1 t1 JOIN
                     SparkJoinTable2 t2 on t1.intcol = t2.intcol""".stripMargin

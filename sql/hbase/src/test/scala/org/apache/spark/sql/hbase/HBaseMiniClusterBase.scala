@@ -37,7 +37,7 @@ class HBaseMiniClusterBase extends FunSuite with BeforeAndAfterAll with Logging 
 
   def sparkContext: SparkContext = sc
 
-  override def beforeAll: Unit = {
+  override def beforeAll(): Unit = {
     sc = new SparkContext("local", "hbase sql test")
     testUtil = new HBaseTestingUtility
     cluster = testUtil.startMiniCluster(NMasters, NRegionServers)
@@ -62,7 +62,7 @@ class HBaseMiniClusterBase extends FunSuite with BeforeAndAfterAll with Logging 
 
   }
 
-  override def afterAll: Unit = {
+  override def afterAll() = {
     sc.stop()
     cluster.shutdown()
   }
