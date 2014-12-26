@@ -619,8 +619,7 @@ object RangeCriticalPoint {
     // no need to prune as hbase partitions size is 1. Generally for single hbase partition there 
     // will not be any lowerBound and upperBound key.
     if (cprs.isEmpty || partitions.length == 1) {
-      partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, 0,
-        p.start, p.end, p.server, pred))
+      partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.start, p.end, p.server, pred))
     } else {
       var cprStartIndex = 0
       var pStartIndex = 0
