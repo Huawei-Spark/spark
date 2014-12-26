@@ -23,8 +23,6 @@ import org.scalatest.FunSuite
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.rdd.ShuffledRDD
 
-import scala.collection.mutable.{ListBuffer, ArrayBuffer}
-
 class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
   test("test hbase partitioner") {
     val data = (1 to 40).map { r =>
@@ -77,10 +75,8 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
         , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
     )
 
-    val partition1 = new HBasePartition(0, 0, -1, Some(rowkey1),
-      Some(rowkey2))
-    val partition2 = new HBasePartition(1, 1, -1, Some(rowkey3),
-      Some(rowkey4))
+//    val partition1 = new HBasePartition(0, 0, Some(rowkey1), Some(rowkey2))
+//    val partition2 = new HBasePartition(1, 1, Some(rowkey3), Some(rowkey4))
 
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
@@ -90,11 +86,11 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 
     val hbr = HBaseRelation(tableName, namespace, hbaseTableName
                 , allColumns)(new HBaseSQLContext(sc))
-    val partitions = List[HBasePartition](partition1, partition2)
+//    val partitions = List[HBasePartition](partition1, partition2)
 //    hbr.partitions = partitions
 
     val attribute1 = hbr.partitionKeys(0)
-    val attribute2 = hbr.partitionKeys(1)
+//    val attribute2 = hbr.partitionKeys(1)
     val predicate5 = new GreaterThan(Literal(5,IntegerType), attribute1)
 
     hbr.getPrunedPartitions(Option(predicate5))

@@ -165,7 +165,7 @@ private[hbase] case class HBaseRelation(
   @transient lazy val partitionExpiration = context.partitionExpiration * 1000
   @transient var partitionTS: Long = _
 
-  private[hbase] def fetchPartitions: Unit = {
+  private[hbase] def fetchPartitions(): Unit = {
     if (System.currentTimeMillis - partitionTS >= partitionExpiration) {
       partitionTS = System.currentTimeMillis
       partitions = {
@@ -189,7 +189,7 @@ private[hbase] case class HBaseRelation(
               }
             }
             new HBasePartition(
-              p._2, p._2, -1,
+              p._2, p._2,
               start,
               end,
               Some(p._1._2.getHostname), relation = this)
@@ -203,7 +203,7 @@ private[hbase] case class HBaseRelation(
   @transient private[hbase] lazy val dimSize = keyColumns.size
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
-                            index: Int): (PartitionRange[_]) = {
+                            index: Int): PartitionRange[_] = {
     def getData(dt: NativeType,
                 buffer: ListBuffer[HBaseRawType],
                 aBuffer: ArrayBuffer[Byte],
@@ -285,9 +285,9 @@ private[hbase] case class HBaseRelation(
           val par = partitions(p.id)
           idx = idx + 1
           if (p.pred == null) {
-            new HBasePartition(idx, par.mappedIndex, -1, par.start, par.end, par.server)
+            new HBasePartition(idx, par.mappedIndex, par.start, par.end, par.server)
           } else {
-            new HBasePartition(idx, par.mappedIndex, -1, par.start, par.end,
+            new HBasePartition(idx, par.mappedIndex, par.start, par.end,
               par.server, Some(p.pred))
           }
         }))
@@ -341,7 +341,7 @@ private[hbase] case class HBaseRelation(
       case None => Some(partitions)
       case Some(pred) => if (pred.references.intersect(AttributeSet(partitionKeys)).isEmpty) {
         // the predicate does not apply to the partitions at all; just push down the filtering
-        Some(partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.keyPartialEvalIndex,
+        Some(partitions.map(p => new HBasePartition(p.idx, p.mappedIndex,
           p.start, p.end, p.server, Some(pred))))
       } else {
         val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
@@ -352,11 +352,9 @@ private[hbase] case class HBaseRelation(
           // pruned partitions have the same "physical" partition index, but different
           // "canonical" index
           if (p.pred == null) {
-            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.start,
-              par.end, par.server, None)
+            new HBasePartition(idx, par.mappedIndex, par.start, par.end, par.server, None)
           } else {
-            new HBasePartition(idx, par.mappedIndex, par.keyPartialEvalIndex, par.start,
-              par.end, par.server, Some(p.pred))
+            new HBasePartition(idx, par.mappedIndex, par.start, par.end, par.server, Some(p.pred))
           }
         }))
         result

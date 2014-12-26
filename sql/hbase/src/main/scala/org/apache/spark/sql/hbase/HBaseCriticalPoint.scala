@@ -67,8 +67,6 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
                                            dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt) {
   var nextDimCriticalPointRanges: Seq[CriticalPointRange[_]] = Nil
-  lazy val isPoint: Boolean = start.isDefined && end.isDefined &&
-    startInclusive && endInclusive && start.get.equals(end.get)
 
   /**
    * expand on nested critical point ranges of sub-dimensions
@@ -79,7 +77,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
   : Seq[MDCriticalPointRange[_]] = {
     if (nextDimCriticalPointRanges.isEmpty) {
       // Leaf node
-      Seq(new MDCriticalPointRange(prefix.toSeq, this, dt, pred))
+      Seq(new MDCriticalPointRange(prefix.toSeq, this, dt))
     } else {
       prefix += ((start.get, dt))
       require(isPoint, "Internal Logical Error: point range expected")
@@ -96,12 +94,11 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
  * @param lastRange the range of the last dimension (not necessarily the last dimension of the
  *                  table but just in this invocation!)
  * @param dt the data type of the range of the last dimension
- * @param pred associated predicate
  * @tparam T the type parameter of the range of the last dimension
  */
 private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)],
-                                                  lastRange: CriticalPointRange[T], dt: NativeType,
-                                                  var pred: Expression) {
+                                                  lastRange: CriticalPointRange[T],
+                                                  dt: NativeType) {
   /**
    * Compare this range's start/end with the partition's end/start
    * @param startOrEnd TRUE if compare this start with the partition's end;
@@ -634,37 +631,22 @@ object RangeCriticalPoint {
         if (qualifiedPartitionIndexes != null) {
           val (pstart, pend) = qualifiedPartitionIndexes
           var p = partitions(pstart)
-          val pred = if (cpr.pred == null) None else Some(cpr.pred)
-          // for partitions on more than 1 critical ranges, use the original pred
-          // and let the slave to do the partial reduction on the leading dimension
-          // only. This is a bit conservative to avoid extra complexity
+
           // Step 3.3
-          result = result :+ new HBasePartition(pIndex, p.idx, 0,
-            p.start, p.end, p.server, pred)
-          pIndex += 1
-          for (i <- pstart + 1 to pend - 1) {
+          for (i <- pstart to pend) {
             p = partitions(i)
             // Step 3.2
-            result = result :+ new HBasePartition(pIndex, p.idx, -1,
+            result = result :+ new HBasePartition(pIndex, p.idx,
               p.start, p.end, p.server, pred)
             pIndex += 1
           }
-          if (pend > pstart) {
-            p = partitions(pend)
-            // for partitions on more than 1 critical ranges, use the original pred
-            // and let the slave to do the partial reduction on the leading dimension
-            // only. This is a bit conservative to avoid extra complexity
-            // Step 3.3
-            result = result :+ new HBasePartition(pIndex, p.idx, 0,
-              p.start, p.end, p.server, pred)
-            pIndex += 1
-          }
+
           pStartIndex = pend + 1
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
-          cprStartIndex = if (qualifiedCPRIndexes == null) cprs.size
-                         else qualifiedCPRIndexes._2
+          if (qualifiedCPRIndexes == null) done = true
+          else cprStartIndex = qualifiedCPRIndexes._2
         } else done = true
       }
       result
@@ -687,8 +669,6 @@ object RangeCriticalPoint {
    *    3.1 start the binary search from the last mapped partition
    *    3.2 For each partition mapped to only one critical point range, assign the latter's filter
    *        predicate to the partition
-   *    3.3 For each partition mapped to multiple critical point ranges, use the original
-   *        predicate so the slave will do their own partial reduction
    */
   private[hbase] def generatePrunedPartitions(relation: HBaseRelation, pred: Option[Expression])
   : Seq[HBasePartition] = {

@@ -305,7 +305,7 @@ object PartialPredicateOperations {
             (null, EqualTo(left, evalR._2))
           } else {
             val cmp = prc2(input, left.dataType, right.dataType, evalL._1, evalR._1)
-            if (cmp.isDefined) {
+            if (cmp.isDefined &&  cmp.get != 1 && cmp.get != -1) {
               (cmp.get == 0, null)
             } else {
               (null, EqualTo(evalL._2, evalR._2))

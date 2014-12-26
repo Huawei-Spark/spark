@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GeneratePredicate
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
 import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -114,17 +115,25 @@ class HBaseSQLReaderRDD(
   // filter predicate will be used
   override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
-    val pred = if (partition.keyPartialEvalIndex >= 0 && partition.filterPred.isDefined &&
+    val pred = if (partition.filterPred.isDefined &&
       partition.filterPred.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
       val oriPred = partition.filterPred.get
       val predRefs = oriPred.references.toSeq
       val boundRef = BindReferences.bindReference(oriPred, predRefs)
       val row = new GenericMutableRow(predRefs.size)
-      for {
-        i <- 0 to partition.keyPartialEvalIndex
-        rowIndex = relation.rowIndex(predRefs, i)
-        if rowIndex >= 0
-      } row.update(rowIndex, relation.generateRange(partition, oriPred, i))
+      var rowIndex = 0
+      var i = 0
+      var range: PartitionRange[_] = null
+      while (i < relation.keyColumns.size) {
+        range = relation.generateRange(partition, oriPred, i)
+        if (range != null) {
+          rowIndex = relation.rowIndex(predRefs, i)
+          if (rowIndex >= 0) row.update(rowIndex, range)
+          // if the non-last dimension range is not point, do not proceed to the next dims
+          if (i < relation.keyColumns.size - 1 && !range.isPoint) i = relation.keyColumns.size
+          else i = i + 1
+        } else i = relation.keyColumns.size
+      }
       val pr = boundRef.partialReduce(row, predRefs)
       pr match {
         case (null, e: Expression) => Some(e)

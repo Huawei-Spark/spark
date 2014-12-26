@@ -18,13 +18,11 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.types.{DataType, BinaryType}
+import org.apache.spark.sql.catalyst.types.BinaryType
 import org.apache.spark.sql.hbase.catalyst.types.Range
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 private[hbase] class HBasePartition(
     val idx: Int, val mappedIndex: Int,
-    val keyPartialEvalIndex: Int = -1,
     start: Option[HBaseRawType] = None,
     end: Option[HBaseRawType] = None,
     val server: Option[String] = None,

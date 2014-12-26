@@ -305,12 +305,12 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
         , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
     )
 
-    val p1 = new HBasePartition(0, 0, -1, None, Some(rowkey0), relation = relation)
-    val p2 = new HBasePartition(1, 1, -1, Some(rowkey0), Some(rowkey1), relation = relation)
-    val p3 = new HBasePartition(2, 2, -1, Some(rowkey1), Some(rowkey2), relation = relation)
-    val p4 = new HBasePartition(3, 3, -1, Some(rowkey2), Some(rowkey3), relation = relation)
-    val p5 = new HBasePartition(4, 4, -1, Some(rowkey3), Some(rowkey4), relation = relation)
-    val p6 = new HBasePartition(5, 5, -1, Some(rowkey4), None, relation = relation)
+    val p1 = new HBasePartition(0, 0, None, Some(rowkey0), relation = relation)
+    val p2 = new HBasePartition(1, 1, Some(rowkey0), Some(rowkey1), relation = relation)
+    val p3 = new HBasePartition(2, 2, Some(rowkey1), Some(rowkey2), relation = relation)
+    val p4 = new HBasePartition(3, 3, Some(rowkey2), Some(rowkey3), relation = relation)
+    val p5 = new HBasePartition(4, 4, Some(rowkey3), Some(rowkey4), relation = relation)
+    val p6 = new HBasePartition(5, 5, Some(rowkey4), None, relation = relation)
 
     relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
 
@@ -384,12 +384,12 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
         , (BytesUtils.create(IntegerType).toBytes(256), IntegerType))
     )
 
-    val p1 = new HBasePartition(0, 0, -1, None, Some(rowkey0), relation = relation)
-    val p2 = new HBasePartition(1, 1, -1, Some(rowkey0), Some(rowkey1), relation = relation)
-    val p3 = new HBasePartition(2, 2, -1, Some(rowkey1), Some(rowkey2), relation = relation)
-    val p4 = new HBasePartition(3, 3, -1, Some(rowkey2), Some(rowkey3), relation = relation)
-    val p5 = new HBasePartition(4, 4, -1, Some(rowkey3), Some(rowkey4), relation = relation)
-    val p6 = new HBasePartition(5, 5, -1, Some(rowkey4), None, relation = relation)
+    val p1 = new HBasePartition(0, 0, None, Some(rowkey0), relation = relation)
+    val p2 = new HBasePartition(1, 1, Some(rowkey0), Some(rowkey1), relation = relation)
+    val p3 = new HBasePartition(2, 2, Some(rowkey1), Some(rowkey2), relation = relation)
+    val p4 = new HBasePartition(3, 3, Some(rowkey2), Some(rowkey3), relation = relation)
+    val p5 = new HBasePartition(4, 4, Some(rowkey3), Some(rowkey4), relation = relation)
+    val p6 = new HBasePartition(5, 5, Some(rowkey4), None, relation = relation)
 
     relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
 

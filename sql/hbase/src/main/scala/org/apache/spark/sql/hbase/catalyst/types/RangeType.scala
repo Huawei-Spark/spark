@@ -36,6 +36,8 @@ class Range[T](val start: Option[T], // None for open ends
       (!startInclusive || !endInclusive)) ||
       dt.ordering.gt(start.get.asInstanceOf[dt.JvmType], end.get.asInstanceOf[dt.JvmType]))),
     "Inappropriate range parameters")
+  @transient lazy val isPoint: Boolean = start.isDefined && end.isDefined &&
+    startInclusive && endInclusive && start.get.equals(end.get)
 }
 
 // HBase ranges:
