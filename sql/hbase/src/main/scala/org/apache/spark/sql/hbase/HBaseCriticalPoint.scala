@@ -634,16 +634,15 @@ object RangeCriticalPoint {
           val (pstart, pend) = qualifiedPartitionIndexes
           var p = partitions(pstart)
 
-          // Step 3.3
           for (i <- pstart to pend) {
             p = partitions(i)
-            // Step 3.2
             result = result :+ new HBasePartition(pIndex, p.idx,
               p.start, p.end, p.server, pred)
             pIndex += 1
           }
 
           pStartIndex = pend + 1
+          // Step 3.2
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
           val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
@@ -669,8 +668,10 @@ object RangeCriticalPoint {
    *    lower level nested critical point ranges for next key dimension(s)
    * 3. For each converted critical point based range, map them to partitions to partitions
    *    3.1 start the binary search from the last mapped partition
-   *    3.2 For each partition mapped to only one critical point range, assign the latter's filter
-   *        predicate to the partition
+   *    3.2 For last mapped partition, find the the last critical point range covered
+   *        by this last mapped partition and use that as the next start point of the critical
+   *        point range to find next set of mapped partitions. This ping-pong manner
+   *        of searching will continue until either list is exhausted.
    */
   private[hbase] def generatePrunedPartitions(relation: HBaseRelation, pred: Option[Expression])
   : Seq[HBasePartition] = {
