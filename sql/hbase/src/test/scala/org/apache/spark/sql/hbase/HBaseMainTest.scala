@@ -21,16 +21,24 @@ object HBaseMainTest extends HBaseIntegrationTestBase(false) with CreateTableAnd
 with Logging {
   @transient val logger = Logger.getLogger(getClass.getName)
 
-  val TabName_a: String = "ta"
-  val TabName_b: String = "tb"
-  val HbaseTabName: String = "ht"
+  val TableName_a: String = "ta"
+  val TableName_b: String = "tb"
+  val HbaseTableName: String = "ht"
+  val Metadata_Table = "metadata"
 
-  def tableSetup() = {
-    createTable()
-  }
-
-  def createTable() = {
+  def createTable(useMultiplePartitions: Boolean) = {
     try {
+      // delete the existing hbase table
+      if (hbaseAdmin.tableExists(HbaseTableName)) {
+        hbaseAdmin.disableTable(HbaseTableName)
+        hbaseAdmin.deleteTable(HbaseTableName)
+      }
+
+      if (hbaseAdmin.tableExists(Metadata_Table)) {
+        hbaseAdmin.disableTable(Metadata_Table)
+        hbaseAdmin.deleteTable(Metadata_Table)
+      }
+      
       var allColumns = List[AbstractColumn]()
       allColumns = allColumns :+ KeyColumn("col1", StringType, 1)
       allColumns = allColumns :+ NonKeyColumn("col2", ByteType, "cf1", "cq11")
@@ -40,22 +48,25 @@ with Logging {
       allColumns = allColumns :+ NonKeyColumn("col6", FloatType, "cf2", "cq22")
       allColumns = allColumns :+ KeyColumn("col7", DoubleType, 0)
 
-      val splitKeys: Array[Array[Byte]] = Array(
-        new GenericRow(Array(1024.0, "Upen", 128: Short)),
-        new GenericRow(Array(1024.0, "Upen", 256: Short)),
-        new GenericRow(Array(4096.0, "SF", 512: Short))
-      ).map(HBaseKVHelper.makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
-      // val splitKeys = null
+      val splitKeys: Array[Array[Byte]] =  if (useMultiplePartitions) {
+        Array(
+          new GenericRow(Array(1024.0, "Upen", 128: Short)),
+          new GenericRow(Array(1024.0, "Upen", 256: Short)),
+          new GenericRow(Array(4096.0, "SF", 512: Short))
+        ).map(HBaseKVHelper.makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
+      } else {
+        null
+      }
 
       catalog = new HBaseCatalog(hbc)
-      catalog.createTable(TabName_a, null, HbaseTabName, allColumns, splitKeys)
+      catalog.createTable(TableName_a, null, HbaseTableName, allColumns, splitKeys)
 
-      hbc.sql( s"""CREATE TABLE $TabName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
+      hbc.sql( s"""CREATE TABLE $TableName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
           col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
-          MAPPED BY ($HbaseTabName, COLS=[col2=cf1.cq11, col4=cf1.cq12, col5=cf2.cq21,
+          MAPPED BY ($HbaseTableName, COLS=[col2=cf1.cq11, col4=cf1.cq12, col5=cf2.cq21,
           col6=cf2.cq22])""".stripMargin)
 
-      if (!hbaseAdmin.tableExists(HbaseTabName)) {
+      if (!hbaseAdmin.tableExists(HbaseTableName)) {
         throw new IllegalArgumentException("where is our table?")
       }
     }
@@ -67,10 +78,10 @@ with Logging {
   }
 
   def insertTestData() = {
-    if (!checkHBaseTableExists(HbaseTabName)) {
-      throw new IllegalStateException(s"Unable to find table $HbaseTabName")
+    if (!checkHBaseTableExists(HbaseTableName)) {
+      throw new IllegalStateException(s"Unable to find table $HbaseTableName")
     }
-    val htable = new HTable(config, HbaseTabName)
+    val htable = new HTable(config, HbaseTableName)
 
     var row = new GenericRow(Array(1024.0, "Upen", 128: Short))
     var key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
@@ -110,12 +121,12 @@ with Logging {
     htable.close()
   }
 
-  def testQuery() {
+  def setupData(useMultiplePartitions: Boolean) {
     ctxSetup()
-    createTable()
+    createTable(useMultiplePartitions)
 
-    if (!checkHBaseTableExists(HbaseTabName)) {
-      throw new IllegalStateException(s"Unable to find table $HbaseTabName")
+    if (!checkHBaseTableExists(HbaseTableName)) {
+      throw new IllegalStateException(s"Unable to find table $HbaseTableName")
     }
 
     insertTestData()
@@ -167,7 +178,7 @@ with Logging {
 
   def testHBaseScanner() = {
     val scan = new Scan
-    val htable = new HTable(config, HbaseTabName)
+    val htable = new HTable(config, HbaseTableName)
     val scanner = htable.getScanner(scan)
     var res: Result = null
     do {
@@ -177,6 +188,6 @@ with Logging {
   }
 
   def main(args: Array[String]) = {
-    testQuery()
+    setupData(useMultiplePartitions = true)
   }
 }
