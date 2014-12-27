@@ -39,24 +39,24 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 class HBaseSource extends RelationProvider {
   // Returns a new HBase relation with the given parameters
   override def createRelation(
-    sqlContext: SQLContext,
-    parameters: Map[String, String]): BaseRelation = {
+                               sqlContext: SQLContext,
+                               parameters: Map[String, String]): BaseRelation = {
     val context = sqlContext.asInstanceOf[HBaseSQLContext]
     val catalog = context.catalog
 
     val tableName = parameters("tableName")
     val rawNamespace = parameters("namespace")
     val namespace: Option[String] = if (rawNamespace == null || rawNamespace.isEmpty) None
-                                    else Some(rawNamespace)
+    else Some(rawNamespace)
     val hbaseTable = parameters("hbaseTableName")
     val colsSeq = parameters("colsSeq").split(",")
     val keyCols = parameters("keyCols").split(";")
-      .map{case c => val cols = c.split(","); (cols(0), cols(1))}
+      .map { case c => val cols = c.split(","); (cols(0), cols(1))}
     val nonKeyCols = parameters("nonKeyCols").split(";")
       .filterNot(_ == "")
-      .map{case c => val cols = c.split(","); (cols(0), cols(1), cols(2), cols(3))}
+      .map { case c => val cols = c.split(","); (cols(0), cols(1), cols(2), cols(3))}
 
-    val keyMap:Map[String, String] = keyCols.toMap
+    val keyMap: Map[String, String] = keyCols.toMap
     val allColumns = colsSeq.map {
       case name =>
         if (keyMap.contains(name)) {
@@ -80,10 +80,11 @@ class HBaseSource extends RelationProvider {
 
 @SerialVersionUID(1529873946227428789L)
 private[hbase] case class HBaseRelation(
-    tableName: String,
-    hbaseNamespace: String,
-    hbaseTableName: String,
-    allColumns: Seq[AbstractColumn])(@transient var context: HBaseSQLContext)
+                                         tableName: String,
+                                         hbaseNamespace: String,
+                                         hbaseTableName: String,
+                                         allColumns: Seq[AbstractColumn])
+                                       (@transient var context: HBaseSQLContext)
   extends CatalystScan with Serializable {
 
   @transient lazy val logger = Logger.getLogger(getClass.getName)
@@ -94,15 +95,15 @@ private[hbase] case class HBaseRelation(
   @transient lazy val nonKeyColumns = allColumns.filter(_.isInstanceOf[NonKeyColumn])
     .asInstanceOf[Seq[NonKeyColumn]]
 
-  lazy val partitionKeys = keyColumns.map(col=>
-                   logicalRelation.output.find(_.name == col.sqlName).get)
+  lazy val partitionKeys = keyColumns.map(col =>
+    logicalRelation.output.find(_.name == col.sqlName).get)
 
   @transient lazy val columnMap = allColumns.map {
     case key: KeyColumn => (key.sqlName, key.order)
     case nonKey: NonKeyColumn => (nonKey.sqlName, nonKey)
   }.toMap
 
-  allColumns.zipWithIndex.foreach(pi=> pi._1.ordinal = pi._2)
+  allColumns.zipWithIndex.foreach(pi => pi._1.ordinal = pi._2)
 
   private var serializedConfiguration: Array[Byte] = _
 
@@ -203,7 +204,7 @@ private[hbase] case class HBaseRelation(
   @transient private[hbase] lazy val dimSize = keyColumns.size
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
-                            index: Int): PartitionRange[_] = {
+                                   index: Int): PartitionRange[_] = {
     def getData(dt: NativeType,
                 buffer: ListBuffer[HBaseRawType],
                 aBuffer: ArrayBuffer[Byte],
@@ -241,61 +242,6 @@ private[hbase] case class HBaseRelation(
     }
   }
 
-  def getPrunedPartitions(partitionPred: Option[Expression] = None): Option[Seq[HBasePartition]] = {
-    def getPrunedRanges(pred: Expression): Seq[PartitionRange[_]] = {
-      val predRefs = pred.references.toSeq
-      val boundPruningPred = BindReferences.bindReference(pred, predRefs)
-      val keyIndexToPredIndex = (for {
-        (keyColumn, keyIndex) <- keyColumns.zipWithIndex
-        (predRef, predIndex) <- predRefs.zipWithIndex
-        if keyColumn.sqlName == predRef.name
-      } yield (keyIndex, predIndex)).toMap
-
-      val row = new GenericMutableRow(predRefs.size)
-      var notPrunedRanges = partitions.map(generateRange(_, null, 0))
-      var prunedRanges: Seq[PartitionRange[_]] = Nil
-
-      for (keyIndex <- 0 until keyColumns.size; if notPrunedRanges.nonEmpty) {
-        val (passedRanges, toBePrunedRanges) = prePruneRanges(notPrunedRanges, keyIndex)
-        prunedRanges = prunedRanges ++ passedRanges
-        notPrunedRanges =
-          if (keyIndexToPredIndex.contains(keyIndex)) {
-            toBePrunedRanges.filter(
-              range => {
-                val predIndex = keyIndexToPredIndex(keyIndex)
-                row.update(predIndex, range)
-                val partialEvalResult = boundPruningPred.partialEval(row)
-                // MAYBE is represented by a null
-                (partialEvalResult == null) || partialEvalResult.asInstanceOf[Boolean]
-              }
-            )
-          } else toBePrunedRanges
-      }
-      prunedRanges ++ notPrunedRanges
-    }
-
-    partitionPred match {
-      case None => Some(partitions)
-      case Some(pred) => if (pred.references.intersect(AttributeSet(partitionKeys)).isEmpty) {
-        Some(partitions)
-      } else {
-        val prunedRanges: Seq[PartitionRange[_]] = getPrunedRanges(pred)
-        var idx: Int = -1
-        val result = Some(prunedRanges.map(p => {
-          val par = partitions(p.id)
-          idx = idx + 1
-          if (p.pred == null) {
-            new HBasePartition(idx, par.mappedIndex, par.start, par.end, par.server)
-          } else {
-            new HBasePartition(idx, par.mappedIndex, par.start, par.end,
-              par.server, Some(p.pred))
-          }
-        }))
-        result
-      }
-    }
-  }
-
   def getPrunedPartitions2(partitionPred: Option[Expression] = None)
   : Option[Seq[HBasePartition]] = {
     def getPrunedRanges(pred: Expression): Seq[PartitionRange[_]] = {
@@ -329,7 +275,7 @@ private[hbase] case class HBaseRelation(
                 }
                 // MAYBE is represented by a to-be-qualified-with expression
                 partialEvalResult._1 == null ||
-                partialEvalResult._1.asInstanceOf[Boolean]
+                  partialEvalResult._1.asInstanceOf[Boolean]
               }
             )
           } else toBePrunedRanges
@@ -373,36 +319,6 @@ private[hbase] case class HBaseRelation(
       ret += new ImmutableBytesWritableWrapper(byteKey)
     }
     ret
-  }
-
-  def buildFilter(
-                   projList: Seq[NamedExpression],
-                   rowKeyPredicate: Option[Expression],
-                   valuePredicate: Option[Expression]) = {
-    val distinctProjList = projList.distinct
-    if (distinctProjList.size == allColumns.size) {
-      Option(new FilterList(new util.ArrayList[Filter]))
-    } else {
-      val filtersList: List[Filter] = nonKeyColumns.filter {
-        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
-      }.map {
-        case nkc@NonKeyColumn(_, _, family, qualifier) =>
-          val columnFilters = new util.ArrayList[Filter]
-          columnFilters.add(
-            new FamilyFilter(
-              CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(nkc.familyRaw)
-            ))
-          columnFilters.add(
-            new QualifierFilter(
-              CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(nkc.qualifierRaw)
-            ))
-          new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
-      }.toList
-
-      Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
-    }
   }
 
   def buildFilter2(
@@ -649,6 +565,7 @@ private[hbase] case class HBaseRelation(
   }
 
   def sqlContext = context
+
   def schema: StructType = StructType(allColumns.map {
     case KeyColumn(name, dt, _) => StructField(name, dt, nullable = false)
     case NonKeyColumn(name, dt, _, _) => StructField(name, dt, nullable = true)
@@ -656,7 +573,7 @@ private[hbase] case class HBaseRelation(
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     val filterPredicate = if (filters.isEmpty) None
-                          else Some(filters(0))
+    else Some(filters(0))
     new HBaseSQLReaderRDD(
       this,
       context.codegenEnabled,

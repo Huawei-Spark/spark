@@ -43,67 +43,13 @@ class HBaseSQLReaderRDD(
   private final val cachingSize: Int = 100 // To be made configurable
 
   override def getPartitions: Array[Partition] = {
-    // relation.getPrunedPartitions(filterPred).get.toArray
-    RangeCriticalPoint.generatePrunedPartitions(relation,filterPred).toArray
+    RangeCriticalPoint.generatePrunedPartitions(relation, filterPred).toArray
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
     split.asInstanceOf[HBasePartition].server.map {
       identity
     }.toSeq
-  }
-
-  // TODO: original implementation of compute(), to roll back, add override and change to compute()
-  def compute3(split: Partition, context: TaskContext): Iterator[Row] = {
-    val filters = relation.buildFilter(output, filterPred, filterPred)
-    val scan = relation.buildScan(split, filters, output)
-    scan.setCaching(cachingSize)
-    logger.debug(s"relation.htable scanner conf="
-      + s"${relation.htable.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
-    val scanner = relation.htable.getScanner(scan)
-
-    val lBuffer = ListBuffer[HBaseRawType]()
-    val aBuffer = ArrayBuffer[Byte]()
-    val row = new GenericMutableRow(output.size)
-    val projections = output.zipWithIndex
-
-    var finished: Boolean = false
-    var gotNext: Boolean = false
-    var result: Result = null
-
-    val iter = new Iterator[Row] {
-      override def hasNext: Boolean = {
-        if (!finished) {
-          if (!gotNext) {
-            result = scanner.next
-            finished = result == null
-            gotNext = true
-          }
-        }
-        if (finished) {
-          close()
-        }
-        !finished
-      }
-
-      override def next(): Row = {
-        if (hasNext) {
-          gotNext = false
-          relation.buildRow(projections, result, lBuffer, aBuffer, row)
-        } else {
-          null
-        }
-      }
-
-      def close() = {
-        try {
-          scanner.close()
-        } catch {
-          case e: Exception => logWarning("Exception in scanner.close", e)
-        }
-      }
-    }
-    new InterruptibleIterator(context, iter)
   }
 
   // For critical-point-based predicate pushdown
