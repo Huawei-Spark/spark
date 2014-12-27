@@ -242,7 +242,7 @@ private[hbase] case class HBaseRelation(
     }
   }
 
-  def getPrunedPartitions2(partitionPred: Option[Expression] = None)
+  def getPrunedPartitions(partitionPred: Option[Expression] = None)
   : Option[Seq[HBasePartition]] = {
     def getPrunedRanges(pred: Expression): Seq[PartitionRange[_]] = {
       val predRefs = pred.references.toSeq
@@ -321,7 +321,7 @@ private[hbase] case class HBaseRelation(
     ret
   }
 
-  def buildFilter2(
+  def buildFilter(
                     projList: Seq[NamedExpression],
                     pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
     var distinctProjList = projList.distinct

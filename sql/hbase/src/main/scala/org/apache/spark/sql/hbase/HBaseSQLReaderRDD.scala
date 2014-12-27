@@ -59,7 +59,7 @@ class HBaseSQLReaderRDD(
   // filter predicate will be used
   override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
-    val (filters, otherFilters) = relation.buildFilter2(output,
+    val (filters, otherFilters) = relation.buildFilter(output,
       partition.computePredicate(relation))
     val scan = relation.buildScan(split, filters, output)
     scan.setCaching(cachingSize)

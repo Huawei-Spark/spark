@@ -93,7 +93,7 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 //    val attribute2 = hbr.partitionKeys(1)
     val predicate5 = new GreaterThan(Literal(5,IntegerType), attribute1)
 
-    hbr.getPrunedPartitions2(Option(predicate5))
+    hbr.getPrunedPartitions(Option(predicate5))
   }
 
   test("row key encode / decode") {
