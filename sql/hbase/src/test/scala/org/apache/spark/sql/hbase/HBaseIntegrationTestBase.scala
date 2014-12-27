@@ -25,13 +25,13 @@ import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HBaseTestingUtility, MiniHBaseCluster}
 import org.apache.log4j.Logger
 import org.apache.spark.{SparkConf, SparkContext}
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
+import org.scalatest.{ConfigMap, BeforeAndAfterAllConfigMap, FunSuite, Suite}
 
 abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
                                         nRegionServers: Int = 2,
                                         nDataNodes: Int = 2,
                                         nMasters: Int = 1)
-  extends FunSuite with BeforeAndAfterAll {
+  extends FunSuite with BeforeAndAfterAllConfigMap {
   self: Suite =>
 
   @transient var sc: SparkContext = _
@@ -49,7 +49,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
   val sparkUiPort = 0xc000 + new Random().nextInt(0x3f00)
   println(s"SparkUIPort = $sparkUiPort\n")
 
-  override def beforeAll(): Unit = {
+  override protected def beforeAll(configMap: ConfigMap): Unit = {
     ctxSetup()
   }
 
@@ -156,7 +156,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       + s"${hbaseAdmin.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
   }
 
-  override def afterAll(): Unit = {
+  override protected def afterAll(configMap: ConfigMap): Unit = {
     var msg = s"Test ${getClass.getName} completed at ${(new java.util.Date).toString} duration=${((new java.util.Date).getTime - startTime) / 1000}"
     logger.info(msg)
     println(msg)
@@ -181,7 +181,5 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     //    msg = "Completed testcase cleanup"
     //    logger.info(msg)
     //    println(msg)
-
   }
-
 }

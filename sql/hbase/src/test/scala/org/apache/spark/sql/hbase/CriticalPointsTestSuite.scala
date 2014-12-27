@@ -79,12 +79,12 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 3)
-    assert(result(0).start.get == 512 && result(0).startInclusive == true
-      && result(0).end.get == 512 && result(0).endInclusive == true)
-    assert(result(1).start.get == 1024 && result(1).startInclusive == true
-      && result(1).end.get == 1024 && result(1).endInclusive == true)
-    assert(result(2).start.get == 2048 && result(2).startInclusive == true
-      && result(2).end == None && result(2).endInclusive == false)
+    assert(result(0).start.get == 512 && result(0).startInclusive
+      && result(0).end.get == 512 && result(0).endInclusive)
+    assert(result(1).start.get == 1024 && result(1).startInclusive
+      && result(1).end.get == 1024 && result(1).endInclusive)
+    assert(result(2).start.get == 2048 && result(2).startInclusive
+      && result(2).end == None && !result(2).endInclusive)
   }
 
   test("Generate CP Ranges 1") {
@@ -117,10 +117,10 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 2)
-    assert(result(0).start.get == 513L && result(0).startInclusive == true
-      && result(0).end.get == 1023L && result(0).endInclusive == true)
-    assert(result(1).start.get == 1025L && result(1).startInclusive == true
-      && result(1).end == None && result(1).endInclusive == false)
+    assert(result(0).start.get == 513L && result(0).startInclusive
+      && result(0).end.get == 1023L && result(0).endInclusive)
+    assert(result(1).start.get == 1025L && result(1).startInclusive
+      && result(1).end == None && !result(1).endInclusive)
   }
 
   test("Generate CP Ranges 2") {
@@ -150,8 +150,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 1)
-    assert(result(0).start.get == "aaa" && result(0).startInclusive == true
-      && result(0).end.get == "aaa" && result(0).endInclusive == true)
+    assert(result(0).start.get == "aaa" && result(0).startInclusive
+      && result(0).end.get == "aaa" && result(0).endInclusive)
   }
 
   test("Generate CP Ranges for Multi-Dimension 0") {
