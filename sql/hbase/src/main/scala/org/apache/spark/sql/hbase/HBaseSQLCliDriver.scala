@@ -166,9 +166,19 @@ object HBaseSQLCliDriver extends Logging {
           println("DESCRIBE table_name")
         case "SHOW" =>
           println("SHOW TABLES")
+        case _ =>
+          printHelpUsage
       }
     }
+    else 
+      printHelpUsage
     0
+  }
+ 
+  private def printHelpUsage = {
+    println("""Usage: HELP Statement    
+      Statement:
+        CREATE | DROP | ALTER | LOAD | SELECT | INSERT | DESCRIBE | SHOW""")    
   }
 
 }
