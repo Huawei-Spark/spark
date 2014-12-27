@@ -35,15 +35,21 @@ trait CreateTableAndLoadData {
   val DefaultHbaseTabName = s"Hb$DefaultTableName"
   val DefaultHbaseColFamiles = Seq("cf1", "cf2")
 
-  val CsvPath = "src/test/resources"
-  val DefaultLoadFile = s"$CsvPath/testTable.csv"
+  val CsvPaths = Array("src/test/resources", "sql/hbase/src/test/resources")
+  val DefaultLoadFile = "testTable.csv"
 
   var AvoidRowkeyBug = false
+
+  import util.control.Breaks._
+  private val tpath = for (csvPath <- CsvPaths
+      if new java.io.File(csvPath).exists()
+    ) yield csvPath
+  private[hbase] val CsvPath = tpath(0)
 
   def createTableAndLoadData(hbc: HBaseSQLContext) = {
     createTables(hbc, DefaultStagingTableName, DefaultTableName,
       DefaultHbaseStagingTableName, DefaultHbaseTabName)
-    loadData(hbc, DefaultStagingTableName, DefaultTableName, DefaultLoadFile)
+    loadData(hbc, DefaultStagingTableName, DefaultTableName, s"$CsvPath/$DefaultLoadFile")
   }
 
   def createTables(hbc: HBaseSQLContext) : Unit = {

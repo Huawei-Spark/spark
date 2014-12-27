@@ -17,16 +17,18 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark.Partition
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types.BinaryType
-import org.apache.spark.sql.hbase.catalyst.types.Range
+import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
+import org.apache.spark.sql.hbase.catalyst.types.{PartitionRange, Range}
+
 
 private[hbase] class HBasePartition(
     val idx: Int, val mappedIndex: Int,
     start: Option[HBaseRawType] = None,
     end: Option[HBaseRawType] = None,
     val server: Option[String] = None,
-    val filterPred: Option[Expression] = None,
+    val filterPredicates: Option[Expression] = None,
     @transient relation: HBaseRelation = null) extends Range[HBaseRawType](start, true,
                end, false, BinaryType) with Partition with IndexMappable {
 
@@ -37,4 +39,33 @@ private[hbase] class HBasePartition(
   @transient lazy val startNative: Seq[Any] = relation.nativeKeysConvert(start)
 
   @transient lazy val endNative: Seq[Any] = relation.nativeKeysConvert(end)
+
+  def computePredicate(relation: HBaseRelation): Option[Expression] = {
+    if (filterPredicates.isDefined &&
+      filterPredicates.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
+      val oriPredicate = filterPredicates.get
+      val predicateReferences = oriPredicate.references.toSeq
+      val boundReference = BindReferences.bindReference(oriPredicate, predicateReferences)
+      val row = new GenericMutableRow(predicateReferences.size)
+      var rowIndex = 0
+      var i = 0
+      var range: PartitionRange[_] = null
+      while (i < relation.keyColumns.size) {
+        range = relation.generateRange(this, oriPredicate, i)
+        if (range != null) {
+          rowIndex = relation.rowIndex(predicateReferences, i)
+          if (rowIndex >= 0) row.update(rowIndex, range)
+          // if the non-last dimension range is not point, do not proceed to the next dims
+          if (i < relation.keyColumns.size - 1 && !range.isPoint) i = relation.keyColumns.size
+          else i = i + 1
+        } else i = relation.keyColumns.size
+      }
+      val pr = boundReference.partialReduce(row, predicateReferences)
+      pr match {
+        case (null, e: Expression) => Some(e)
+        case (true, _) => None
+        case (false, _) => Some(Literal(false))
+      }
+    } else filterPredicates
+  }
 }

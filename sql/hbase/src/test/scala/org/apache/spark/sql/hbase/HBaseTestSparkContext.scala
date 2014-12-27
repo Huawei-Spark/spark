@@ -13,11 +13,11 @@ trait HBaseTestSparkContext extends BeforeAndAfterAll { self: Suite =>
 
   def sparkContext: SparkContext = sc
 
-  override def beforeAll: Unit = {
+  override def beforeAll() = {
     sc = new SparkContext("local", "test")
   }
 
-  override def afterAll: Unit = {
+  override def afterAll() = {
     sc.stop()
     sc = null
   }

@@ -47,24 +47,34 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
 
   val startTime = (new Date).getTime
   val sparkUiPort = 0xc000 + new Random().nextInt(0x3f00)
-  println(s"SparkUIPort = $sparkUiPort")
+  println(s"SparkUIPort = $sparkUiPort\n")
 
   override def beforeAll(): Unit = {
     ctxSetup()
   }
 
-//  def simpleSetupShutdown() {
-//      testUtil = new HBaseTestingUtility
-//      config = testUtil.getConfiguration
-//      testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
-//      testUtil.shutdownMiniCluster()
-//  }
-//
+  //  def simpleSetupShutdown() {
+  //      testUtil = new HBaseTestingUtility
+  //      config = testUtil.getConfiguration
+  //      testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
+  //      testUtil.shutdownMiniCluster()
+  //  }
+  //
 
   val useMiniClusterInt = useMiniCluster // false
+
+  val WorkDirProperty = "test.build.data.basedirectory"
+  val DefaultWorkDir = "/tmp/minihbase"
+
   def ctxSetup() {
 
-    println(s"useMiniCluster=$useMiniClusterInt")
+    var workDir = System.getProperty(WorkDirProperty)
+    if (workDir == null) {
+      workDir = DefaultWorkDir
+      System.setProperty(WorkDirProperty, workDir)
+    }
+
+    println(s"useMiniCluster=$useMiniClusterInt workingDir ($WorkDirProperty})=$workDir\n")
     if (useMiniClusterInt) {
       logger.debug(s"Spin up hbase minicluster w/ $nMasters mast, $nRegionServers RS, $nDataNodes dataNodes")
       testUtil = new HBaseTestingUtility
@@ -93,7 +103,6 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       config.set("hbase.rest.info.port", "50006")
       config.set("hbase.thrift.info.port", "50007")
 
-
       cluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
       println(s"Started HBaseMiniCluster with region servers = ${cluster.countServedRegions}")
 
@@ -112,8 +121,8 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
         "%s:%s".format(config.get("hbase.zookeeper.quorum"), zkPort))
       // Do not use the default ui port: helps avoid BindException's
       sconf.set("spark.ui.port", sparkUiPort.toString)
-//      sconf.set("spark.hadoop.hbase.regionserver.info.port", "-1")
-//      sconf.set("spark.hadoop.hbase.master.info.port", "-1")
+      //      sconf.set("spark.hadoop.hbase.regionserver.info.port", "-1")
+      //      sconf.set("spark.hadoop.hbase.master.info.port", "-1")
       //    // Increase the various timeout's to allow for debugging/breakpoints. If we simply
       //    // leave default values then ZK connection timeouts tend to occur
       sconf.set("spark.hadoop.dfs.client.socket-timeout", "480000")
@@ -142,7 +151,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     sc = new SparkContext("local[2]", "TestSQLContext", sconf)
 
     hbc = new HBaseSQLContext(sc, Some(config))
-//    hbc.catalog.hBaseAdmin = hbaseAdmin
+    //    hbc.catalog.hBaseAdmin = hbaseAdmin
     logger.debug(s"In testbase: HBaseAdmin.configuration zkPort="
       + s"${hbaseAdmin.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
   }
@@ -159,8 +168,8 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     }
     hbc = null
     msg = "HBaseSQLContext was shut down"
-//    println(msg)
-//    logger.info(msg)
+    //    println(msg)
+    //    logger.info(msg)
 
     try {
       testUtil.shutdownMiniCluster()
@@ -168,10 +177,10 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       case e: Throwable =>
         logger.error(s"Exception shutting down HBaseMiniCluster: ${e.getMessage}")
     }
-//    println("HBaseMiniCluster was shutdown")
-//    msg = "Completed testcase cleanup"
-//    logger.info(msg)
-//    println(msg)
+    //    println("HBaseMiniCluster was shutdown")
+    //    msg = "Completed testcase cleanup"
+    //    logger.info(msg)
+    //    println(msg)
 
   }
 
