@@ -114,7 +114,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
       ParallelizedBulkLoadIntoTableCommand(
       "./sql/hbase/src/test/resources/test.csv",
       "hbasetablename",
-      true,
+      isLocal = true,
       Option(","))
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
@@ -160,8 +160,8 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
         val rowKey = new ImmutableBytesWritableWrapper(rowKeyData)
         val put = new PutWrapper(rowKeyData)
-        valueBytes.foreach { case (family, qualifier, value) =>
-          put.add(family, qualifier, value)
+        valueBytes.foreach { case (fam, qualifier, value) =>
+          put.add(fam, qualifier, value)
         }
         (rowKey, put)
       }
