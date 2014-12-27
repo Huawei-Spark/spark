@@ -38,4 +38,9 @@ class HBaseSQLContext(sc: SparkContext,
     new HBaseCatalog(this) with OverrideCatalog
 
   extraStrategies = Seq((new SparkPlanner with HBaseStrategies).HBaseDataSource)
+
+  // do reassignment so our extra strategies will be picked up. Otherwise if the planner in
+  // superclass was made lazy, it might have made this unnecessary
+  @transient
+  override protected[sql] val planner = new SparkPlanner
 }

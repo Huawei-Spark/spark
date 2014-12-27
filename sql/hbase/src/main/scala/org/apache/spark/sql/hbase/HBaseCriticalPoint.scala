@@ -149,40 +149,33 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
             -1
           }
         } else {
-          // if the dimension size of this MD Critical Point range is larger than that of
-          // the partition, the comparison is equal irrespective of inclusiveness
-          if (prefix.size > comparePPoint.size - 1) 0
-          else {
-            (comparePoint, comparePPoint(i)) match {
-              case (null, _) => if (startOrEnd) {
-                -1
-              } else {
+        (comparePoint, comparePPoint(i)) match {
+          case (null, _) => if (startOrEnd) {
+            -1
+          } else {
+            1
+          }
+          case (_, pend) =>
+            if (dt.ordering.gt(comparePoint.asInstanceOf[dt.JvmType],
+              pend.asInstanceOf[dt.JvmType])) {
+              1
+            }
+            else if (dt.ordering.lt(comparePoint.asInstanceOf[dt.JvmType],
+              pend.asInstanceOf[dt.JvmType])) {
+              -1
+            } else {
+              if (comparePointInclusive && comparePPointInclusive) {
+                0
+              } else if ((comparePointInclusive && prefix.size + 1 < comparePPoint.size) ||
+                         (comparePPointInclusive && prefix.size + 1 < comparePPoint.size)) {
+                // if the inclusive side has smaller dimensionality, there is overlap
+                0
+              } else if (startOrEnd) {
                 1
               }
-              case (_, pend) =>
-                if (dt.ordering.gt(comparePoint.asInstanceOf[dt.JvmType],
-                  pend.asInstanceOf[dt.JvmType])) {
-                  1
-                }
-                else if (dt.ordering.lt(comparePoint.asInstanceOf[dt.JvmType],
-                  pend.asInstanceOf[dt.JvmType])) {
-                  -1
-                }
-                else {
-                  // dimension size mismatch, return 0 irrespective of inclusiveness
-                  if (prefix.size + 1 < comparePPoint.size) {
-                    0
-                  }
-                  else if (comparePointInclusive && comparePPointInclusive) {
-                    0
-                  }
-                  else if (startOrEnd) {
-                    1
-                  }
-                  else {
-                    -1
-                  }
-                }
+              else {
+                -1
+              }
             }
           }
         }

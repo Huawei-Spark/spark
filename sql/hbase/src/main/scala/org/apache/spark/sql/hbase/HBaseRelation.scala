@@ -655,6 +655,7 @@ private[hbase] case class HBaseRelation(
   })
 
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
+    require(filters.size < 2, "Internal logical error: unexpected filter list size")
     val filterPredicate = if (filters.isEmpty) None
                           else Some(filters(0))
     new HBaseSQLReaderRDD(

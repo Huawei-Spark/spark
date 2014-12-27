@@ -51,22 +51,23 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
     allColumns = allColumns :+ NonKeyColumn("column2", BooleanType, family1, "qualifier1")
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
 
-    val lll = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val lll = relation.output.find(_.name == "column1").get
     val llr = Literal(1023, IntegerType)
     val ll = GreaterThan(lll, llr)
 
-    val lrl = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val lrl = lll
     val lrr = Literal(1025, IntegerType)
     val lr = LessThan(lrl, lrr)
 
     val l = And(ll, lr)
 
-    val rll = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val rll = lll
     val rlr = Literal(2048, IntegerType)
     val rl = GreaterThanOrEqual(rll, rlr)
 
-    val rrl = AttributeReference("column1", IntegerType)(ExprId(0L), Seq("testTable"))
+    val rrl = lll
     val rrr = Literal(512, IntegerType)
     val rr = EqualTo(rrl, rrr)
 
@@ -75,7 +76,6 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     val mid = Or(l, r)
     val pred = Some(mid)
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
     assert(result.size == 3)
