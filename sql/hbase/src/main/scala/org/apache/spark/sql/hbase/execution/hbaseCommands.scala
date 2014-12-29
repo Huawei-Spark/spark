@@ -162,8 +162,9 @@ case class BulkLoadIntoTableCommand(
       relation: HBaseRelation) = {
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(splitKeys)
+    val ordering = Ordering[ImmutableBytesWritableWrapper]
     val shuffled =
-        new HBaseShuffledRDD(rdd, partitioner, relation.partitions)
+      new HBaseShuffledRDD(rdd, partitioner, relation.partitions).setKeyOrdering(ordering)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
       // the rdd now already sort by key, to sort by value
       val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
@@ -266,8 +267,9 @@ case class ParallelizedBulkLoadIntoTableCommand(
       tmpPath: String)(relation: HBaseRelation) = {
     val rdd = hadoopReader.makeBulkLoadRDDFromTextFile
     val partitioner = new HBasePartitioner(splitKeys)
+    val ordering = Ordering[ImmutableBytesWritableWrapper]
     val shuffled =
-      new HBaseShuffledRDD(rdd, partitioner, relation.partitions)
+      new HBaseShuffledRDD(rdd, partitioner, relation.partitions).setKeyOrdering(ordering)
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
     // the rdd now already sort by key, to sort by value
       val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
