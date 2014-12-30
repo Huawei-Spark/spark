@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.hbase
 
+import org.apache.spark.sql.catalyst.types.IntegerType
+import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.apache.spark.Logging
 import org.apache.spark.sql._
@@ -28,4 +30,13 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging{
     assert(BytesUtils.toInt(intBytesUtils.toBytes(40), 0) == 40)
   }
 
+  test("byte test") {
+    val s = Seq(-257,-256, -255, -129, -128, -127, -64, -16, -4, -1,
+      0, 1, 4, 16, 64, 127, 128, 129, 255, 256,257)
+      .map(i => (i, BytesUtils.create(IntegerType).toBytes(i)))
+      .sortWith((f, s) =>
+      HBaseBytesType.ordering.gt(
+        f._2.asInstanceOf[HBaseBytesType.JvmType], s._2.asInstanceOf[HBaseBytesType.JvmType]))
+    s.foreach(t => println(t._1))
+  }
 }

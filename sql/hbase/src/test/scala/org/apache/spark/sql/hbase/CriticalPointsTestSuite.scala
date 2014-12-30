@@ -21,6 +21,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.spark._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
+import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import scala.collection.mutable.ArrayBuffer
@@ -482,5 +483,91 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size, 4)
     assert(prunedPartitions0.size == 3)
     assert(prunedPartitions1.size == 3)
+  }
+
+  test("Get partitions 3") {
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ KeyColumn("column3", IntegerType, 2)
+    allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+
+    val lll = relation.output.find(_.name == "column3").get
+    val llr = Literal(32, IntegerType)
+    val ll = GreaterThan(lll, llr)
+
+    val lrl = lll
+    val lrr = Literal(128, IntegerType)
+    val lr = LessThan(lrl, lrr)
+
+    val l = And(ll, lr)
+
+    val rll = relation.output.find(_.name == "column1").get
+    val rlr = Literal(2, IntegerType)
+    val rl = EqualTo(rll, rlr)
+
+    val rrl = relation.output.find(_.name == "column2").get
+    val rrr = Literal(8, IntegerType)
+    val rr = EqualTo(rrl, rrr)
+
+    val r = And(rl, rr)
+
+    val mid = And(l, r)
+    val pred = Some(mid)
+
+    val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    assert(cprs.size == 1)
+
+    val expandedCPRs: Seq[MDCriticalPointRange[_]] =
+      cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
+
+    assert(expandedCPRs.size == 1)
+
+    val rowkey0 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(16), IntegerType))
+    )
+
+    val rowkey1 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(32), IntegerType))
+    )
+
+    val rowkey2 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(64), IntegerType))
+    )
+
+    val rowkey3 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(128), IntegerType))
+    )
+
+    val rowkey4 = HBaseKVHelper.encodingRawKeyColumns(
+      Seq((BytesUtils.create(IntegerType).toBytes(2), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(8), IntegerType)
+        , (BytesUtils.create(IntegerType).toBytes(256), IntegerType))
+    )
+
+    val p1 = new HBasePartition(0, 0, None, Some(rowkey0), relation = relation)
+    val p2 = new HBasePartition(1, 1, Some(rowkey0), Some(rowkey1), relation = relation)
+    val p3 = new HBasePartition(2, 2, Some(rowkey1), Some(rowkey2), relation = relation)
+    val p4 = new HBasePartition(3, 3, Some(rowkey2), Some(rowkey3), relation = relation)
+    val p5 = new HBasePartition(4, 4, Some(rowkey3), Some(rowkey4), relation = relation)
+    val p6 = new HBasePartition(5, 5, Some(rowkey4), None, relation = relation)
+
+    relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
+
+    val prunedPartitions = RangeCriticalPoint.prunePartitions(
+      expandedCPRs, pred, relation.partitions, relation.partitionKeys.size, 4)
+    assert(prunedPartitions.size == 2)
   }
 }
