@@ -80,8 +80,8 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
         , (BytesUtils.create(IntegerType).toBytes(6), IntegerType))
     )
 
-//    val partition1 = new HBasePartition(0, 0, Some(rowkey1), Some(rowkey2))
-//    val partition2 = new HBasePartition(1, 1, Some(rowkey3), Some(rowkey4))
+    //    val partition1 = new HBasePartition(0, 0, Some(rowkey1), Some(rowkey2))
+    //    val partition2 = new HBasePartition(1, 1, Some(rowkey3), Some(rowkey4))
 
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
@@ -90,13 +90,13 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     allColumns = allColumns :+ NonKeyColumn("column3", ShortType, family1, "qualifier1")
 
     val hbr = HBaseRelation(tableName, namespace, hbaseTableName
-                , allColumns)(new HBaseSQLContext(sc))
-//    val partitions = List[HBasePartition](partition1, partition2)
-//    hbr.partitions = partitions
+      , allColumns)(new HBaseSQLContext(sc))
+    //    val partitions = List[HBasePartition](partition1, partition2)
+    //    hbr.partitions = partitions
 
     val attribute1 = hbr.partitionKeys(0)
-//    val attribute2 = hbr.partitionKeys(1)
-    val predicate5 = new GreaterThan(Literal(5,IntegerType), attribute1)
+    //    val attribute2 = hbr.partitionKeys(1)
+    val predicate5 = new GreaterThan(Literal(5, IntegerType), attribute1)
 
     hbr.getPrunedPartitions(Option(predicate5))
   }
@@ -204,9 +204,22 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 
     relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
 
-    for (partition <- relation.partitions) {
-      val predicate = partition.computePredicate(relation)
-      println(predicate)
-    }
+    val predicate1 = p1.computePredicate(relation)
+    assert(predicate1.toString == "Some(false)")
+
+    val predicate2 = p2.computePredicate(relation)
+    assert(predicate2.toString == "Some(false)")
+
+    val predicate3 = p3.computePredicate(relation)
+    assert(predicate3.toString == "Some((((column2#1 = 8) || (column2#1 = 2048)) && (column1#0 = 32)))")
+
+    val predicate4 = p4.computePredicate(relation)
+    assert(predicate4.toString == "Some((((column2#1 = 8) || (column2#1 = 2048)) && (column1#0 = 32)))")
+
+    val predicate5 = p5.computePredicate(relation)
+    assert(predicate5.toString == "Some((((column2#1 = 8) || (column2#1 = 2048)) && (column1#0 = 1024)))")
+
+    val predicate6 = p6.computePredicate(relation)
+    assert(predicate6.toString == "Some((((column2#1 = 8) || (column2#1 = 2048)) && (column1#0 = 1024)))")
   }
 }
