@@ -41,10 +41,10 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
   }
 
   def compare(a: Array[Byte], b: Array[Byte]): Int = {
-    val length = a.length
+    val length = Math.min(a.length, b.length)
     var result: Int = 0
     for (i <- 0 to length - 1) {
-      val diff: Int = b(i) - a(i)
+      val diff: Int = (a(i) & 0xff).asInstanceOf[Byte] - (b(i) & 0xff).asInstanceOf[Byte]
       if (diff != 0) {
         result = diff
       }
@@ -90,6 +90,9 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
       .toBytes(5.asInstanceOf[Byte]), 0) === 5)
     assert(BytesUtils.toByte(BytesUtils.create(ByteType)
       .toBytes(-5.asInstanceOf[Byte]), 0) === -5)
+
+    assert(compare(BytesUtils.create(IntegerType).toBytes(128),
+      BytesUtils.create(IntegerType).toBytes(-128)) > 0)
   }
 
   test("Create Table") {
