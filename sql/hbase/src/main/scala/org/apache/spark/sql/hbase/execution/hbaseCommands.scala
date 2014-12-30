@@ -343,7 +343,7 @@ case class ParallelizedBulkLoadIntoTableCommand(
         // around by taking a mod. We expect that no task will be attempted 2 billion times.
         val attemptNumber = (context.attemptId % Int.MaxValue).toInt
         /* "reduce task" <split #> <attempt # = spark task #> */
-        val attemptId = newTaskAttemptID(jobtrackerID, stageId, true, 0, 0)
+        val attemptId = newTaskAttemptID(jobtrackerID, stageId, isMap = true, 0, 0)
         val hadoopContext = newTaskAttemptContext(config, attemptId)
         jobFormat match {
           case c: Configurable => c.setConf(config)
