@@ -493,9 +493,11 @@ object RangeCriticalPoint {
    * @tparam T the type of the target elements
    * @return the index of the result
    */
-  private def binarySearchForTightBound[S, T](src: S, tgt: Seq[T], startIndex: Int,
-                                              upperBound: Boolean, comp: (S, T) => Int): Int = {
-    val threshold = 10 // linear search threshold
+  private def binarySearchForTightBound[S, T](src: S, tgt: Seq[T],
+                                              startIndex: Int,
+                                              upperBound: Boolean,
+                                              comp: (S, T) => Int,
+                                              threshold:Int = 10): Int = {
     var left = startIndex
     var right = tgt.size - 1
     var prevLarger = -1
@@ -563,15 +565,16 @@ object RangeCriticalPoint {
    */
   private[hbase] def getQualifiedPartitions[T](cpr: MDCriticalPointRange[T],
                                                partitions: Seq[HBasePartition],
-                                               pStartIndex: Int): (Int, Int) = {
+                                               pStartIndex: Int,
+                                               threshold:Int = 10): (Int, Int) = {
     val largestStart = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
       cpr, partitions, pStartIndex, upperBound = false,
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
-        mdpr.compareWithPartition(startOrEnd = false, p))
+        mdpr.compareWithPartition(startOrEnd = false, p), threshold)
     val smallestEnd = binarySearchForTightBound[MDCriticalPointRange[T], HBasePartition](
       cpr, partitions, pStartIndex, upperBound = true,
       (mdpr: MDCriticalPointRange[T], p: HBasePartition) =>
-        mdpr.compareWithPartition(startOrEnd = true, p))
+        mdpr.compareWithPartition(startOrEnd = true, p), threshold)
     if (largestStart == -1 || smallestEnd == -1 || smallestEnd > largestStart) {
       null // no overlapping
     }
@@ -588,28 +591,26 @@ object RangeCriticalPoint {
    * @return the start and end index of the qualified crps, inclusive on both boundaries
    */
   private[hbase] def getQualifiedCRRanges(partition: HBasePartition,
-                                          crps: Seq[MDCriticalPointRange[_]], startIndex: Int):
-  (Int, Int) = {
+                                          crps: Seq[MDCriticalPointRange[_]],
+                                          startIndex: Int,
+                                          threshold:Int = 10): Int = {
     val largestStart = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
       partition, crps, startIndex, upperBound = false,
       (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
-        -mdpr.compareWithPartition(startOrEnd = true, p))
-    val smallestEnd = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
-      partition, crps, startIndex, upperBound = true,
-      (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
-        -mdpr.compareWithPartition(startOrEnd = false, p))
-    if (largestStart == -1 || smallestEnd == -1 | largestStart < smallestEnd) {
-      null // no overlapping
-    }
-    else {
-      (smallestEnd, largestStart)
-    }
+        -mdpr.compareWithPartition(startOrEnd = true, p), threshold)
+//    val smallestEnd = binarySearchForTightBound[HBasePartition, MDCriticalPointRange[_]](
+//      partition, crps, startIndex, upperBound = true,
+//      (p: HBasePartition, mdpr: MDCriticalPointRange[_]) =>
+//        -mdpr.compareWithPartition(startOrEnd = false, p), threshold)
+    largestStart
   }
 
   private[hbase] def prunePartitions(cprs: Seq[MDCriticalPointRange[_]],
-                                     pred: Option[Expression], partitions: Seq[HBasePartition],
-                                     dimSize: Int): Seq[HBasePartition] = {
-    // no need to prune as hbase partitions size is 1. Generally for single hbase partition there 
+                                     pred: Option[Expression],
+                                     partitions: Seq[HBasePartition],
+                                     dimSize: Int,
+                                     threshold:Int = 10): Seq[HBasePartition] = {
+    // no need to prune as hbase partitions size is 1. Generally for single hbase partition there
     // will not be any lowerBound and upperBound key.
     if (cprs.isEmpty || partitions.length == 1) {
       partitions.map(p => new HBasePartition(p.idx, p.mappedIndex, p.start, p.end, p.server, pred))
@@ -638,10 +639,15 @@ object RangeCriticalPoint {
           // Step 3.2
           // skip any critical point ranges that possibly are covered by
           // the last of just-qualified partitions
-          val qualifiedCPRIndexes = getQualifiedCRRanges(partitions(pend), cprs, cprStartIndex)
-          if (qualifiedCPRIndexes == null) done = true
-          else cprStartIndex = qualifiedCPRIndexes._2
-        } else done = true
+          val qualifiedCPRIndexes = getQualifiedCRRanges(
+            partitions(pend), cprs, cprStartIndex, threshold)
+          if (qualifiedCPRIndexes == -1) done = true
+          else cprStartIndex = if (qualifiedCPRIndexes == cprStartIndex) {
+             qualifiedCPRIndexes + 1
+          } else qualifiedCPRIndexes
+        } else {
+          done = true
+        }
       }
       result
     }
