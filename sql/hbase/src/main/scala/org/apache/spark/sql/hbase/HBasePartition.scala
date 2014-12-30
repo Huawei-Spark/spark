@@ -18,9 +18,8 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.types.BinaryType
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.catalyst.types.{PartitionRange, Range}
+import org.apache.spark.sql.hbase.catalyst.types.{HBaseBytesType, PartitionRange, Range}
 
 
 private[hbase] class HBasePartition(
@@ -30,7 +29,7 @@ private[hbase] class HBasePartition(
     val server: Option[String] = None,
     val filterPredicates: Option[Expression] = None,
     @transient relation: HBaseRelation = null) extends Range[HBaseRawType](start, true,
-               end, false, BinaryType) with Partition with IndexMappable {
+               end, false, HBaseBytesType) with Partition with IndexMappable {
 
   override def index: Int = idx
 
