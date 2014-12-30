@@ -83,8 +83,8 @@ class HBaseBasicOperationSuite extends QueryTest {
 
   test("Select test 1") {
     sql( """SELECT * FROM ta""").foreach(println)
-    sql( """SELECT * FROM ta WHERE col7 > 1024""").foreach(println)
-    sql( """SELECT * FROM ta WHERE (col7 - 10 > 1024) AND col1 = 'SF'""").foreach(println)
+    assert(sql( """SELECT * FROM ta WHERE col7 > 1024""").count() == 2)
+    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 1024) AND col1 = 'SF'""").count() == 1)
   }
 
   test("Select test 2") {
