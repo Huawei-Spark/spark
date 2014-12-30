@@ -27,12 +27,11 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
   test("byte test") {
     val s = Seq(-257, -256, -255, -129, -128, -127, -64, -16, -4, -1,
       0, 1, 4, 16, 64, 127, 128, 129, 255, 256, 257)
-      .map(i => (i, BytesUtils.create(IntegerType).toBytes(i)))
+    val result = s.map(i => (i, BytesUtils.create(IntegerType).toBytes(i)))
       .sortWith((f, s) =>
       HBaseBytesType.ordering.gt(
         f._2.asInstanceOf[HBaseBytesType.JvmType], s._2.asInstanceOf[HBaseBytesType.JvmType]))
-    assert(s.map(a => a._1).toSeq == Seq(257, 256, 255, 129, 128, 127, 64, 16, 4,
-      1, 0, -1, -4, -16, -64, -127, -128, -129, -255, -256, -257))
+    assert(result.map(a => a._1).toSeq == s.sorted.reverse)
   }
 
   def compare(a: Array[Byte], b: Array[Byte]): Int = {
