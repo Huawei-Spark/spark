@@ -20,8 +20,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.spark._
-import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.catalyst.expressions.GenericRow
+import org.apache.spark.sql.catalyst.types._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 //@Ignore
@@ -38,61 +38,6 @@ class CatalogTestSuite extends FunSuite with BeforeAndAfterAll with Logging {
     hbaseContext = new HBaseSQLContext(sparkContext)
     catalog = new HBaseCatalog(hbaseContext)
     configuration = HBaseConfiguration.create()
-  }
-
-  def compare(a: Array[Byte], b: Array[Byte]): Int = {
-    val length = Math.min(a.length, b.length)
-    var result: Int = 0
-    for (i <- 0 to length - 1) {
-      val diff: Int = (a(i) & 0xff).asInstanceOf[Byte] - (b(i) & 0xff).asInstanceOf[Byte]
-      if (diff != 0) {
-        result = diff
-      }
-    }
-    result
-  }
-
-  test("Bytes Utility") {
-    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
-      .toBytes(input = true), 0) === true)
-    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
-      .toBytes(input = false), 0) === false)
-
-    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(12.34d), 0)
-      === 12.34d)
-    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(-12.34d), 0)
-      === -12.34d)
-
-    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(12.34f), 0)
-      === 12.34f)
-    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(-12.34f), 0)
-      === -12.34f)
-
-    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(12), 0)
-      === 12)
-    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(-12), 0)
-      === -12)
-
-    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(1234l), 0)
-      === 1234l)
-    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(-1234l), 0)
-      === -1234l)
-
-    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
-      .toBytes(12.asInstanceOf[Short]), 0) === 12)
-    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
-      .toBytes(-12.asInstanceOf[Short]), 0) === -12)
-
-    assert(BytesUtils.toString(BytesUtils.create(StringType).toBytes("abc"), 0, 3)
-      === "abc")
-
-    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
-      .toBytes(5.asInstanceOf[Byte]), 0) === 5)
-    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
-      .toBytes(-5.asInstanceOf[Byte]), 0) === -5)
-
-    assert(compare(BytesUtils.create(IntegerType).toBytes(128),
-      BytesUtils.create(IntegerType).toBytes(-128)) > 0)
   }
 
   test("Create Table") {

@@ -23,20 +23,70 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.apache.spark.Logging
 import org.apache.spark.sql._
 
-class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging{
-
-  test("BytesUtils for int") {
-    val intBytesUtils = BytesUtils.create(IntegerType)
-    assert(BytesUtils.toInt(intBytesUtils.toBytes(40), 0) == 40)
-  }
-
+class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
   test("byte test") {
-    val s = Seq(-257,-256, -255, -129, -128, -127, -64, -16, -4, -1,
-      0, 1, 4, 16, 64, 127, 128, 129, 255, 256,257)
+    val s = Seq(-257, -256, -255, -129, -128, -127, -64, -16, -4, -1,
+      0, 1, 4, 16, 64, 127, 128, 129, 255, 256, 257)
       .map(i => (i, BytesUtils.create(IntegerType).toBytes(i)))
       .sortWith((f, s) =>
       HBaseBytesType.ordering.gt(
         f._2.asInstanceOf[HBaseBytesType.JvmType], s._2.asInstanceOf[HBaseBytesType.JvmType]))
-    s.foreach(t => println(t._1))
+    assert(s.map(a => a._1).toSeq == Seq(257, 256, 255, 129, 128, 127, 64, 16, 4,
+      1, 0, -1, -4, -16, -64, -127, -128, -129, -255, -256, -257))
+  }
+
+  def compare(a: Array[Byte], b: Array[Byte]): Int = {
+    val length = Math.min(a.length, b.length)
+    var result: Int = 0
+    for (i <- 0 to length - 1) {
+      val diff: Int = (a(i) & 0xff).asInstanceOf[Byte] - (b(i) & 0xff).asInstanceOf[Byte]
+      if (diff != 0) {
+        result = diff
+      }
+    }
+    result
+  }
+
+  test("Bytes Utility") {
+    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
+      .toBytes(input = true), 0) === true)
+    assert(BytesUtils.toBoolean(BytesUtils.create(BooleanType)
+      .toBytes(input = false), 0) === false)
+
+    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(12.34d), 0)
+      === 12.34d)
+    assert(BytesUtils.toDouble(BytesUtils.create(DoubleType).toBytes(-12.34d), 0)
+      === -12.34d)
+
+    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(12.34f), 0)
+      === 12.34f)
+    assert(BytesUtils.toFloat(BytesUtils.create(FloatType).toBytes(-12.34f), 0)
+      === -12.34f)
+
+    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(12), 0)
+      === 12)
+    assert(BytesUtils.toInt(BytesUtils.create(IntegerType).toBytes(-12), 0)
+      === -12)
+
+    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(1234l), 0)
+      === 1234l)
+    assert(BytesUtils.toLong(BytesUtils.create(LongType).toBytes(-1234l), 0)
+      === -1234l)
+
+    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
+      .toBytes(12.asInstanceOf[Short]), 0) === 12)
+    assert(BytesUtils.toShort(BytesUtils.create(ShortType)
+      .toBytes(-12.asInstanceOf[Short]), 0) === -12)
+
+    assert(BytesUtils.toString(BytesUtils.create(StringType).toBytes("abc"), 0, 3)
+      === "abc")
+
+    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
+      .toBytes(5.asInstanceOf[Byte]), 0) === 5)
+    assert(BytesUtils.toByte(BytesUtils.create(ByteType)
+      .toBytes(-5.asInstanceOf[Byte]), 0) === -5)
+
+    assert(compare(BytesUtils.create(IntegerType).toBytes(128),
+      BytesUtils.create(IntegerType).toBytes(-128)) > 0)
   }
 }
