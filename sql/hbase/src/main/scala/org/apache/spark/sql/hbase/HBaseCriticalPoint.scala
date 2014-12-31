@@ -105,7 +105,7 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
    *                   FALSE if compare this end with the partition's start
    * @param part the HBase partition to compare with
    * @return -1 if this critical point range's start is smaller than the partition's end
-   *         1  if this critical point range's start is biger than the partition's end
+   *         1  if this critical point range's start is bigger than the partition's end
    */
   private[hbase] def compareWithPartition(startOrEnd: Boolean, part: HBasePartition): Int = {
     val (comparePoint, comparePointInclusive, comparePPoint, comparePPointInclusive) =
