@@ -17,14 +17,12 @@
 
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
 import org.scalatest.FunSuite
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.rdd.ShuffledRDD
 
 import scala.collection.mutable.ArrayBuffer
 
