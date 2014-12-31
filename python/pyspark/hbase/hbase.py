@@ -34,7 +34,7 @@ class HBaseSQLContext(SQLContext):
   It supports running both SQL and HiveQL commands.
   """
 
-  def __init__(self, sparkContext, hbaseContext=None):
+  def __init__(self, sparkContext):
     """Create a new HiveContext.
 
     @param sparkContext: The SparkContext to wrap.
@@ -43,10 +43,10 @@ class HBaseSQLContext(SQLContext):
     """
     SQLContext.__init__(self, sparkContext)
 
-    if hbaseContext:
-      self._scala_HBaseSQLContext = hbaseContext
-    else:
-      self._scala_HBaseSQLContext = None
+    #if hbaseContext:
+    #  self._scala_HBaseSQLContext = hbaseContext
+    #else:
+    self._scala_HBaseSQLContext = self._get_hbase_ctx()
     print("HbaseContext is %s" % self._scala_HBaseSQLContext)
 
   @property
@@ -75,11 +75,11 @@ class HBaseSQLContext(SQLContext):
   def _get_hbase_ctx(self):
     print("sc=%s conf=%s" % (self._jsc.sc(), self._jsc.sc().configuration))
     java_import(self._sc._gateway.jvm,'org.apache.spark.sql.hbase.*')
-    java_import(self._sc._gateway.jvm,'org.apache.hadoop.conf.Configuration')
-    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.*')
-    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.util.*')
-    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.client.*')
-    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.filter.*')
+#    java_import(self._sc._gateway.jvm,'org.apache.hadoop.conf.Configuration')
+#    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.*')
+#    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.util.*')
+#    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.client.*')
+#    java_import(self._sc._gateway.jvm,'org.apache.hadoop.hbase.filter.*')
     return self._jvm.HBaseSQLContext(self._jsc.sc())
     # return self._jvm.SQLContext(self._jsc.sc())
 

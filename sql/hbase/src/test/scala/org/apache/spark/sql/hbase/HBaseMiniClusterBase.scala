@@ -42,7 +42,8 @@ class HBaseMiniClusterBase extends FunSuite with BeforeAndAfterAll with Logging 
     testUtil = new HBaseTestingUtility
     cluster = testUtil.startMiniCluster(NMasters, NRegionServers)
     config = testUtil.getConfiguration
-    hbc = new HBaseSQLContext(sc, Some(config))
+    hbc = new HBaseSQLContext(sc)
+    hbc.optConfiguration = Some(config)
   }
 
   test("test whether minicluster work") {
