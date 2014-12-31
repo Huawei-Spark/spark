@@ -11,8 +11,6 @@ import org.apache.spark.sql.SchemaRDD
 import org.apache.spark.sql.catalyst.expressions.{GenericRow, Row}
 import org.apache.spark.sql.catalyst.types._
 
-import scala.collection.mutable.ListBuffer
-
 /**
  * HBaseMainTest
  * create HbTestTable and metadata table, and insert some data

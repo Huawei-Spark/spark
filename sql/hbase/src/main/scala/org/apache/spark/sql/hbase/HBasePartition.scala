@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.hbase
 
+import org.apache.spark.Logging
 import org.apache.spark.Partition
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
@@ -29,7 +30,7 @@ private[hbase] class HBasePartition(
     val server: Option[String] = None,
     val filterPredicates: Option[Expression] = None,
     @transient relation: HBaseRelation = null) extends Range[HBaseRawType](start, true,
-               end, false, HBaseBytesType) with Partition with IndexMappable {
+               end, false, HBaseBytesType) with Partition with IndexMappable with Logging {
 
   override def index: Int = idx
 
@@ -40,7 +41,7 @@ private[hbase] class HBasePartition(
   @transient lazy val endNative: Seq[Any] = relation.nativeKeysConvert(end)
 
   def computePredicate(relation: HBaseRelation): Option[Expression] = {
-    if (filterPredicates.isDefined &&
+    val predicate = if (filterPredicates.isDefined &&
       filterPredicates.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
       val oriPredicate = filterPredicates.get
       val predicateReferences = oriPredicate.references.toSeq
@@ -66,5 +67,7 @@ private[hbase] class HBasePartition(
         case (false, _) => Some(Literal(false))
       }
     } else filterPredicates
+    logInfo(predicate.toString)
+    predicate
   }
 }
