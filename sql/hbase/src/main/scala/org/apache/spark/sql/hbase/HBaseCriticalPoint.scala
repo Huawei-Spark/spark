@@ -40,12 +40,13 @@ object CriticalPointType extends Enumeration {
  */
 case class CriticalPoint[T](value: T, ctype: CriticalPointType.CriticalPointType, dt: NativeType) {
   override def hashCode() = value.hashCode()
-
-  // val decreteType: Boolean = dt.isInstanceOf[IntegralType]
-
   override def equals(other: Any): Boolean = other match {
     case cp: CriticalPoint[T] => value.equals(cp.value)
     case _ => false
+  }
+
+  override def toString() = {
+    s"CriticalPoint: value=$value, ctype=$ctype., dt=${dt.typeName}"
   }
 }
 
@@ -83,6 +84,15 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
       require(isPoint, "Internal Logical Error: point range expected")
       nextDimCriticalPointRanges.map(_.flatten(prefix)).reduceLeft(_ ++ _)
     }
+  }
+
+  override def toString() = {
+    val result = new mutable.StringBuilder()
+    if (startInclusive) result.append("[") else result.append("(")
+    result.append(s"$start, $end")
+    if (endInclusive) result.append("]") else result.append(")")
+    result.append(s" ${dt.typeName} $pred")
+    result.toString()
   }
 }
 
@@ -180,6 +190,15 @@ private[hbase] case class MDCriticalPointRange[T](prefix: Seq[(Any, NativeType)]
           }
         }
     }
+  }
+
+  override def toString() = {
+    val result = new mutable.StringBuilder()
+    for (item <- prefix) {
+      result.append(s"(${item._1} ${item._2}}) ")
+    }
+    result.append(s"${lastRange.toString()} ${dt.typeName}}")
+    result.toString()
   }
 }
 
