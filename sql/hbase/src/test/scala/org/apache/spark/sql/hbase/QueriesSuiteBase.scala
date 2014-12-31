@@ -67,8 +67,8 @@ class QueriesSuiteBase() extends HBaseIntegrationTestBase(
   val CompareTol = 1e-6
 
   def compareWithTol(actarr: Seq[Any], exparr: Seq[Any], emsg: String): Boolean = {
-    actarr.zip(exparr).forall { case (a, e) =>
-      val eq = (a, e) match {
+    actarr.zip(exparr).forall { case (aa, ee) =>
+      val eq = (aa, ee) match {
         case (a: Double, e: Double) =>
           Math.abs(a - e) <= CompareTol
         case (a: Float, e: Float) =>
@@ -82,7 +82,7 @@ class QueriesSuiteBase() extends HBaseIntegrationTestBase(
         case _ => throw new IllegalArgumentException("Expected tuple")
       }
       if (!eq) {
-        logger.error(s"$emsg: Mismatch- act=$a exp=$e")
+        logger.error(s"$emsg: Mismatch- act=$aa exp=$ee")
       }
       eq
     }
