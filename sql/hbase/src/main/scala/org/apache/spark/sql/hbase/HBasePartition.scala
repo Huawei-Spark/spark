@@ -70,4 +70,8 @@ private[hbase] class HBasePartition(
     logInfo(predicate.toString)
     predicate
   }
+
+  override def toString = {
+    s"HBasePartition: $idx, $mappedIndex, [$start, $end), $filterPredicates"
+  }
 }
