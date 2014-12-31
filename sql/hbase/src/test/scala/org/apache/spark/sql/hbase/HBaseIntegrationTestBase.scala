@@ -24,14 +24,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HBaseTestingUtility, MiniHBaseCluster}
 import org.apache.log4j.Logger
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.scalatest.{ConfigMap, BeforeAndAfterAllConfigMap, FunSuite, Suite}
 
 abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
                                         nRegionServers: Int = 2,
                                         nDataNodes: Int = 2,
                                         nMasters: Int = 1)
-  extends FunSuite with BeforeAndAfterAllConfigMap {
+  extends FunSuite with BeforeAndAfterAllConfigMap with Logging {
   self: Suite =>
 
   @transient var sc: SparkContext = _
@@ -47,7 +47,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
 
   val startTime = (new Date).getTime
   val sparkUiPort = 0xc000 + new Random().nextInt(0x3f00)
-  println(s"SparkUIPort = $sparkUiPort\n")
+  logInfo(s"SparkUIPort = $sparkUiPort\n")
 
   override protected def beforeAll(configMap: ConfigMap): Unit = {
     ctxSetup()
@@ -74,7 +74,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       System.setProperty(WorkDirProperty, workDir)
     }
 
-    println(s"useMiniCluster=$useMiniClusterInt workingDir ($WorkDirProperty})=$workDir\n")
+    logInfo(s"useMiniCluster=$useMiniClusterInt workingDir ($WorkDirProperty})=$workDir\n")
     if (useMiniClusterInt) {
       logger.debug(s"Spin up hbase minicluster w/ $nMasters mast, $nRegionServers RS, $nDataNodes dataNodes")
       testUtil = new HBaseTestingUtility
@@ -104,11 +104,11 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       config.set("hbase.thrift.info.port", "50007")
 
       cluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
-      println(s"Started HBaseMiniCluster with region servers = ${cluster.countServedRegions}")
+      logInfo(s"Started HBaseMiniCluster with region servers = ${cluster.countServedRegions}")
 
       // Need to retrieve zkPort AFTER mini cluster is started
       val zkPort = config.get("hbase.zookeeper.property.clientPort")
-      println(s"After testUtil.getConfiguration the hbase.zookeeper.quorum="
+      logInfo(s"After testUtil.getConfiguration the hbase.zookeeper.quorum="
         + s"${config.get("hbase.zookeeper.quorum")} port=$zkPort")
 
       // Inject the zookeeper port/quorum obtained from the HBaseMiniCluster
@@ -161,7 +161,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
   override protected def afterAll(configMap: ConfigMap): Unit = {
     var msg = s"Test ${getClass.getName} completed at ${(new java.util.Date).toString} duration=${((new java.util.Date).getTime - startTime) / 1000}"
     logger.info(msg)
-    println(msg)
+    logInfo(msg)
     try {
       hbc.sparkContext.stop()
     } catch {
@@ -170,8 +170,6 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     }
     hbc = null
     msg = "HBaseSQLContext was shut down"
-    //    println(msg)
-    //    logger.info(msg)
 
     try {
       testUtil.shutdownMiniCluster()
@@ -179,9 +177,5 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
       case e: Throwable =>
         logger.error(s"Exception shutting down HBaseMiniCluster: ${e.getMessage}")
     }
-    //    println("HBaseMiniCluster was shutdown")
-    //    msg = "Completed testcase cleanup"
-    //    logger.info(msg)
-    //    println(msg)
   }
 }
