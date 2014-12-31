@@ -218,8 +218,10 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: HBaseSQLContext)
         result = None
       } else {
         result = Some(getRelationFromResult(values))
-        result.get.fetchPartitions()
       }
+    }
+    if (result.isDefined)  {
+      result.get.fetchPartitions()
     }
     result
   }
