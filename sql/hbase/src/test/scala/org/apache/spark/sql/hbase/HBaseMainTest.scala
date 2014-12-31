@@ -50,10 +50,14 @@ with Logging {
 
       val splitKeys: Array[Array[Byte]] =  if (useMultiplePartitions) {
         Array(
-          new GenericRow(Array(1024.0, "Upen", 128: Short)),
-          new GenericRow(Array(1024.0, "Upen", 256: Short)),
-          new GenericRow(Array(4096.0, "SF", 512: Short))
-        ).map(HBaseKVHelper.makeRowKey(_, Seq(DoubleType, StringType, ShortType)))
+          new GenericRow(Array(256, "p256", 128: Short)),
+          new GenericRow(Array(32, "p32", 256: Short)),
+          new GenericRow(Array(-32, "n32", 128: Short)),
+          new GenericRow(Array(-256, "n256", 256: Short)),
+          new GenericRow(Array(-128, "n128", 128: Short)),
+          new GenericRow(Array(0, "zero", 256: Short)),
+          new GenericRow(Array(128, "p128", 512: Short))
+        ).map(HBaseKVHelper.makeRowKey(_, Seq(IntegerType, StringType, ShortType)))
       } else {
         null
       }
@@ -62,7 +66,7 @@ with Logging {
       catalog.createTable(TableName_a, null, HbaseTableName, allColumns, splitKeys)
 
       hbc.sql( s"""CREATE TABLE $TableName_b(col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
-          col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
+          col5 LONG, col6 FLOAT, col7 INTEGER, PRIMARY KEY(col7, col1, col3))
           MAPPED BY ($HbaseTableName, COLS=[col2=cf1.cq11, col4=cf1.cq12, col5=cf2.cq21,
           col6=cf2.cq22])""".stripMargin)
 
