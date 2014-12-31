@@ -23,19 +23,16 @@ import org.apache.spark.sql.catalyst.types._
 /**
  * Helper class for scanning files stored in Hadoop - e.g., to read text file when bulk loading.
  */
-private[hbase]
-class HadoopReader(
-    @transient sc: SparkContext,
-    path: String,
-    delimiter: Option[String])(baseRelation: HBaseRelation) {
-
+private[hbase] class HadoopReader(
+                                   @transient sc: SparkContext,
+                                   path: String,
+                                   delimiter: Option[String])(baseRelation: HBaseRelation) {
   /** make RDD[(SparkImmutableBytesWritable, SparkKeyValue)] from text file. */
   private[hbase] def makeBulkLoadRDDFromTextFile = {
-
     val rdd = sc.textFile(path)
     val splitRegex = delimiter.getOrElse(",")
     val relation = baseRelation
-    // todo(wf): we should not resue the buffer in bulkloading ortherwise it will lead to
+    // todo(wf): we should not reuse the buffer in bulk-loading otherwise it will lead to
     // corrupted as we are reusing same buffer
     rdd.mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](relation.keyColumns.size)

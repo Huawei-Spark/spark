@@ -23,10 +23,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.SparkSQLParser
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
 
-class HBaseSQLContext(sc: SparkContext) //,
-//                      val optConfiguration: Option[Configuration] = None)
-  extends SQLContext(sc) with HBaseSQLConf {
-
+class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) with HBaseSQLConf {
   var optConfiguration: Option[Configuration] = None
 
   @transient

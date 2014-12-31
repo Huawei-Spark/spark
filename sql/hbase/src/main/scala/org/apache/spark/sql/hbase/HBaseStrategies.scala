@@ -26,11 +26,10 @@ import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.{SQLContext, Strategy}
 
-
-  /**
-   * Retrieves data using a HBaseTableScan.  Partition pruning predicates are also detected and
-   * applied.
-   */
+/**
+ * Retrieves data using a HBaseTableScan.  Partition pruning predicates are also detected and
+ * applied.
+ */
 private[hbase] trait HBaseStrategies {
   self: SQLContext#SparkPlanner =>
 
@@ -46,17 +45,17 @@ private[hbase] trait HBaseStrategies {
           (a, f) => relation.buildScan(a, f)) :: Nil
 
       case InsertIntoTable(l@LogicalRelation(t: HBaseRelation), partition, child, _) =>
-          execution.InsertIntoHBaseTable(t, planLater(child)) :: Nil
+        execution.InsertIntoHBaseTable(t, planLater(child)) :: Nil
       case _ => Nil
     }
 
     // Based on Catalyst expressions.
     // Almost identical to pruneFilterProjectRaw
     protected def pruneFilterProjectHBase(
-                    relation: LogicalRelation,
-                    projectList: Seq[NamedExpression],
-                    filterPredicates: Seq[Expression],
-                    scanBuilder: (Seq[Attribute], Seq[Expression]) => RDD[Row]) = {
+                                  relation: LogicalRelation,
+                                  projectList: Seq[NamedExpression],
+                                  filterPredicates: Seq[Expression],
+                                  scanBuilder: (Seq[Attribute], Seq[Expression]) => RDD[Row]) = {
 
       val projectSet = AttributeSet(projectList.flatMap(_.references))
       val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
@@ -96,7 +95,7 @@ private[hbase] trait HBaseStrategies {
       } else {
         val requestedColumns = (projectSet ++ filterSet).map(relation.attributeMap).toSeq
         val scan = HBaseSQLTableScan(hbaseRelation, requestedColumns,
-            scanBuilder(requestedColumns, pushedFilters))
+          scanBuilder(requestedColumns, pushedFilters))
         Project(projectList, scan)
       }
     }
