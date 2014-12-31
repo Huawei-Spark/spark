@@ -79,7 +79,7 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
   }
   
   def compareResults(fetchResult: Array[Row], targetResult: Array[Row]) = {
-    var res = {
+    val res = {
       for (rx <- 0 until targetResult.size)
       yield compareWithTol(fetchResult(rx).toSeq, targetResult(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
@@ -140,7 +140,7 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
       Array("Row1", 'b', 12345, 23456789),
       Array("Row2", 'c', 12342, 23456782))
 
-    var res = {
+    val res = {
       for (rx <- 0 until 3)
       yield compareWithTol(testResult(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
@@ -151,5 +151,4 @@ class HBaseInsertTableSuite extends QueriesSuiteBase {
 
     println(s"Test $testnm completed successfully")
   }
-
 }

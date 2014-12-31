@@ -18,14 +18,13 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{TableName, HColumnDescriptor, HTableDescriptor, MiniHBaseCluster, HBaseTestingUtility}
+import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client.HBaseAdmin
+import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.{Logging, SparkContext}
-import org.scalatest.{Suite, BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
 class HBaseMiniClusterBase extends FunSuite with BeforeAndAfterAll with Logging { self: Suite =>
-
   val NMasters = 1
   val NRegionServers = 2
 
@@ -59,8 +58,6 @@ class HBaseMiniClusterBase extends FunSuite with BeforeAndAfterAll with Logging 
 
     hbaseAdmin.createTable(desc)
     println(s"2: ${hbaseAdmin.tableExists("wf")}")
-
-
   }
 
   override def afterAll() = {

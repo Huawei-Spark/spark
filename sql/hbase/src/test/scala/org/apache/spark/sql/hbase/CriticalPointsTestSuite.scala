@@ -21,7 +21,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.spark._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import scala.collection.mutable.ArrayBuffer

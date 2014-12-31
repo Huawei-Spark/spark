@@ -17,11 +17,11 @@
 
 package org.apache.spark.sql.hbase
 
+import org.apache.spark.Logging
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.types.IntegerType
 import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
-import org.apache.spark.Logging
-import org.apache.spark.sql._
 
 class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
   test("byte test") {

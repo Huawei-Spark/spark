@@ -17,8 +17,8 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client.HBaseAdmin
-import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.spark._
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.types._

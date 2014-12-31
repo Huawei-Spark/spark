@@ -10,9 +10,7 @@ import scala.collection.mutable.ArrayBuffer
 
 /**
  * CompositeRowKeyParserTest
- * Created by sboesch on 9/25/14.
  */
-
 case class TestCall(callId: Int, userId: String, duration: Double)
 
 class RowKeyParserSuite extends FunSuite with ShouldMatchers {

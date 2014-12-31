@@ -24,7 +24,7 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.types.IntegerType
-import org.apache.spark.sql.hbase.execution.{BulkLoadIntoTableCommand, ParallelizedBulkLoadIntoTableCommand}
+import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.{Logging, SerializableWritable, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 

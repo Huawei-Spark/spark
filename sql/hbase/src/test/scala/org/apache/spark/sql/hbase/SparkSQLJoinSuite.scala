@@ -73,7 +73,7 @@ class SparkSQLJoinSuite extends FunSuite {
   def verify(testName: String, sql: String, result1: Seq[Seq[Any]], exparr: Seq[Seq[Any]]) = {
     println(s"$sql came back with ${result1.size} results")
     println(result1.mkString("Results\n","\n",""))
-    var res = {
+    val res = {
       for (rx <- 0 until exparr.size)
       yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
@@ -102,5 +102,4 @@ class SparkSQLJoinSuite extends FunSuite {
       eq
     }
   }
-
 }
