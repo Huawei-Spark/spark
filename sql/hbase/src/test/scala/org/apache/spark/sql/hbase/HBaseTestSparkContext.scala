@@ -1,7 +1,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark.SparkContext
-import org.scalatest.{Suite, BeforeAndAfterAll}
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
 /**
  * HBaseTestSparkContext used for test.

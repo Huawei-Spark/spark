@@ -16,8 +16,7 @@
  */
 package org.apache.spark.sql.hbase
 
-import org.apache.spark.Logging
-import org.apache.spark.Partition
+import org.apache.spark.{Logging, Partition}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.{HBaseBytesType, PartitionRange, Range}

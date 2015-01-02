@@ -16,14 +16,19 @@
  */
 package org.apache.spark.sql.hbase.execution
 
+import java.text.SimpleDateFormat
+import java.util.Date
+
+import org.apache.hadoop.conf.{Configurable, Configuration}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client.{HTable, Put}
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
-import org.apache.hadoop.mapreduce.{RecordWriter, Job}
+import org.apache.hadoop.mapreduce.{Job, RecordWriter}
 import org.apache.log4j.Logger
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.mapreduce.SparkHadoopMapReduceUtil
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Row}
 import org.apache.spark.sql.catalyst.plans.logical.Subquery
@@ -31,14 +36,10 @@ import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase._
 import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.{SerializableWritable, SparkEnv, TaskContext}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
-import org.apache.hadoop.conf.{Configurable, Configuration}
-import org.apache.spark.{TaskContext, SparkEnv, SerializableWritable}
-import org.apache.spark.mapreduce.SparkHadoopMapReduceUtil
-import java.text.SimpleDateFormat
-import java.util.Date
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {

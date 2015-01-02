@@ -28,7 +28,7 @@ private[hbase] object HBaseSQLConf {
  *
  */
 private[hbase] trait HBaseSQLConf extends SQLConf {
-  import HBaseSQLConf._
+  import org.apache.spark.sql.hbase.HBaseSQLConf._
 
   /** The expiration of cached partition (i.e., region) info; defaults to 10 minutes . */
   private[spark] def partitionExpiration: Long = getConf(PARTITION_EXPIRATION, "600").toLong

@@ -25,7 +25,7 @@ import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.hadoop.hbase.{HBaseConfiguration, HBaseTestingUtility, MiniHBaseCluster}
 import org.apache.log4j.Logger
 import org.apache.spark.{Logging, SparkConf, SparkContext}
-import org.scalatest.{ConfigMap, BeforeAndAfterAllConfigMap, FunSuite, Suite}
+import org.scalatest.{BeforeAndAfterAllConfigMap, ConfigMap, FunSuite, Suite}
 
 abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
                                         nRegionServers: Int = 2,

@@ -1,9 +1,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.log4j.Logger
-import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.types._
-import org.apache.spark.sql.hbase.DataTypeUtils._
 import org.scalatest.{FunSuite, ShouldMatchers}
 
 import scala.collection.mutable.ArrayBuffer

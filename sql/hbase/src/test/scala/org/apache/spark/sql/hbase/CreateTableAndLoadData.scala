@@ -1,8 +1,7 @@
 package org.apache.spark.sql.hbase
 
-import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor}
+import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.log4j.Logger
 
 /*
@@ -39,8 +38,6 @@ trait CreateTableAndLoadData {
   val DefaultLoadFile = "testTable.csv"
 
   var AvoidRowkeyBug = false
-
-  import util.control.Breaks._
   private val tpath = for (csvPath <- CsvPaths
       if new java.io.File(csvPath).exists()
     ) yield csvPath

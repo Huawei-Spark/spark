@@ -17,9 +17,9 @@
 
 package org.apache.spark.sql.hbase.catalyst.types
 
-import scala.reflect.runtime.universe.typeTag
-
 import org.apache.spark.sql.catalyst.types.{NativeType, PrimitiveType}
+
+import scala.reflect.runtime.universe.typeTag
 
 /**
  * Almost identical to BinaryType except for a different ordering to be consistent
