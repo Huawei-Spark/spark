@@ -125,8 +125,6 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
     val family2 = "family2"
 
     val hbaseContext = new HBaseSQLContext(sparkContext)
-    val catalog = new HBaseCatalog(hbaseContext)
-    val configuration = HBaseConfiguration.create()
 
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
@@ -219,5 +217,71 @@ class HBasePartitionerSuite extends FunSuite with HBaseTestSparkContext {
 
     val predicate6 = p6.computePredicate(relation)
     assert(predicate6.toString == "Some((((column2#1 = 8) || (column2#1 = 2048)) && (column1#0 = 1024)))")
+  }
+
+  test("test k = 8 OR k > 8 (k is int)") {
+    val namespace = "testNamespace"
+    val tableName = "testTable"
+    val hbaseTableName = "ht"
+    val family1 = "family1"
+    val family2 = "family2"
+
+    val hbaseContext = new HBaseSQLContext(sparkContext)
+
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+
+    val lll = relation.output.find(_.name == "column1").get
+    val llr = Literal(8, IntegerType)
+    val ll = EqualTo(lll, llr)
+
+    val lrl = lll
+    val lrr = Literal(8, IntegerType)
+    val lr = GreaterThan(lrl, lrr)
+
+    val l = Or(ll, lr)
+    val pred = Some(l)
+
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    assert(result.size == 2)
+  }
+
+  test("test k < 8 AND k > 8 (k is int)") {
+    val namespace = "testNamespace"
+    val tableName = "testTable"
+    val hbaseTableName = "ht"
+    val family1 = "family1"
+    val family2 = "family2"
+
+    val hbaseContext = new HBaseSQLContext(sparkContext)
+
+    var allColumns = List[AbstractColumn]()
+    allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
+    allColumns = allColumns :+ KeyColumn("column2", IntegerType, 1)
+    allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
+    allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
+
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+
+    val lll = relation.output.find(_.name == "column1").get
+    val llr = Literal(8, IntegerType)
+    val ll = LessThan(lll, llr)
+
+    val lrl = lll
+    val lrr = Literal(8, IntegerType)
+    val lr = GreaterThan(lrl, lrr)
+
+    val l = And(ll, lr)
+    val pred = Some(l)
+
+    val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
+
+    assert(result.size == 0)
   }
 }
