@@ -36,7 +36,7 @@ with Logging {
         hbaseAdmin.disableTable(Metadata_Table)
         hbaseAdmin.deleteTable(Metadata_Table)
       }
-      
+
       var allColumns = List[AbstractColumn]()
       allColumns = allColumns :+ KeyColumn("col1", StringType, 1)
       allColumns = allColumns :+ NonKeyColumn("col2", ByteType, "cf1", "cq11")
@@ -44,17 +44,17 @@ with Logging {
       allColumns = allColumns :+ NonKeyColumn("col4", IntegerType, "cf1", "cq12")
       allColumns = allColumns :+ NonKeyColumn("col5", LongType, "cf2", "cq21")
       allColumns = allColumns :+ NonKeyColumn("col6", FloatType, "cf2", "cq22")
-      allColumns = allColumns :+ KeyColumn("col7", DoubleType, 0)
+      allColumns = allColumns :+ KeyColumn("col7", IntegerType, 0)
 
-      val splitKeys: Array[Array[Byte]] =  if (useMultiplePartitions) {
+      val splitKeys: Array[Array[Byte]] = if (useMultiplePartitions) {
         Array(
-          new GenericRow(Array(256, "p256", 128: Short)),
-          new GenericRow(Array(32, "p32", 256: Short)),
-          new GenericRow(Array(-32, "n32", 128: Short)),
-          new GenericRow(Array(-256, "n256", 256: Short)),
-          new GenericRow(Array(-128, "n128", 128: Short)),
-          new GenericRow(Array(0, "zero", 256: Short)),
-          new GenericRow(Array(128, "p128", 512: Short))
+          new GenericRow(Array(256, " p256 ", 128: Short)),
+          new GenericRow(Array(32, " p32 ", 256: Short)),
+          new GenericRow(Array(-32, " n32 ", 128: Short)),
+          new GenericRow(Array(-256, " n256 ", 256: Short)),
+          new GenericRow(Array(-128, " n128 ", 128: Short)),
+          new GenericRow(Array(0, " zero ", 256: Short)),
+          new GenericRow(Array(128, " p128 ", 512: Short))
         ).map(HBaseKVHelper.makeRowKey(_, Seq(IntegerType, StringType, ShortType)))
       } else {
         null
@@ -83,55 +83,95 @@ with Logging {
     if (!checkHBaseTableExists(HbaseTableName)) {
       throw new IllegalStateException(s"Unable to find table $HbaseTableName")
     }
+
     val htable = new HTable(config, HbaseTableName)
 
-    var row = new GenericRow(Array(1024.0, "Upen", 128: Short))
-    var key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
-    var put = new Put(key)
-    Seq((64.toByte, ByteType, "cf1", "cq11"),
-      (12345678, IntegerType, "cf1", "cq12"),
-      (12345678901234L, LongType, "cf2", "cq21"),
-      (1234.5678F, FloatType, "cf2", "cq22")).foreach {
-      case (rowValue, rowType, colFamily, colQualifier) =>
-        addRowVals(put, rowValue, rowType, colFamily, colQualifier)
+    def putNewTableIntoHBase(keys: Seq[Any], keysType: Seq[DataType],
+                       vals: Seq[Any], valsType: Seq[DataType]): Unit = {
+      val row = new GenericRow(keys.toArray)
+      val key = makeRowKey(row, keysType)
+      val put = new Put(key)
+      Seq((vals(0), valsType(0), "cf1", "cq11"),
+        (vals(1), valsType(1), "cf1", "cq12"),
+        (vals(2), valsType(2), "cf2", "cq21"),
+        (vals(3), valsType(3), "cf2", "cq22")).foreach {
+        case (rowValue, rowType, colFamily, colQualifier) =>
+          addRowVals(put, rowValue, rowType, colFamily, colQualifier)
+      }
+      htable.put(put)
     }
-    htable.put(put)
 
-    row = new GenericRow(Array(2048.0, "Michigan", 256: Short))
-    key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
-    put = new Put(key)
-    Seq((32.toByte, ByteType, "cf1", "cq11"),
-      (456789012, IntegerType, "cf1", "cq12"),
-      (4567890123446789L, LongType, "cf2", "cq21"),
-      (456.78901F, FloatType, "cf2", "cq22")).foreach {
-      case (rowValue, rowType, colFamily, colQualifier) =>
-        addRowVals(put, rowValue, rowType, colFamily, colQualifier)
-    }
-    htable.put(put)
+    putNewTableIntoHBase(Seq(-257, " n257 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](1.toByte, -2048, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
 
-    row = new GenericRow(Array(4096.0, "SF", 512: Short))
-    key = makeRowKey(row, Seq(DoubleType, StringType, ShortType))
-    put = new Put(key)
-    Seq((16.toByte, ByteType, "cf1", "cq11"),
-      (98767, IntegerType, "cf1", "cq12"),
-      (987563454423454L, LongType, "cf2", "cq21"),
-      (987.645F, FloatType, "cf2", "cq22")).foreach {
-      case (rowValue, rowType, colFamily, colQualifier) =>
-        addRowVals(put, rowValue, rowType, colFamily, colQualifier)
-    }
-    htable.put(put)
+    putNewTableIntoHBase(Seq(-255, " n255 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](2.toByte, -1024, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(-129, " n129 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](3.toByte, -512, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(-127, " n127 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](4.toByte, -256, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(-33, " n33 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](5.toByte, -128, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(-31, " n31 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](6.toByte, -64, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(-1, " n1 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](7.toByte, -1, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(1, " p1 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](8.toByte, 1, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(31, " p31 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](9.toByte, 4, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(33, " p33 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](10.toByte, 64, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(127, " p127 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](11.toByte, 128, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(129, " p129 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](12.toByte, 256, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(255, " p255 ", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](13.toByte, 512, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
+    putNewTableIntoHBase(Seq(257, " p257", 128: Short),
+      Seq(IntegerType, StringType, ShortType),
+      Seq[Any](14.toByte, 1024, 12345678901234L,1234.5678F),
+      Seq(ByteType, IntegerType, LongType, FloatType))
+
     htable.close()
-  }
-
-  def setupData(useMultiplePartitions: Boolean) {
-    ctxSetup()
-    createTable(useMultiplePartitions)
-
-    if (!checkHBaseTableExists(HbaseTableName)) {
-      throw new IllegalStateException(s"Unable to find table $HbaseTableName")
-    }
-
-    insertTestData()
   }
 
   def printResults(msg: String, results: SchemaRDD) =
@@ -186,6 +226,17 @@ with Logging {
       res = scanner.next
       if (res != null) println(s"Row ${res.getRow} has map=${res.getNoVersionMap.toString}")
     } while (res != null)
+  }
+
+  def setupData(useMultiplePartitions: Boolean) {
+    ctxSetup()
+    createTable(useMultiplePartitions)
+
+    if (!checkHBaseTableExists(HbaseTableName)) {
+      throw new IllegalStateException(s"Unable to find table $HbaseTableName")
+    }
+
+    insertTestData()
   }
 
   def main(args: Array[String]) = {
