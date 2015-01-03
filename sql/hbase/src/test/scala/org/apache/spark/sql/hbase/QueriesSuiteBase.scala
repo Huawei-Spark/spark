@@ -36,6 +36,7 @@ class QueriesSuiteBase() extends HBaseIntegrationTestBase(
   }
 
   def runQuery(sql: String) = {
+    logger.info(sql)
     val execQuery1 = hbc.sql(sql)
     execQuery1.collect()
   }

@@ -1,7 +1,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, TableName}
+import org.apache.hadoop.hbase.{TableExistsException, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.log4j.Logger
 
 /*
@@ -38,9 +38,17 @@ trait CreateTableAndLoadData {
   val DefaultLoadFile = "testTable.csv"
 
   var AvoidRowkeyBug = false
+
+  var AvoidIfNotExistsBug = true
+
+  val ifNotExists = if (!AvoidIfNotExistsBug) "IF NOT EXISTS" else ""
+
   private val tpath = for (csvPath <- CsvPaths
-      if new java.io.File(csvPath).exists()
-    ) yield csvPath
+                           if new java.io.File(csvPath).exists()
+                      ) yield {
+                        println(s"Following path exists $csvPath")
+                        csvPath
+                      }
   private[hbase] val CsvPath = tpath(0)
 
   def createTableAndLoadData(hbc: HBaseSQLContext) = {
@@ -49,7 +57,7 @@ trait CreateTableAndLoadData {
     loadData(hbc, DefaultStagingTableName, DefaultTableName, s"$CsvPath/$DefaultLoadFile")
   }
 
-  def createTables(hbc: HBaseSQLContext) : Unit = {
+  def createTables(hbc: HBaseSQLContext): Unit = {
     createTables(hbc, DefaultStagingTableName, DefaultTableName,
       DefaultHbaseStagingTableName, DefaultHbaseTabName)
   }
@@ -58,7 +66,12 @@ trait CreateTableAndLoadData {
     val hbaseAdmin = hbc.catalog.hBaseAdmin
     val hdesc = new HTableDescriptor(TableName.valueOf(tableName))
     families.foreach { f => hdesc.addFamily(new HColumnDescriptor(f))}
-    hbaseAdmin.createTable(hdesc)
+    try {
+      hbaseAdmin.createTable(hdesc)
+    } catch {
+      case e: TableExistsException =>
+        logger.error(s"Table already exists $tableName", e)
+    }
   }
 
   def createTables(hbc: HBaseSQLContext, stagingTableName: String, tableName: String,
@@ -83,7 +96,7 @@ trait CreateTableAndLoadData {
     }
 
     val (stagingSql, tabSql) =
-      ( s"""CREATE TABLE $stagingTableName(strcol STRING, bytecol String, shortcol String, intcol String,
+      ( s"""CREATE TABLE $ifNotExists $stagingTableName(strcol STRING, bytecol String, shortcol String, intcol String,
             longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))
             MAPPED BY ($hbaseStagingTable, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
@@ -95,13 +108,25 @@ trait CreateTableAndLoadData {
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])"""
           .stripMargin
         )
-    runSql(hbc, stagingSql)
+    try {
+      logger.info(s"invoking $stagingSql ..")
+      runSql(hbc, stagingSql)
+    } catch {
+      case e: TableExistsException =>
+        logger.info("IF NOT EXISTS still not implemented so we get the following exception", e)
+    }
 
     logger.debug(s"Created table $tableName: " +
       s"isTableAvailable= ${hbaseAdmin.isTableAvailable(s2b(hbaseStagingTable))}" +
       s" tableDescriptor= ${hbaseAdmin.getTableDescriptor(s2b(hbaseStagingTable))}")
 
-    runSql(hbc, tabSql)
+    try {
+      logger.info(s"invoking $tabSql ..")
+      runSql(hbc, tabSql)
+    } catch {
+      case e: TableExistsException =>
+        logger.info("IF NOT EXISTS still not implemented so we get the following exception", e)
+    }
   }
 
   def runSql(hbc: HBaseSQLContext, sql: String) = {
