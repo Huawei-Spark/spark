@@ -16,8 +16,6 @@
  */
 package org.apache.spark.sql.hbase
 
-import java.util
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
@@ -31,6 +29,7 @@ import org.apache.spark.sql.catalyst.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
 import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
+import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
 import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation, RelationProvider}
 
 import scala.collection.JavaConverters._
@@ -335,7 +334,7 @@ private[hbase] case class HBaseRelation(
         case nkc => distinctProjList.exists(nkc.sqlName == _.name)
       }.map {
         case nkc@NonKeyColumn(_, _, family, qualifier) =>
-          val columnFilters = new util.ArrayList[Filter]
+          val columnFilters = new java.util.ArrayList[Filter]
           columnFilters.add(
             new FamilyFilter(
               CompareFilter.CompareOp.EQUAL,
@@ -371,7 +370,7 @@ private[hbase] case class HBaseRelation(
 
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
     var result: Option[FilterList] = None
-    val filters = new util.ArrayList[Filter]
+    val filters = new java.util.ArrayList[Filter]
     if (pred.isDefined) {
       val expression = pred.get
       expression match {

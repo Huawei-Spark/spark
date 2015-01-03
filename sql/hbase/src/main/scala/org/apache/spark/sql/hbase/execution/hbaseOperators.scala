@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.RangePartitioning
 import org.apache.spark.sql.execution.{LeafNode, SparkPlan, UnaryNode}
 import org.apache.spark.sql.hbase._
+import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper}
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer

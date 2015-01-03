@@ -21,6 +21,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.types.IntegerType
 import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
+import org.apache.spark.sql.hbase.util.BytesUtils
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {

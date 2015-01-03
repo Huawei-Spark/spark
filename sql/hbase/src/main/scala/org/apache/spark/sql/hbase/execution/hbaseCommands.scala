@@ -35,6 +35,7 @@ import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.catalyst.types.DataType
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase._
+import org.apache.spark.sql.hbase.util.{HBaseKVHelper, Util}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.{SerializableWritable, SparkEnv, TaskContext}
 

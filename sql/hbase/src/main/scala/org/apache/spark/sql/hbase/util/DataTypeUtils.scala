@@ -14,11 +14,12 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbase.util
 
 import org.apache.hadoop.hbase.filter.BinaryComparator
 import org.apache.spark.sql.catalyst.expressions.{Literal, MutableRow, Row}
 import org.apache.spark.sql.catalyst.types._
+import org.apache.spark.sql.hbase._
 
 /**
  * Data Type conversion utilities

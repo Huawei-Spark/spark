@@ -14,10 +14,11 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbase.util
 
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql._
+import org.apache.spark.sql.hbase._
 
 object BytesUtils {
   def create(dataType: DataType): BytesUtils = {

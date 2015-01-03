@@ -22,6 +22,7 @@ import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.spark._
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.types._
+import org.apache.spark.sql.hbase.util.HBaseKVHelper
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 //@Ignore

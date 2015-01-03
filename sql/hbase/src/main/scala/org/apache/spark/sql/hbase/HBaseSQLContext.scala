@@ -22,6 +22,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.SparkSQLParser
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+import org.apache.spark.sql.hbase.execution.HBaseStrategies
 
 class HBaseSQLContext(sc: SparkContext) extends SQLContext(sc) with HBaseSQLConf {
   var optConfiguration: Option[Configuration] = None

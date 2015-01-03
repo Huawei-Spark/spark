@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase
+package org.apache.spark.sql.hbase.util
 
 import java.io._
 import java.util.concurrent.atomic.AtomicInteger
