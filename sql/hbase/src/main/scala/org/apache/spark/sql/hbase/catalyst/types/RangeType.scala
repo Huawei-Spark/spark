@@ -50,7 +50,9 @@ class PartitionRange[T](start: Option[T], startInclusive: Boolean,
 
 class RangeType[T] extends PartialOrderingDataType {
   private[sql] type JvmType = Range[T]
-  @transient private[sql] val tag = typeTag[JvmType]
+  // TODO: can not use ScalaReflectionLock now for its accessibility
+  // @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[JvmType] }
+  @transient private[sql] lazy val tag = synchronized(typeTag[JvmType])
 
   def toPartiallyOrderingDataType(s: Any, dt: NativeType): Any = s match {
     case i: Int => new Range[Int](Some(i), true, Some(i), true, IntegerType)
