@@ -28,6 +28,7 @@ import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.hbase.util.{BytesUtils, Util}
 import org.apache.spark.{Logging, SerializableWritable, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.apache.spark.sql.hbase.util.InsertWappers._
 
 import scala.collection.mutable.ArrayBuffer
 

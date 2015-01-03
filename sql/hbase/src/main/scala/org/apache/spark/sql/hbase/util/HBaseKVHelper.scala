@@ -141,7 +141,7 @@ object HBaseKVHelper {
   def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]): HBaseRawType = {
     val rawKeyCol = dataTypeOfKeys.zipWithIndex.map {
       case (dataType, index) =>
-        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType), dataType)
+        (DataTypeUtils.getRowColumnInHBaseRawType(row, index, dataType), dataType)
     }
 
     encodingRawKeyColumns(rawKeyCol)

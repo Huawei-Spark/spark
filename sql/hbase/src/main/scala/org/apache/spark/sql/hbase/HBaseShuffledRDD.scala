@@ -19,6 +19,7 @@ package org.apache.spark.sql.hbase
 
 import org.apache.spark._
 import org.apache.spark.rdd.{RDD, ShuffledRDD, ShuffledRDDPartition}
+import org.apache.spark.sql.hbase.util.InsertWappers._
 
 class HBaseShuffledRDD (
     prevRdd: RDD[(ImmutableBytesWritableWrapper, PutWrapper)],

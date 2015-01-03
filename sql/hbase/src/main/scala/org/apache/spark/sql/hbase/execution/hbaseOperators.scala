@@ -81,7 +81,7 @@ case class InsertIntoHBaseTable(
         val row = iterator.next()
         val rawKeyCol = relation.keyColumns.map(
           kc => {
-            val rowColumn = DataTypeUtils.getRowColumnFromHBaseRawType(
+            val rowColumn = DataTypeUtils.getRowColumnInHBaseRawType(
               row, kc.ordinal, kc.dataType)
             colIndexInBatch += 1
             (rowColumn, kc.dataType)
@@ -91,7 +91,7 @@ case class InsertIntoHBaseTable(
         val put = new Put(key)
         relation.nonKeyColumns.foreach(
           nkc => {
-            val rowVal = DataTypeUtils.getRowColumnFromHBaseRawType(
+            val rowVal = DataTypeUtils.getRowColumnInHBaseRawType(
               row, nkc.ordinal, nkc.dataType)
             colIndexInBatch += 1
             put.add(nkc.familyRaw, nkc.qualifierRaw, rowVal)

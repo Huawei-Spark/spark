@@ -192,7 +192,7 @@ with Logging {
   def makeRowKey(row: Row, dataTypeOfKeys: Seq[DataType]) = {
     val rawKeyCol = dataTypeOfKeys.zipWithIndex.map {
       case (dataType, index) =>
-        (DataTypeUtils.getRowColumnFromHBaseRawType(row, index, dataType),
+        (DataTypeUtils.getRowColumnInHBaseRawType(row, index, dataType),
           dataType)
     }
 

@@ -80,7 +80,7 @@ object DataTypeUtils {
     }
   }
 
-  def getRowColumnFromHBaseRawType(row: Row,
+  def getRowColumnInHBaseRawType(row: Row,
                                    index: Int,
                                    dt: DataType): HBaseRawType = {
     val bu = BytesUtils.create(dt)

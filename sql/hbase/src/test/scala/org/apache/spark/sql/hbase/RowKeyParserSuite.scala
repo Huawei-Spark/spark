@@ -4,6 +4,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.sql.catalyst.types._
 import org.scalatest.{FunSuite, ShouldMatchers}
 
+
 import scala.collection.mutable.ArrayBuffer
 
 /**
