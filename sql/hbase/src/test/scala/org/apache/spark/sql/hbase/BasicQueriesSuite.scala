@@ -157,26 +157,28 @@ class BasicQueriesSuite extends QueriesSuiteBase {
 
     testnm = "Mixed And/or predicates"
   test("Mixed And/or predicates") {
-    val query1 =
-      s"""select doublecol as double1, -1 * doublecol as minusdouble,
-         | substr(strcol, 2) as substrcol, doublecol, strcol,
-         | bytecol, shortcol, intcol, longcol, floatcol from $tabName where strcol like
-         |  '%Row%' and (shortcol < 12345
-         |  and doublecol > 5678912.345681 and doublecol < 5678912.345683)
-         |   OR (doublecol 5678912.345683 and strcol is not null)
-         |   AND floatcol is not null
-         |   AND (intcol is not null and intcol > 0)
-         |   AND (intcol < 0 OR intcol is not null)"""
-        .stripMargin
+    val query1 =  s"""select doublecol as double1, -1 * doublecol as minusdouble,
+     substr(strcol, 2) as substrcol, doublecol, strcol,
+     bytecol, shortcol, intcol, longcol, floatcol from $tabName
+     where strcol like '%Row%'
+     and shortcol < 12345
+      and doublecol > 5678912.345681 and doublecol < 5678912.345683
+       OR (doublecol = 5678912.345683 and strcol is not null)
+       OR (doublecol = 5678912.345683 and strcol is not null or intcol > 12345 AND intcol < 0)
+       OR (doublecol <> 5678912.345683 and (strcol is null or intcol > 12345 AND intcol < 0))
+       AND floatcol is not null
+       AND (intcol is not null and intcol > 0)
+       AND (intcol < 0 OR intcol is not null)""".stripMargin
 
     val result1 = runQuery(query1)
     println(s"$query1 came back with ${result1.size} results")
     assert(result1.size == 2, s"$testnm failed on size")
     val exparr = Array(
       Array(5678912.345682, -5678912.345682, "ow2", 5678912.345682,
-        "Row2", 'b', 12342, 23456782, 3456789012342L, 45657.82F))
+        "Row2", 'b', 12342, 23456782, 3456789012342L, 45657.82F),
+     Array(5678912.345683,-5678912.345683,"ow3",5678912.345683,
+       "Row3",-29,12343,23456783,3456789012343L,45657.83))
 
-    assert(result1.size == 1, s"$testnm failed assertion on size")
     val res = {
       for (rx <- 0 until 1)
       yield compareWithTol(result1(rx).toSeq, exparr(rx), s"Row$rx failed")
@@ -189,3 +191,4 @@ class BasicQueriesSuite extends QueriesSuiteBase {
 
 
 }
+
