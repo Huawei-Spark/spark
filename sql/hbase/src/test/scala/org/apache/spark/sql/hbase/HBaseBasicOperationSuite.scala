@@ -17,108 +17,102 @@
 
 package org.apache.spark.sql.hbase
 
+import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.client.HBaseAdmin
+import org.apache.spark.Logging
 import org.apache.spark.sql.hbase.TestHbase._
+import org.scalatest._
 
 /**
  * Test insert / query against the table created by HBaseMainTest
  */
-class HBaseBasicOperationSuite extends QueryTest {
 
-  test("create table") {
-    sql( """CREATE TABLE tb (col1 STRING, col2 BYTE, col3 SHORT, col4 INTEGER,
-      col5 LONG, col6 FLOAT, col7 DOUBLE, PRIMARY KEY(col7, col1, col3))
-      MAPPED BY (hbaseTableName1, COLS=[col2=cf1.cq11,
-      col4=cf1.cq12, col5=cf2.cq21, col6=cf2.cq22])"""
-    )
+class HBaseBasicOperationSuite extends QueryTest with BeforeAndAfterAll with Logging {
+
+//  override def beforeAll: Unit = {
+//    import org.apache.spark.sql.hbase.HBaseMainTest._
+//
+//    HBaseMainTest.main(null)
+//    hbaseAdmin.close()
+//  }
+
+  override def afterAll() = {
+    import org.apache.spark.sql.hbase.HBaseMainTest._
+
+    if (config == null) {
+      config = HBaseConfiguration.create
+    }
+    hbaseAdmin = new HBaseAdmin(config)
+
+    if (hbaseAdmin.tableExists("ht0")) {
+      hbaseAdmin.disableTable("ht0")
+      hbaseAdmin.deleteTable("ht0")
+    }
+    if (hbaseAdmin.tableExists("ht1")) {
+      hbaseAdmin.disableTable("ht1")
+      hbaseAdmin.deleteTable("ht1")
+    }
   }
 
-  test("create table1") {
-    sql( """CREATE TABLE testTable (column2 INTEGER, column1 INTEGER, column4 FLOAT,
-        column3 SHORT, PRIMARY KEY(column1, column2))
-        MAPPED BY (testNamespace.hbaseTable, COLS=[column3=family1.qualifier1,
-        column4=family2.qualifier2])"""
-    )
-  }
+    test("Insert Into table0") {
+      sql( """CREATE TABLE tb0 (column2 INTEGER, column1 INTEGER, column4 FLOAT,
+          column3 SHORT, PRIMARY KEY(column1, column2))
+          MAPPED BY (testNamespace.ht0, COLS=[column3=family1.qualifier1,
+          column4=family2.qualifier2])"""
+      )
 
-  test("create table2") {
-    sql( """CREATE TABLE test (column1 INTEGER,
-        PRIMARY KEY(column1))
-        MAPPED BY (testTable, COLS=[])"""
-    )
-  }
+      assert(sql("""SELECT * FROM tb0""").count() == 0)
+      sql( """INSERT INTO tb0 SELECT col4,col4,col6,col3 FROM ta""")
+      assert(sql("""SELECT * FROM tb0""").count() == 14)
 
-  test("create table3") {
-    sql( """CREATE TABLE tb3 (column1 INTEGER, column2 STRING,
-        PRIMARY KEY(column2))
-        MAPPED BY (htb3, COLS=[column1=cf.cq])"""
-    )
-  }
+      sql( """DROP TABLE tb0""")
+    }
 
-  test("Insert Into table0") {
-        sql( """INSERT INTO testTable SELECT col4,col4,col6,col3 FROM ta""")
-  }
+    test("Insert Into table 1") {
+      sql( """CREATE TABLE tb1 (column1 INTEGER, column2 STRING,
+          PRIMARY KEY(column2))
+          MAPPED BY (ht1, COLS=[column1=cf.cq])"""
+      )
 
-  test("Insert Into table") {
-    //    sql("""CREATE TABLE t1 (t1c1 STRING, t1c2 STRING)
-    //      MAPPED BY (ht1, KEYS=[t1c1], COLS=[t1c2=cf1.cq11])""".stripMargin
-    //    )
-    //    sql("""CREATE TABLE t2 (t2c1 STRING, t2c2 STRING)
-    //      MAPPED BY (ht2, KEYS=[t2c1], COLS=[t2c2=cf2.cq21])""".stripMargin
-    //    )
-    sql( """INSERT INTO tableName SELECT * FROM testTable""")
-  }
+      assert(sql("""SELECT * FROM tb1""").count() == 0)
+      sql( """INSERT INTO tb1 VALUES (1024, "abc")""")
+      assert(sql("""SELECT * FROM tb1""").count() == 1)
 
-  test("Insert Into table1") {
-//    sql( """INSERT INTO testTable VALUES (1024, 2048, 13.6, 2)""")
-    sql( """SELECT * FROM testTable""").foreach(println)
-  }
+      sql( """DROP TABLE tb1""")
+    }
 
-  test("Insert Into table3") {
-    sql( """INSERT INTO tb3 VALUES (1024, "abc")""")
-  }
+    test("Select test 0") {
+      assert(sql( """SELECT * FROM ta""").count() == 14)
+    }
 
-  test("Select test 0") {
-    sql( """SELECT ta.col2 FROM ta join tb on ta.col1=tb.col1""").foreach(println)
-  }
+    test("Select test 1 (AND, OR)") {
+      assert(sql( """SELECT * FROM ta WHERE col7 = 255 OR col7 = 127""").count == 2)
+      assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col4 < -255""").count == 4)
+    }
 
-  test("Select test 1") {
-    sql( """SELECT * FROM ta""").foreach(println)
-    assert(sql( """SELECT * FROM ta WHERE col7 > 0""").count() == 7)
-    assert(sql( """SELECT * FROM ta WHERE col7 < 0 AND col7 > 0""").count() == 0)
-    assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 0) AND col1 = ' p129 '""").count() == 1)
-  }
+    test("Select test 2 (WHERE)") {
+      assert(sql( """SELECT * FROM ta WHERE col7 > 128""").count() == 3)
+      assert(sql( """SELECT * FROM ta WHERE (col7 - 10 > 128) AND col1 = ' p255 '""").count() == 1)
+    }
 
-  test("Select test 2") {
-    sql( """SELECT col6, col7 FROM ta ORDER BY col6 DESC""").foreach(println)
-  }
+    test("Select test 3 (ORDER BY)") {
+      val result = sql( """SELECT col1, col7 FROM ta ORDER BY col7 DESC""").collect()
+      val sortedResult = result.sortWith(
+        (r1, r2) => r1(1).asInstanceOf[Int] > r2(1).asInstanceOf[Int])
+      for ((r1, r2) <- (result zip sortedResult)) {
+        assert(r1.equals(r2))
+      }
+    }
 
-  test("Select test 3") {
-    sql( """SELECT * FROM tb""").foreach(println)
-  }
+    test("Select test 4 (join)") {
+      assert(sql( """SELECT ta.col2 FROM ta join tb on ta.col1=tb.col1""").count == 14)
+    }
 
-  test("Select test 4") {
-    sql( """SELECT * FROM ta WHERE col7 = 1024 OR col7 = 2048""").foreach(println)
-  }
-
-  test("Select test 5") {
-    sql( """SELECT * FROM ta WHERE col7 < 1025 AND col1 ='Upen'""").foreach(println)
-  }
-
-  test("Alter Add column") {
+  test("Alter Add column and Alter Drop column") {
+    assert(sql( """SELECT * FROM ta""").collect()(0).size == 7)
     sql( """ALTER TABLE ta ADD col8 STRING MAPPED BY (col8 = cf1.cf13)""")
-  }
-
-  test("Alter Drop column") {
-    sql( """ALTER TABLE ta DROP col6""")
-  }
-
-  test("Drop table") {
-    sql( """DROP TABLE tb3""")
-  }
-
-  test("SPARK-3176 Added Parser of SQL ABS()") {
-    checkAnswer(
-      sql("SELECT ABS(-1.3)"),
-      1.3)
+    assert(sql( """SELECT * FROM ta""").collect()(0).size == 8)
+    sql( """ALTER TABLE ta DROP col8""")
+    assert(sql( """SELECT * FROM ta""").collect()(0).size == 7)
   }
 }

@@ -167,7 +167,7 @@ with Logging {
       Seq[Any](13.toByte, 512, 12345678901234L,1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
-    putNewTableIntoHBase(Seq(257, " p257", 128: Short),
+    putNewTableIntoHBase(Seq(257, " p257 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
       Seq[Any](14.toByte, 1024, 12345678901234L,1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))

@@ -61,7 +61,7 @@ object DataTypeUtils {
                                    index: Int,
                                    src: HBaseRawType,
                                    offset: Int,
-                                   length: Int,
+                                   length: => Int,
                                    dt: DataType): Unit = {
     if (src == null) {
       row.setNullAt(index)
