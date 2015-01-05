@@ -40,6 +40,13 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
   val family1 = "family1"
   val family2 = "family2"
 
+  def partitionEquals(p1:HBasePartition, p2:HBasePartition):Boolean = {
+    ((p1.start equals p2.start)
+    && (p1.startInclusive equals p2.startInclusive)
+    && (p1.end equals p2.end)
+    && (p1.endInclusive equals p2.endInclusive))
+  }
+
   override def beforeAll() = {
     sparkConf = new SparkConf().setAppName("Catalog Test").setMaster("local[4]")
     sparkContext = new SparkContext(sparkConf)
@@ -195,8 +202,26 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     assert(cprs.size == 2)
     assert(expandedCPRs.size == 2)
-    assert(expandedCPRs(0).prefix.size == 2)
-    assert(expandedCPRs(1).prefix.size == 2)
+
+    val prefix0 = expandedCPRs(0).prefix
+    assert(prefix0.size == 2
+      && prefix0(0) == ("abc", StringType)
+      && prefix0(1) == (2048, IntegerType))
+    val lastRange0 = expandedCPRs(0).lastRange
+    assert(lastRange0.start.get == 9
+      && lastRange0.startInclusive
+      && lastRange0.end == None
+      && !lastRange0.endInclusive)
+
+    val prefix1 = expandedCPRs(1).prefix
+    assert(prefix1.size == 2
+      && prefix1(0) == ("cba", StringType)
+      && prefix1(1) == (2048, IntegerType))
+    val lastRange1 = expandedCPRs(1).lastRange
+    assert(lastRange1.start.get == 9
+      && lastRange1.startInclusive
+      && lastRange1.end == None
+      && !lastRange1.endInclusive)
   }
 
   test("Generate CP Ranges for Multi-Dimension 1") {
@@ -233,11 +258,35 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val cprs = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(cprs.size == 2)
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
       cprs.flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
+    assert(cprs.size == 2)
     assert(expandedCPRs.size == 4)
+
+    val prefix0 = expandedCPRs(0).prefix
+    assert(prefix0.size == 1 && prefix0(0) == ("abc", StringType))
+    val lastRange0 = expandedCPRs(0).lastRange
+    assert(lastRange0.start.get == 8 && lastRange0.startInclusive
+      && lastRange0.end.get == 8 && lastRange0.endInclusive)
+
+    val prefix1 = expandedCPRs(1).prefix
+    assert(prefix1.size == 1 && prefix1(0) == ("abc", StringType))
+    val lastRange1 = expandedCPRs(1).lastRange
+    assert(lastRange1.start.get == 2048 && lastRange1.startInclusive
+      && lastRange1.end.get == 2048 && lastRange1.endInclusive)
+
+    val prefix2 = expandedCPRs(2).prefix
+    assert(prefix2.size == 1 && prefix2(0) == ("cba", StringType))
+    val lastRange2 = expandedCPRs(2).lastRange
+    assert(lastRange2.start.get == 8 && lastRange2.startInclusive
+      && lastRange2.end.get == 8 && lastRange2.endInclusive)
+
+    val prefix3 = expandedCPRs(3).prefix
+    assert(prefix3.size == 1 && prefix3(0) == ("cba", StringType))
+    val lastRange3 = expandedCPRs(3).lastRange
+    assert(lastRange3.start.get == 2048 && lastRange3.startInclusive
+      && lastRange3.end.get == 2048 && lastRange3.endInclusive)
   }
 
   test("Get partitions 0") {
@@ -315,8 +364,9 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     relation.partitions = Seq(p1, p2, p3, p4, p5, p6)
 
-    RangeCriticalPoint.prunePartitions(
+    val prunedPartitions = RangeCriticalPoint.prunePartitions(
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
+    assert(prunedPartitions.size == 1 && partitionEquals(prunedPartitions(0), p6))
   }
 
   test("Get partitions 1") {
@@ -398,8 +448,16 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
     val prunedPartitions1 = RangeCriticalPoint.prunePartitions(
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size, 4)
-    assert(prunedPartitions0.size == 4)
-    assert(prunedPartitions1.size == 4)
+    assert(prunedPartitions0.size == 4
+      && partitionEquals(prunedPartitions0(0), p3)
+      && partitionEquals(prunedPartitions0(1), p4)
+      && partitionEquals(prunedPartitions0(2), p5)
+      && partitionEquals(prunedPartitions0(3), p6))
+    assert(prunedPartitions1.size == 4
+      && partitionEquals(prunedPartitions1(0), p3)
+      && partitionEquals(prunedPartitions1(1), p4)
+      && partitionEquals(prunedPartitions1(2), p5)
+      && partitionEquals(prunedPartitions1(3), p6))
   }
 
   test("Get partitions 2") {
@@ -481,8 +539,14 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size)
     val prunedPartitions1 = RangeCriticalPoint.prunePartitions(
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size, 4)
-    assert(prunedPartitions0.size == 3)
-    assert(prunedPartitions1.size == 3)
+    assert(prunedPartitions0.size == 3
+      && partitionEquals(prunedPartitions0(0), p3)
+      && partitionEquals(prunedPartitions0(1), p4)
+      && partitionEquals(prunedPartitions0(2), p5))
+    assert(prunedPartitions1.size == 3
+      && partitionEquals(prunedPartitions1(0), p3)
+      && partitionEquals(prunedPartitions1(1), p4)
+      && partitionEquals(prunedPartitions1(2), p5))
   }
 
   test("Get partitions 3") {
@@ -568,6 +632,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
 
     val prunedPartitions = RangeCriticalPoint.prunePartitions(
       expandedCPRs, pred, relation.partitions, relation.partitionKeys.size, 4)
-    assert(prunedPartitions.size == 2)
+    assert(prunedPartitions.size == 2
+      && partitionEquals(prunedPartitions(0), p3)
+      && partitionEquals(prunedPartitions(1), p4))
   }
 }
