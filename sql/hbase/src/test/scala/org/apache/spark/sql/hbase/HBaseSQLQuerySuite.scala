@@ -26,11 +26,13 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.TestData._
 import org.scalatest.BeforeAndAfterAll
 
-/* Implicits */
-import org.apache.spark.sql.hbase.TestHbase._
-
 class HBaseSQLQuerySuite extends QueryTest with BeforeAndAfterAll {
   // Make sure the tables are loaded.
+  val sqlContext:SQLContext = {
+    HBaseMainTest.main(null);
+    HBaseMainTest.hbc
+  }
+  import sqlContext._
   TestData
 
   var origZone: TimeZone = _

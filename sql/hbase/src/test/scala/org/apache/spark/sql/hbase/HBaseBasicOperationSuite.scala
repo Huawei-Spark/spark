@@ -20,7 +20,6 @@ package org.apache.spark.sql.hbase
 import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.HBaseAdmin
 import org.apache.spark.Logging
-import org.apache.spark.sql.hbase.TestHbase._
 import org.scalatest._
 
 /**
@@ -29,12 +28,11 @@ import org.scalatest._
 
 class HBaseBasicOperationSuite extends QueryTest with BeforeAndAfterAll with Logging {
 
-  //  override def beforeAll: Unit = {
-  //    import org.apache.spark.sql.hbase.HBaseMainTest._
-  //
-  //    HBaseMainTest.main(null)
-  //    hbaseAdmin.close()
-  //  }
+  val sqlContext:HBaseSQLContext = {
+    HBaseMainTest.main(null);
+    HBaseMainTest.hbc
+  }
+  import sqlContext._
 
   override def afterAll() = {
     import org.apache.spark.sql.hbase.HBaseMainTest._
