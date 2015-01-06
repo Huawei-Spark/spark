@@ -37,11 +37,11 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   val sc = new SparkContext("local", "test")
   val hbc = new HBaseSQLContext(sc)
 
-  // Test if we can parse 'LOAD DATA LOCAL INPATH './usr/file.csv' INTO TABLE tb'
+  // Test if we can parse 'LOAD DATA LOCAL INPATH './usr/file.txt' INTO TABLE tb'
   test("bulkload parser test, local file") {
 
     val parser = new HBaseSQLParser()
-    val sql = raw"LOAD DATA LOCAL INPATH './usr/file.csv' INTO TABLE tb"
+    val sql = raw"LOAD DATA LOCAL INPATH './usr/file.txt' INTO TABLE tb"
     //val sql = "select"
 
     val plan: LogicalPlan = parser(sql)
@@ -49,16 +49,16 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
 
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
-    assert(l.path.equals(raw"./usr/file.csv"))
+    assert(l.path.equals(raw"./usr/file.txt"))
     assert(l.isLocal)
     assert(l.tableName.equals("tb"))
   }
 
-  // Test if we can parse 'LOAD DATA INPATH '/usr/hdfsfile.csv' INTO TABLE tb'
+  // Test if we can parse 'LOAD DATA INPATH '/usr/hdfsfile.txt' INTO TABLE tb'
   test("bulkload parser test, load hdfs file") {
 
     val parser = new HBaseSQLParser()
-    val sql = raw"LOAD DATA INPATH '/usr/hdfsfile.csv' INTO TABLE tb"
+    val sql = raw"LOAD DATA INPATH '/usr/hdfsfile.txt' INTO TABLE tb"
     //val sql = "select"
 
     val plan: LogicalPlan = parser(sql)
@@ -66,7 +66,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
 
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
-    assert(l.path.equals(raw"/usr/hdfsfile.csv"))
+    assert(l.path.equals(raw"/usr/hdfsfile.txt"))
     assert(!l.isLocal)
     assert(l.tableName.equals("tb"))
   }
@@ -74,14 +74,14 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   test("bulkload parser test, using delimiter") {
 
     val parser = new HBaseSQLParser()
-    val sql = raw"LOAD DATA INPATH '/usr/hdfsfile.csv' INTO TABLE tb FIELDS TERMINATED BY '|' "
+    val sql = raw"LOAD DATA INPATH '/usr/hdfsfile.txt' INTO TABLE tb FIELDS TERMINATED BY '|' "
 
     val plan: LogicalPlan = parser(sql)
     assert(plan != null)
     assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
 
     val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
-    assert(l.path.equals(raw"/usr/hdfsfile.csv"))
+    assert(l.path.equals(raw"/usr/hdfsfile.txt"))
     assert(!l.isLocal)
     assert(l.tableName.equals("tb"))
     assert(l.delimiter.get.equals("|"))
@@ -90,7 +90,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   test("write data to HFile") {
     val colums = Seq(new KeyColumn("k1", IntegerType, 0), new NonKeyColumn("v1", IntegerType, "cf1", "c1"))
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
-    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.csv", "hbasetablename",
+    val bulkLoad = BulkLoadIntoTableCommand("./sql/hbase/src/test/resources/test.txt", "hbasetablename",
       isLocal = true, Option(","))
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
@@ -114,7 +114,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
     val bulkLoad =
       ParallelizedBulkLoadIntoTableCommand(
-      "./sql/hbase/src/test/resources/test.csv",
+      "./sql/hbase/src/test/resources/test.txt",
       "hbasetablename",
       isLocal = true,
       Option(","))
@@ -144,7 +144,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
   test("hfile output format, delete me when ready") {
     import org.apache.spark.sql.catalyst.types._
     val splitRegex = ","
-    val rdd = sc.textFile("./sql/hbase/src/test/resources/test.csv", 1).mapPartitions { iter =>
+    val rdd = sc.textFile("./sql/hbase/src/test/resources/test.txt", 1).mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](1)
       val valueBytes = new Array[(Array[Byte], Array[Byte], Array[Byte])](1)
       val bytesUtils = BytesUtils.create(IntegerType)
@@ -266,7 +266,7 @@ import scala.collection.JavaConversions._
     executeSql2.toRdd.collect().foreach(println)
 
     // then load data into table
-    val loadSql = "LOAD DATA LOCAL INPATH './sql/hbase/src/test/resources/loadData.csv' INTO TABLE testblk"
+    val loadSql = "LOAD DATA LOCAL INPATH './sql/hbase/src/test/resources/loadData.txt' INTO TABLE testblk"
 
     val executeSql3 = hbc.executeSql(loadSql)
     executeSql3.toRdd.collect().foreach(println)

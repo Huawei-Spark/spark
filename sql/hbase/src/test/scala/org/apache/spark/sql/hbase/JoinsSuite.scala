@@ -168,10 +168,10 @@ class JoinsSuite extends JoinsSuiteBase  {
     val query = s"""select t1.intcol t1intcol, t2.intcol t2intcol from JoinTableOneCol1 t1 JOIN
                     JoinTableOneCol2 t2 on t1.intcol = t2.intcol""".stripMargin
 
-    val loads1 = s"load data local inpath '$CsvPath/onecoljoin1.csv' overwrite into table" +
+    val loads1 = s"load data local inpath '$CsvPath/onecoljoin1.txt' overwrite into table" +
       s" JoinTableOneCol1"
     runQuery(loads1)
-    val loads2 = s"load data local inpath '$CsvPath/onecoljoin2.csv' into table" +
+    val loads2 = s"load data local inpath '$CsvPath/onecoljoin2.txt' into table" +
       s" JoinTableOneCol2"
     runQuery(loads2)
     val exparr = Seq(

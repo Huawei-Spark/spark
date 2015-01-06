@@ -30,7 +30,7 @@ class JoinsSuiteBase extends QueriesSuiteBase with CreateTableAndLoadData {
       val HBaseJoinTable = s"Hb$JoinTable"
       val JoinTableStg = s"JoinTableStg$tx"
       val HBaseJoinTableStg = s"Hb$JoinTableStg"
-      val JoinTableCsv: String = s"$CsvPath/JoinTable$tx.csv"
+      val JoinTableCsv: String = s"$CsvPath/JoinTable$tx.txt"
       createTables(hbc, JoinTableStg, JoinTable, HBaseJoinTableStg, HBaseJoinTable)
       loadData(hbc, JoinTableStg, JoinTable, JoinTableCsv)
     }
