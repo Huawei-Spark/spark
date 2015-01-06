@@ -36,62 +36,64 @@ else:
 # class HBaseUnitTests(PySparkTestCase):
 
 from pyspark.hbase.hbase import *
+
+
 class HBaseTest:
 
-  def __init__(self):
-    from pyspark.context import SparkContext
-    sc = SparkContext('local[4]', 'PythonTest')
-    self._hbctx = HBaseSQLContext(sc)
+    def __init__(self):
+        from pyspark.context import SparkContext
+        sc = SparkContext('local[4]', 'PythonTest')
+        self._hbctx = HBaseSQLContext(sc)
 
-    self.staging_table = "StagingTable"
-    self.hb_staging_table = "HbStagingTable"
-    self.test_table = "TestTable"
-    self.hb_test_table = "HbTestTable"
-    self.load_file = "sql/hbase/src/test/resources/testTable.csv"
+        self.staging_table = "StagingTable"
+        self.hb_staging_table = "HbStagingTable"
+        self.test_table = "TestTable"
+        self.hb_test_table = "HbTestTable"
+        self.load_file = "sql/hbase/src/test/resources/testTable.csv"
 
-  def _ctx(self):
-    return self._hbctx
+    def _ctx(self):
+        return self._hbctx
 
-  def create_test_tables(self):
-    create_sql =   """CREATE TABLE %s(strcol STRING, bytecol String, shortcol String, intcol String,
-      longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))
+    def create_test_tables(self):
+        create_sql = """CREATE TABLE %s(strcol STRING, bytecol String, shortcol String,intcol String,
+        longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))
         MAPPED BY (%s, COLS=[bytecol=cf1.hbytecol,
+        shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])""" \
+        % (self.staging_table, self.hb_staging_table)
+        print("%s" % create_sql)
+        self._ctx().sql(create_sql).toRdd().collect()
+        print("Created tables %s and %s" % (self.staging_table, self.hb_staging_table))
+
+        create_sql = """CREATE TABLE %s(strcol STRING, bytecol Byte, shortcol short, intcol int,
+            longcol long, floatcol float, doublecol double, PRIMARY KEY(doublecol, strcol, intcol))
+            MAPPED BY (%s, COLS=[bytecol=cf1.hbytecol,
             shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])""" \
-      % (self.staging_table, self.hb_staging_table)
-    print("%s" %create_sql)
-    self._ctx().sql(create_sql).toRdd().collect()
-    print("Created tables %s and %s" %(self.staging_table, self.hb_staging_table))
+        % (self.test_table, self.hb_test_table)
+        print("%s" % create_sql)
+        self._ctx().sql(create_sql).toRdd().collect()
+        print("Created tables %s and %s" % (self.test_table, self.hb_test_table))
 
-    create_sql =   """CREATE TABLE %s(strcol STRING, bytecol Byte, shortcol short, intcol int,
-      longcol long, floatcol float, doublecol double, PRIMARY KEY(doublecol, strcol, intcol))
-        MAPPED BY (%s, COLS=[bytecol=cf1.hbytecol,
-            shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])""" \
-      % (self.test_table, self.hb_test_table)
-    print("%s" %create_sql)
-    self._ctx().sql(create_sql).toRdd().collect()
-    print("Created tables %s and %s" %(self.test_table, self.hb_test_table))
+        self._ctx().sql(create_sql)
 
-    self._ctx().sql(create_sql)
+    # def load_data(self , staging_table, test_table, load_file):
+    def load_data(self, load_file):
+        sql = "LOAD DATA LOCAL INPATH '%s' INTO TABLE %s" % (load_file, self.staging_table)
+        print("%s" % sql)
+        self._ctx().sql(sql).toRdd().collect()
+        print("Loaded data into %s" % (self.staging_table))
 
-  # def load_data(self , staging_table, test_table, load_file):
-  def load_data(self, load_file):
-    sql = "LOAD DATA LOCAL INPATH '%s' INTO TABLE %s" %(load_file, self.staging_table)
-    print("%s" %sql)
-    self._ctx().sql(sql).toRdd().collect()
-    print("Loaded data into %s" %(self.staging_table))
+        sql = """insert into %s select cast(strcol as string),
+            cast(bytecol as tinyint), cast(shortcol as smallint), cast(intcol as int),
+            cast (longcol as bigint), cast(floatcol as float), cast(doublecol as double)
+            from %s""" % (self.test_table, self.staging_table)
+        print("%s" % sql)
+        self._ctx().sql(sql).toRdd().collect()
+        print("Inserted data from %s into %s" % (self.staging_table, self.test_table))
 
-    sql = """insert into %s select cast(strcol as string),
-    cast(bytecol as tinyint), cast(shortcol as smallint), cast(intcol as int),
-    cast (longcol as bigint), cast(floatcol as float), cast(doublecol as double)
-    from %s"""  %(self.test_table, self.staging_table)
-    print("%s" %sql)
-    self._ctx().sql(sql).toRdd().collect()
-    print("Inserted data from %s into %s" %(self.staging_table, self.test_table))
+    def _test(self):
+        self.create_test_tables()
+        self.load_data(self.load_file)
 
-  def _test(self):
-    self.create_test_tables()
-    self.load_data(self.load_file)
-
-if __name__ == "__main__":
-  test = HBaseTest()
-  test._test()
+    if __name__ == "__main__":
+        test = HBaseTest()
+        test._test()
