@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.SQLConf
 
 private[hbase] object HBaseSQLConf {
-  val PARTITION_EXPIRATION = "spark.sql.hbase.partition"
+  val PARTITION_EXPIRATION = "spark.sql.hbase.partition.expiration"
 }
 
 /**
