@@ -1,10 +1,3 @@
-package org.apache.spark.graphx
-
-import java.sql.ResultSetMetaData
-
-import org.apache.spark.SparkContext
-
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,14 +15,15 @@ import org.apache.spark.SparkContext
  * limitations under the License.
  */
 
+package org.apache.spark.graphx
+
+
+import org.apache.spark.SparkContext
+
 /**
  * SpectralClustering
  *
  */
-
-import org.apache.spark.SparkContext
-import org.apache.spark.graphx._
-
 object SpectralClustering {
 
   def gaussianDist(c1arr: Array[Double], c2arr: Array[Double], sigma: Double) = {
@@ -41,7 +35,7 @@ object SpectralClustering {
     dist
   }
 
-  def testBasic(sigma: Double) = {
+  def fromFile(sc: SparkContext, verticesFile: String, sigma: Double) = {
 
     import org.apache.spark.graphx._
 
@@ -52,11 +46,10 @@ object SpectralClustering {
     //G.vertices.cache()
     //val vBc = G.vertices.broadcast
 
-    val sc = new SparkContext("local[2]", "testapp")
-
-    val vertFile = "./data/mllib/new_lr_data.10.txt"
     import scala.io.Source
-    val vertices = Source.fromFile(vertFile).getLines.map { l =>
+//    println(s"Contents of working dir: ${new java.io.File(".").getAbsolutePath}"
+//      + s" ${new java.io.File(".").list.mkString(",")}")
+    val vertices = Source.fromFile(verticesFile).getLines.map { l =>
       val toks = l.split("\t")
       val arr = toks.slice(1, toks.length).map(_.toDouble)
       (toks(0).toInt, arr)
@@ -86,6 +79,7 @@ object SpectralClustering {
       }
       darr
     }, vertices.length)
+    gaussRdd.collect()
 
     // Create degree matrix
     // This is by summing the columns
@@ -106,25 +100,12 @@ object SpectralClustering {
 //    val prodResults = firstColumnProductsRdd.collect
   }
 
-
   def main(args: Array[String]) {
-    testBasic(1.0)
+    val sc = new SparkContext("local[2]", "TestSpark")
+    val vertFile = "../data/graphx/new_lr_data.10.txt"
+    val sigma = 1.0
+    SpectralClustering.fromFile(sc, vertFile, sigma)
   }
 
-  def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String = {
-    val stride = (darr.length / numCols).toInt
-    val sb = new StringBuilder
-    def leftJust(s: String, len: Int) = {
-      "         ".substring(0, len - s.length) + s
-    }
-
-    for (r <- 0 until numRows) {
-      for (c <- 0 until numCols) {
-        sb.append(leftJust(f"${darr(c * stride + r)}%.6f", 9) + " ")
-      }
-      sb.append("\n")
-    }
-    sb.toString
-  }
 
 }
