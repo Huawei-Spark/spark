@@ -33,7 +33,7 @@ import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils
  * HBaseMainTest
  * create HbTestTable and metadata table, and insert some data
  */
-object HBaseMainTest extends HBaseIntegrationTestBase(false) with CreateTableAndLoadData
+object HBaseMainTest extends HBaseIntegrationTestBase(true) with CreateTableAndLoadData
 with Logging {
   @transient val logger = Logger.getLogger(getClass.getName)
 
@@ -105,7 +105,7 @@ with Logging {
     val htable = new HTable(config, HbaseTableName)
 
     def putNewTableIntoHBase(keys: Seq[Any], keysType: Seq[DataType],
-                       vals: Seq[Any], valsType: Seq[DataType]): Unit = {
+                             vals: Seq[Any], valsType: Seq[DataType]): Unit = {
       val row = new GenericRow(keys.toArray)
       val key = makeRowKey(row, keysType)
       val put = new Put(key)
@@ -121,72 +121,72 @@ with Logging {
 
     putNewTableIntoHBase(Seq(-257, " n257 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](1.toByte, -2048, 12345678901234L,1234.5678F),
+      Seq[Any](1.toByte, -2048, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-255, " n255 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](2.toByte, -1024, 12345678901234L,1234.5678F),
+      Seq[Any](2.toByte, -1024, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-129, " n129 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](3.toByte, -512, 12345678901234L,1234.5678F),
+      Seq[Any](3.toByte, -512, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-127, " n127 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](4.toByte, -256, 12345678901234L,1234.5678F),
+      Seq[Any](4.toByte, -256, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-33, " n33 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](5.toByte, -128, 12345678901234L,1234.5678F),
+      Seq[Any](5.toByte, -128, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-31, " n31 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](6.toByte, -64, 12345678901234L,1234.5678F),
+      Seq[Any](6.toByte, -64, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(-1, " n1 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](7.toByte, -1, 12345678901234L,1234.5678F),
+      Seq[Any](7.toByte, -1, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(1, " p1 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](8.toByte, 1, 12345678901234L,1234.5678F),
+      Seq[Any](8.toByte, 1, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(31, " p31 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](9.toByte, 4, 12345678901234L,1234.5678F),
+      Seq[Any](9.toByte, 4, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(33, " p33 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](10.toByte, 64, 12345678901234L,1234.5678F),
+      Seq[Any](10.toByte, 64, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(127, " p127 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](11.toByte, 128, 12345678901234L,1234.5678F),
+      Seq[Any](11.toByte, 128, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(129, " p129 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](12.toByte, 256, 12345678901234L,1234.5678F),
+      Seq[Any](12.toByte, 256, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(255, " p255 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](13.toByte, 512, 12345678901234L,1234.5678F),
+      Seq[Any](13.toByte, 512, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     putNewTableIntoHBase(Seq(257, " p257 ", 128: Short),
       Seq(IntegerType, StringType, ShortType),
-      Seq[Any](14.toByte, 1024, 12345678901234L,1234.5678F),
+      Seq[Any](14.toByte, 1024, 12345678901234L, 1234.5678F),
       Seq(ByteType, IntegerType, LongType, FloatType))
 
     htable.close()
@@ -246,18 +246,19 @@ with Logging {
     } while (res != null)
   }
 
-  def setupData(useMultiplePartitions: Boolean) {
-    ctxSetup()
+  def setupData(useMultiplePartitions: Boolean, needInsertData: Boolean = false) {
     createTable(useMultiplePartitions)
 
     if (!checkHBaseTableExists(HbaseTableName)) {
       throw new IllegalStateException(s"Unable to find table $HbaseTableName")
     }
 
-    insertTestData()
+    if (needInsertData) {
+      insertTestData()
+    }
   }
 
   def main(args: Array[String]) = {
-    setupData(useMultiplePartitions = true)
+    setupData(useMultiplePartitions = true, true)
   }
 }

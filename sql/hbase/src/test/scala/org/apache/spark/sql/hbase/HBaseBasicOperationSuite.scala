@@ -29,7 +29,7 @@ import org.scalatest._
 class HBaseBasicOperationSuite extends QueryTest with BeforeAndAfterAll with Logging {
 
   val sqlContext:HBaseSQLContext = {
-    HBaseMainTest.main(null);
+    HBaseMainTest.main(null)
     HBaseMainTest.hbc
   }
   import sqlContext._

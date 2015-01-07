@@ -49,10 +49,6 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
   val sparkUiPort = 0xc000 + new Random().nextInt(0x3f00)
   logInfo(s"SparkUIPort = $sparkUiPort\n")
 
-  override protected def beforeAll(configMap: ConfigMap): Unit = {
-    ctxSetup()
-  }
-
   //  def simpleSetupShutdown() {
   //      testUtil = new HBaseTestingUtility
   //      config = testUtil.getConfiguration
@@ -66,13 +62,10 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
   val WorkDirProperty = "test.build.data.basedirectory"
   val DefaultWorkDir = "/tmp/minihbase"
 
-  def ctxSetup() {
 
-    var workDir = System.getProperty(WorkDirProperty)
-    if (workDir == null) {
-      workDir = DefaultWorkDir
-      System.setProperty(WorkDirProperty, workDir)
-    }
+
+    val workDir = System.getProperty(WorkDirProperty, DefaultWorkDir)
+    System.setProperty(WorkDirProperty, workDir)
 
     logInfo(s"useMiniCluster=$useMiniClusterInt workingDir ($WorkDirProperty})=$workDir\n")
     if (useMiniClusterInt) {
@@ -153,10 +146,9 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     hbc = new HBaseSQLContext(sc)
     hbc.optConfiguration = Some(config)
 
-//        hbc.catalog.hBaseAdmin = hbaseAdmin
+    //        hbc.catalog.hBaseAdmin = hbaseAdmin
     logger.debug(s"In testbase: HBaseAdmin.configuration zkPort="
       + s"${hbaseAdmin.getConfiguration.get("hbase.zookeeper.property.clientPort")}")
-  }
 
   override protected def afterAll(configMap: ConfigMap): Unit = {
     var msg = s"Test ${getClass.getName} completed at ${(new java.util.Date).toString} duration=${((new java.util.Date).getTime - startTime) / 1000}"
@@ -172,6 +164,7 @@ abstract class HBaseIntegrationTestBase(useMiniCluster: Boolean = true,
     msg = "HBaseSQLContext was shut down"
 
     try {
+      testUtil.cleanupTestDir
       testUtil.shutdownMiniCluster()
     } catch {
       case e: Throwable =>

@@ -25,17 +25,19 @@ import org.apache.spark.rdd.ShuffledRDD
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.types.IntegerType
 import org.apache.spark.sql.hbase.execution._
+import org.apache.spark.sql.hbase.util.InsertWappers._
 import org.apache.spark.sql.hbase.util.{BytesUtils, Util}
 import org.apache.spark.{Logging, SerializableWritable, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
-import org.apache.spark.sql.hbase.util.InsertWappers._
 
 import scala.collection.mutable.ArrayBuffer
 
-class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Logging{
+class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Logging {
 
-  val sc = new SparkContext("local", "test")
-  val hbc = new HBaseSQLContext(sc)
+  val (hbc: HBaseSQLContext, sc: SparkContext) = {
+    HBaseMainTest.setupData(true)
+    (HBaseMainTest.hbc, HBaseMainTest.sc)
+  }
 
   // Test if we can parse 'LOAD DATA LOCAL INPATH './usr/file.txt' INTO TABLE tb'
   test("bulkload parser test, local file") {
@@ -46,9 +48,9 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
     val plan: LogicalPlan = parser(sql)
     assert(plan != null)
-    assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
+    assert(plan.isInstanceOf[ParallelizedBulkLoadIntoTableCommand])
 
-    val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
+    val l = plan.asInstanceOf[ParallelizedBulkLoadIntoTableCommand]
     assert(l.path.equals(raw"./usr/file.txt"))
     assert(l.isLocal)
     assert(l.tableName.equals("tb"))
@@ -63,9 +65,9 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
     val plan: LogicalPlan = parser(sql)
     assert(plan != null)
-    assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
+    assert(plan.isInstanceOf[ParallelizedBulkLoadIntoTableCommand])
 
-    val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
+    val l = plan.asInstanceOf[ParallelizedBulkLoadIntoTableCommand]
     assert(l.path.equals(raw"/usr/hdfsfile.txt"))
     assert(!l.isLocal)
     assert(l.tableName.equals("tb"))
@@ -78,9 +80,9 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
 
     val plan: LogicalPlan = parser(sql)
     assert(plan != null)
-    assert(plan.isInstanceOf[BulkLoadIntoTableCommand])
+    assert(plan.isInstanceOf[ParallelizedBulkLoadIntoTableCommand])
 
-    val l = plan.asInstanceOf[BulkLoadIntoTableCommand]
+    val l = plan.asInstanceOf[ParallelizedBulkLoadIntoTableCommand]
     assert(l.path.equals(raw"/usr/hdfsfile.txt"))
     assert(!l.isLocal)
     assert(l.tableName.equals("tb"))
@@ -114,10 +116,10 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     val hbaseRelation = HBaseRelation("testtablename", "hbasenamespace", "hbasetablename", colums)(hbc)
     val bulkLoad =
       ParallelizedBulkLoadIntoTableCommand(
-      "./sql/hbase/src/test/resources/test.txt",
-      "hbasetablename",
-      isLocal = true,
-      Option(","))
+        "./sql/hbase/src/test/resources/test.txt",
+        "hbasetablename",
+        isLocal = true,
+        Option(","))
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
       new ImmutableBytesWritableWrapper(bytesUtils.toBytes(r))
@@ -139,11 +141,15 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
       "./hfileoutput")(hbaseRelation)
 
     result.foreach(println)
+    for (i <- 0 to 7)
+      FileSystem.get(conf).delete(new Path("./hfileoutput" + i), true)
   }
 
   test("hfile output format, delete me when ready") {
     import org.apache.spark.sql.catalyst.types._
     val splitRegex = ","
+    val conf = hbc.sparkContext.hadoopConfiguration
+
     val rdd = sc.textFile("./sql/hbase/src/test/resources/test.txt", 1).mapPartitions { iter =>
       val keyBytes = new Array[(Array[Byte], DataType)](1)
       val valueBytes = new Array[(Array[Byte], Array[Byte], Array[Byte])](1)
@@ -172,7 +178,7 @@ class BulkLoadIntoTableSuite extends FunSuite with BeforeAndAfterAll with Loggin
     import org.apache.hadoop.hbase._
     import org.apache.hadoop.hbase.io._
 
-import scala.collection.JavaConversions._
+    import scala.collection.JavaConversions._
     val splitKeys = (1 to 40).filter(_ % 5 == 0).map { r =>
       val bytesUtils = BytesUtils.create(IntegerType)
       new ImmutableBytesWritableWrapper(bytesUtils.toBytes(r))
@@ -185,7 +191,7 @@ import scala.collection.JavaConversions._
         .setKeyOrdering(ordering)
 
     val bulkLoadRDD = shuffled.mapPartitions { iter =>
-    // the rdd now already sort by key, to sort by value
+      // the rdd now already sort by key, to sort by value
       val map = new java.util.TreeSet[KeyValue](KeyValue.COMPARATOR)
       var preKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
       var nowKV: (ImmutableBytesWritableWrapper, PutWrapper) = null
@@ -235,6 +241,7 @@ import scala.collection.JavaConversions._
     job.setOutputFormatClass(classOf[HFileOutputFormat2])
     job.getConfiguration.set("mapred.output.dir", "./hfileoutput")
     bulkLoadRDD.saveAsNewAPIHadoopDataset(job.getConfiguration)
+    FileSystem.get(conf).delete(new Path("./hfileoutput"), true)
   }
 
   test("load data into hbase") {
@@ -246,7 +253,7 @@ import scala.collection.JavaConversions._
     } catch {
       case e: IllegalStateException =>
         // do not throw exception here
-      println(e.getMessage)
+        println(e.getMessage)
     }
 
     // create sql table map with hbase table and run simple sql
