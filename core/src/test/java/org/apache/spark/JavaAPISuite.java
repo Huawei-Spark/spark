@@ -184,6 +184,7 @@ public class JavaAPISuite implements Serializable {
     Assert.assertEquals(new Tuple2<Integer, Integer>(3, 2), sortedPairs.get(2));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void repartitionAndSortWithinPartitions() {
     List<Tuple2<Integer, Integer>> pairs = new ArrayList<Tuple2<Integer, Integer>>();
@@ -491,6 +492,7 @@ public class JavaAPISuite implements Serializable {
     Assert.assertEquals(33, sum);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void aggregateByKey() {
     JavaPairRDD<Integer, Integer> pairs = sc.parallelizePairs(
@@ -1357,6 +1359,19 @@ public class JavaAPISuite implements Serializable {
     pairRDD.collectAsMap();  // Used to crash with ClassCastException
   }
 
+  @SuppressWarnings("unchecked")
+  @Test
+  public void collectAsMapAndSerialize() throws Exception {
+    JavaPairRDD<String,Integer> rdd =
+        sc.parallelizePairs(Arrays.asList(new Tuple2<String,Integer>("foo", 1)));
+    Map<String,Integer> map = rdd.collectAsMap();
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    new ObjectOutputStream(bytes).writeObject(map);
+    Map<String,Integer> deserializedMap = (Map<String,Integer>)
+        new ObjectInputStream(new ByteArrayInputStream(bytes.toByteArray())).readObject();
+    Assert.assertEquals(1, deserializedMap.get("foo").intValue());
+  }
+
   @Test
   @SuppressWarnings("unchecked")
   public void sampleByKey() {
@@ -1543,7 +1558,7 @@ public class JavaAPISuite implements Serializable {
   @Test
   public void testRegisterKryoClasses() {
     SparkConf conf = new SparkConf();
-    conf.registerKryoClasses(new Class[]{ Class1.class, Class2.class });
+    conf.registerKryoClasses(new Class<?>[]{ Class1.class, Class2.class });
     Assert.assertEquals(
         Class1.class.getName() + "," + Class2.class.getName(),
         conf.get("spark.kryo.classesToRegister"));
