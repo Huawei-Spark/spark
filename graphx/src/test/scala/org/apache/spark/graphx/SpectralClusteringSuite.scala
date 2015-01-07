@@ -31,24 +31,13 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     val sigma = 1.0
     withSpark { sc =>
       val out = SpectralClustering.fromFile(sc, vertFile, sigma)
-      println(printMatrix(out, 10, 10))
+      println(printMatrix(out.map{ _._2}.collect, 10, 10))
     }
   }
 
-  def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String = {
-    val stride = (darr.length / numCols).toInt
-    val sb = new StringBuilder
-    def leftJust(s: String, len: Int) = {
-      "         ".substring(0, len - s.length) + s
-    }
+  def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String =
+    SpectralClustering.printMatrix(darr, numRows, numCols)
 
-    for (r <- 0 until numRows) {
-      for (c <- 0 until numCols) {
-        sb.append(leftJust(f"${darr(c * stride + r)}%.6f", 9) + " ")
-      }
-      sb.append("\n")
-    }
-    sb.toString
-  }
-
+  def printMatrix(darr: Array[Array[Double]], numRows: Int, numCols: Int): String =
+    SpectralClustering.printMatrix(darr, numRows, numCols)
 }

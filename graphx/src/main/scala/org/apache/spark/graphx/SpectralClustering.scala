@@ -18,7 +18,8 @@
 package org.apache.spark.graphx
 
 
-import org.apache.spark.SparkContext
+import org.apache.spark.{Partitioner, SparkContext}
+
 
 /**
  * SpectralClustering
@@ -26,7 +27,33 @@ import org.apache.spark.SparkContext
  */
 object SpectralClustering {
 
-  def gaussianDist(c1arr: Array[Double], c2arr: Array[Double], sigma: Double) = {
+  type DVector = Array[Double]
+
+   def printMatrix(darr: Array[Array[Double]], numRows: Int, numCols: Int): String = {
+     val flattenedArr = darr.zipWithIndex.foldLeft(new Array[Double](numRows*numCols)) { case (flatarr, (row, indx)) =>
+         System.arraycopy(row, 0, flatarr, indx * numCols, numCols)
+         flatarr
+     }
+     printMatrix(flattenedArr, numRows, numCols)
+   }
+
+   def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String = {
+    val stride = (darr.length / numCols).toInt
+    val sb = new StringBuilder
+    def leftJust(s: String, len: Int) = {
+      "         ".substring(0, len - s.length) + s
+    }
+
+    for (r <- 0 until numRows) {
+      for (c <- 0 until numCols) {
+        sb.append(leftJust(f"${darr(c * stride + r)}%.6f", 9) + " ")
+      }
+      sb.append("\n")
+    }
+    sb.toString
+  }
+
+  def gaussianDist(c1arr: DVector, c2arr: DVector, sigma: Double) = {
     val c1c2 = c1arr.zip(c2arr)
     val dist = Math.exp((0.5 / Math.pow(sigma, 2.0)) * c1c2.foldLeft(0.0) {
       case (dist: Double, (c1: Double, c2: Double)) =>
@@ -54,6 +81,11 @@ object SpectralClustering {
       val arr = toks.slice(1, toks.length).map(_.toDouble)
       (toks(0).toInt, arr)
     }.toList
+
+    val nVertices = vertices.length
+    val bcNumVertices = sc.broadcast(nVertices)
+    println(s"Read in ${bcNumVertices.value} from $verticesFile")
+
     println(vertices.map { case (x, arr) => s"($x,${arr.mkString(",")})"}.mkString("[", ",\n", "]"))
 
     //    val darr : Seq[Double] = for (i <- vertices.size;
@@ -67,19 +99,80 @@ object SpectralClustering {
 //    printMatrix(darr, vertices.size, vertices.size)
 
     val gaussRdd = sc.parallelize( {
-      val darr = new Array[Double](vertices.size * vertices.size)
+      val dvect = new Array[Array[Double]](nVertices)
       for (i <- 0 until vertices.size) {
+        dvect(i) = new Array[Double](nVertices)
         for (j <- 0 until vertices.size) {
-          darr(i * vertices.size + j) = if (i != j) {
+          dvect(i)(j) = if (i != j) {
             gaussianDist(vertices(i)._2, vertices(j)._2, sigma)
           } else {
             0.0
           }
         }
       }
-      darr
-    }, vertices.length)
-    gaussRdd.collect()
+      dvect
+    }, nVertices).cache()
+
+    var ix = 0
+    val indexedGaussRdd = gaussRdd.map { d =>
+      ix+=1
+      (ix, d)
+    }
+
+    val ColsPartitioner = new Partitioner() {
+      override def numPartitions: Int = nVertices
+
+      override def getPartition(key: Any): Int = {
+        val index = key.asInstanceOf[Int]
+        index % nVertices
+      }
+    }
+    import org.apache.spark.SparkContext._   // Needed for the PairRDDFunctions implicits
+    val columnsRdd = indexedGaussRdd.partitionBy(ColsPartitioner)  // Is this giving the desired # partitions
+        .mapPartitions ({ iter =>
+        var cntr = -1
+        iter.map { case (rowIndex, dval) =>
+          cntr += 1
+          (cntr, dval)
+        }
+      }, preservesPartitioning = true)
+
+    val colSums = columnsRdd.mapPartitions { iter =>
+      iter.map{ case (rowIndex, darr) =>
+        (rowIndex, darr.foldLeft(0.0) { case (sum, dval) =>
+            sum + dval
+          })
+      }
+    }.collect()
+
+    println(s"colSums: ${colSums.mkString(",")}")
+
+    val bcColSums = sc.broadcast(colSums)
+
+    val indexedCollected = indexedGaussRdd.collect
+
+    println(s"indexedGaussRdd.partitions: ${indexedGaussRdd.partitions.mkString(",")}")
+    println(s"indexedCollected.size: ${indexedCollected.length} ic(0): ${indexedCollected(0)._2.mkString(",")}")
+
+    val degreeRdd = indexedGaussRdd.mapPartitionsWithIndex({(partIndex,iter) =>
+      val localNumVertices = bcNumVertices.value
+      val localColSums = bcColSums.value
+      var rowctr = -1
+      iter.toList.map{ case (dindex, dval) =>
+
+        dval(partIndex) = localColSums(partIndex)._2
+        (rowctr, dval)
+      }.iterator
+    }, preservesPartitioning = true)
+
+    val collectedDegRdd = degreeRdd.map{ case (index, dval) => dval}.collect
+//    val collectedDegRddParts = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collectPartitions
+//    val collectedDegRddCoalesce = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collect
+
+    println(printMatrix(collectedDegRdd, nVertices, nVertices))
+
+    degreeRdd
+//    val localGaussRdd = gaussRdd.collect()
 
     // Create degree matrix
     // This is by summing the columns
