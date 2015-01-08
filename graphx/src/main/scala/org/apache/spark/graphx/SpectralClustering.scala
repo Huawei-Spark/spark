@@ -32,7 +32,7 @@ object SpectralClustering {
 
   type Vertices = Seq[LabeledVector]
 
-  def cluster(sc: SparkContext, vertices: Vertices, sigma: Double) = {
+  def cluster(sc: SparkContext, vertices: Vertices, sigma: Double, nIterations: Int) = {
     val nVertices = vertices.length
     val gaussRdd = createGaussianRdd(sc, vertices, sigma).cache()
 
@@ -44,7 +44,7 @@ object SpectralClustering {
 
     val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
     val degreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
-    val principalEigen = getPrincipalEigen(sc, vertices, indexedGaussRdd, columnsRdd, colSumsRdd)
+    val principalEigen = getPrincipalEigen(sc, vertices, indexedGaussRdd, nIterations)
     degreesRdd
   }
 
@@ -147,12 +147,53 @@ object SpectralClustering {
     degreeRdd
   }
 
+  def onesVector(len: Int): DVector = {
+    Array.fill(len)(1.0)
+  }
+
   def getPrincipalEigen(sc: SparkContext,
                         vertices: Vertices,
                         indexedGaussRdd: RDD[(Int, DVector)],
-                        columnsRdd: RDD[(Int, DVector)],
-                        colSumsRdd: RDD[(Int, Double)]) = {
+                        //                        columnsRdd: RDD[(Int, DVector)],
+                        //                        colSumsRdd: RDD[(Int, Double)],
+                        nIterations: Int) = {
 
+    val nVertices = vertices.length
+    indexedGaussRdd.cache()
+    //    columnsRdd.cache()
+    //    val bcColumnsRdd = sc.broadcast(columnsRdd)
+    var eigenRddCollected = sc.parallelize(onesVector(nVertices)).collect()
+    var (eigenRddPrior, priorNorm) = (onesVector(nVertices), nVertices * 1.0)
+
+    for (iter <- 0 until nIterations) {
+      val bcEigenRdd = sc.broadcast(eigenRddCollected)
+
+      val eigenRdd = indexedGaussRdd.mapPartitions { iter =>
+        val localEigenRdd = bcEigenRdd.value
+        iter.map { case (ix, dvect) =>
+          println(s"computing inner product from ${dvect.length} items per row on ${dvect.mkString(",")}")
+          dvect.zip(localEigenRdd).foldLeft(0.0) { case (sum, (ax, ex)) =>
+            sum + ax * ex
+          }
+        }
+      }
+      eigenRddCollected = eigenRdd.collect()
+      val norm = eigenRddCollected.foldLeft(0.0) {
+        _ + _
+      }
+      eigenRddCollected = eigenRddCollected.map {
+        _ / norm
+      }
+      val normDiff = norm - priorNorm
+      val eigenDiff = eigenRddCollected.zip(eigenRddPrior).map { case (enew, eold) =>
+        enew - eold
+      }
+      println(s"Norm is $norm NormDiff=$normDiff EigenRddCollected: ${eigenRddCollected.mkString(",")} EigenDiffs: ${eigenDiff.mkString(",")}")
+      System.arraycopy(eigenRddCollected, 0, eigenRddPrior, 0, eigenRddCollected.length)
+      priorNorm = norm
+
+    }
+    eigenRddCollected
 
     //    val labelsRdd = sc.parallelize(vertices)
     //    val verticesVals = vertices.map{ _._2}
@@ -198,8 +239,9 @@ object SpectralClustering {
     val sc = new SparkContext("local[2]", "TestSpark")
     val vertFile = "../data/graphx/new_lr_data.10.txt"
     val sigma = 1.0
+    val nIterations = 3
     val vertices = readVerticesfromFile(vertFile)
-    SpectralClustering.cluster(sc, vertices, sigma)
+    SpectralClustering.cluster(sc, vertices, sigma, nIterations)
   }
 
 }

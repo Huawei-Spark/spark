@@ -26,13 +26,15 @@ import org.scalatest.FunSuite
 class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
 
   test("tenVerticesTest") {
-    val vertFile = "../data/graphx/new_lr_data.10.txt"
+    val vertFile = "../data/graphx/new_lr_data.15.txt"
     val sigma = 1.0
+    val nIterations = 5
     withSpark { sc =>
       val vertices = SpectralClustering.readVerticesfromFile(vertFile)
-      val out = SpectralClustering.cluster(sc, vertices, sigma)
+      val nVertices = vertices.length
+      val out = SpectralClustering.cluster(sc, vertices, sigma, nIterations)
       val collectedRdd = out.map{ _._2}.collect
-      println(printMatrix(collectedRdd, 10, 10))
+      println(printMatrix(collectedRdd, nVertices, nVertices))
     }
   }
 
