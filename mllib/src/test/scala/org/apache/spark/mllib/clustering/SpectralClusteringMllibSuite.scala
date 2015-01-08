@@ -22,16 +22,16 @@ import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.spark._
 import org.apache.spark.mllib.linalg.{Vector => MVector, DenseMatrix, Matrices, Matrix, Vectors}
 import org.scalatest.FunSuite
-object SpectralClusteringSuite {
+object SpectralClusteringMllibSuite {
   def main(args: Array[String]) {
     val sc = new SparkContext("local[2]", "GSTest")
-    val testee = new SpectralClusteringSuite
+    val testee = new SpectralClusteringMllibSuite
     // testee.te`stBroadcast
     testee.testIter(sc)
 //    testee.testGaussianSimilarity(sc)
   }
 }
-class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
+class SpectralClusteringMllibSuite extends FunSuite with LocalSparkContext {
   import SpectralClustering._
   val NCols = 3 // 100
   val NRows = 8 // 10000
@@ -135,6 +135,6 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     new IndexedRowMatrix(createIndexedMatTestRdd(sc, NRows, NCols))
   }
   test("main") {
-    SpectralClusteringSuite.main(null)
+    SpectralClusteringMllibSuite.main(null)
   }
 }
