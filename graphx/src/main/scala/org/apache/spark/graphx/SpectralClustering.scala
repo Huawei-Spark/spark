@@ -32,13 +32,20 @@ object SpectralClustering {
 
   type Vertices = Seq[LabeledVector]
 
-  def gaussianDist(c1arr: DVector, c2arr: DVector, sigma: Double) = {
-    val c1c2 = c1arr.zip(c2arr)
-    val dist = Math.exp((0.5 / Math.pow(sigma, 2.0)) * c1c2.foldLeft(0.0) {
-      case (dist: Double, (c1: Double, c2: Double)) =>
-        dist - Math.pow(c1 - c2, 2)
-    })
-    dist
+  def cluster(sc: SparkContext, vertices: Vertices, sigma: Double) = {
+    val nVertices = vertices.length
+    val gaussRdd = createGaussianRdd(sc, vertices, sigma).cache()
+
+    var ix = 0
+    val indexedGaussRdd = gaussRdd.map { d =>
+      ix += 1
+      (ix, d)
+    }
+
+    val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
+    val degreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
+    val principalEigen = getPrincipalEigen(sc, vertices, indexedGaussRdd, columnsRdd, colSumsRdd)
+    degreesRdd
   }
 
   def readVerticesfromFile(verticesFile: String): Vertices = {
@@ -54,20 +61,13 @@ object SpectralClustering {
     vertices
   }
 
-  def cluster(sc: SparkContext, vertices: Vertices, sigma: Double) = {
-    val nVertices = vertices.length
-    val gaussRdd = createGaussianRdd(sc, vertices, sigma).cache()
-
-    var ix = 0
-    val indexedGaussRdd = gaussRdd.map { d =>
-      ix += 1
-      (ix, d)
-    }
-
-    val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
-    val degreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
-    val principalEigen = getPrincipalEigen(sc, vertices, indexedGaussRdd, columnsRdd, colSumsRdd)
-    degreesRdd
+  def gaussianDist(c1arr: DVector, c2arr: DVector, sigma: Double) = {
+    val c1c2 = c1arr.zip(c2arr)
+    val dist = Math.exp((0.5 / Math.pow(sigma, 2.0)) * c1c2.foldLeft(0.0) {
+      case (dist: Double, (c1: Double, c2: Double)) =>
+        dist - Math.pow(c1 - c2, 2)
+    })
+    dist
   }
 
   def createGaussianRdd(sc: SparkContext, vertices: Vertices, sigma: Double) = {
@@ -179,7 +179,7 @@ object SpectralClustering {
   }
 
   def printMatrix(darr: DVector, numRows: Int, numCols: Int): String = {
-    val stride = (darr.length / numCols).toInt
+    val stride = (darr.length / numCols)
     val sb = new StringBuilder
     def leftJust(s: String, len: Int) = {
       "         ".substring(0, len - s.length) + s
