@@ -30,7 +30,8 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     val vertFile = "../data/graphx/new_lr_data.10.txt"
     val sigma = 1.0
     withSpark { sc =>
-      val out = SpectralClustering.fromFile(sc, vertFile, sigma)
+      val vertices = SpectralClustering.readVerticesfromFile(vertFile)
+      val out = SpectralClustering.cluster(sc, vertices, sigma)
       val collectedRdd = out.map{ _._2}.collect
       println(printMatrix(collectedRdd, 10, 10))
     }

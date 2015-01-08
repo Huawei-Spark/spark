@@ -17,9 +17,8 @@
 
 package org.apache.spark.graphx
 
-
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partitioner, SparkContext}
-
 
 /**
  * SpectralClustering
@@ -38,33 +37,41 @@ object SpectralClustering {
     dist
   }
 
-  def fromFile(sc: SparkContext, verticesFile: String, sigma: Double) = {
+  type LabeledVector = (String, Array[Double])
 
-    import org.apache.spark.graphx._
+  type Vertices = Seq[LabeledVector]
+
+  def readVerticesfromFile(verticesFile: String): Vertices = {
 
     import scala.io.Source
     val vertices = Source.fromFile(verticesFile).getLines.map { l =>
       val toks = l.split("\t")
       val arr = toks.slice(1, toks.length).map(_.toDouble)
-      (toks(0).toInt, arr)
+      (toks(0), arr)
     }.toList
-
-    val nVertices = vertices.length
-    val bcNumVertices = sc.broadcast(nVertices)
-    println(s"Read in ${bcNumVertices.value} from $verticesFile")
-
+    println(s"Read in ${vertices.length} from $verticesFile")
     println(vertices.map { case (x, arr) => s"($x,${arr.mkString(",")})"}.mkString("[", ",\n", "]"))
+    vertices
+  }
 
-    //    val darr : Seq[Double] = for (i <- vertices.size;
-    //                    j <- vertices.size
-    //    ) yield {
-    //      val gdist = gaussianDist(vertices(i)._2, vertices(j)._2, sigma)
-    //      gdist
-    //    }
+  def cluster(sc: SparkContext, vertices: Vertices, sigma: Double) = {
+    val nVertices = vertices.length
+    val gaussRdd = createGaussianRdd(sc, vertices, sigma).cache()
 
-    //    println(darr.toList.mkString(","))
-    //    printMatrix(darr, vertices.size, vertices.size)
+    var ix = 0
+    val indexedGaussRdd = gaussRdd.map { d =>
+      ix += 1
+      (ix, d)
+    }
 
+    val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
+    val degreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
+    val principalEigen = getPrincipalEigen(sc, vertices, indexedGaussRdd, columnsRdd, colSumsRdd)
+    degreesRdd
+  }
+
+  def createGaussianRdd(sc: SparkContext, vertices: Vertices, sigma: Double) = {
+    val nVertices = vertices.length
     val gaussRdd = sc.parallelize({
       val dvect = new Array[Array[Double]](nVertices)
       for (i <- 0 until vertices.size) {
@@ -78,14 +85,12 @@ object SpectralClustering {
         }
       }
       dvect
-    }, nVertices).cache()
+    }, nVertices)
+    gaussRdd
+  }
 
-    var ix = 0
-    val indexedGaussRdd = gaussRdd.map { d =>
-      ix += 1
-      (ix, d)
-    }
-
+  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedGaussRdd: RDD[(Int, Array[Double])]) = {
+    val nVertices = vertices.length
     val ColsPartitioner = new Partitioner() {
       override def numPartitions: Int = nVertices
 
@@ -94,8 +99,8 @@ object SpectralClustering {
         index % nVertices
       }
     }
-    import org.apache.spark.SparkContext._
     // Needed for the PairRDDFunctions implicits
+    import org.apache.spark.SparkContext._
     val columnsRdd = indexedGaussRdd.partitionBy(ColsPartitioner) // Is this giving the desired # partitions
       .mapPartitions({ iter =>
       var cntr = -1
@@ -111,17 +116,25 @@ object SpectralClustering {
           sum + dval
         })
       }
-    }.collect()
+    }
 
-//    println(s"colSums: ${colSums.mkString(",")}")
+    //    println(s"colSums: ${colSums.mkString(",")}")
 
-    val bcColSums = sc.broadcast(colSums)
+    (columnsRdd, colSums)
+  }
 
-    val indexedCollected = indexedGaussRdd.collect
+  //    val indexedCollected = indexedGaussRdd.collect
 
-//    println(s"indexedGaussRdd.partitions: ${indexedGaussRdd.partitions.mkString(",")}")
-//    println(s"indexedCollected.size: ${indexedCollected.length} ic(0): ${indexedCollected(0)._2.mkString(",")}")
+  //    println(s"indexedGaussRdd.partitions: ${indexedGaussRdd.partitions.mkString(",")}")
+  //    println(s"indexedCollected.size: ${indexedCollected.length} ic(0): ${indexedCollected(0)._2.mkString(",")}")
 
+  def createDegreesRdd(sc: SparkContext,
+                       vertices: Vertices,
+                       indexedGaussRdd: RDD[(Int, Array[Double])],
+                       colSums: RDD[(Int, Double)]) = {
+    val nVertices = vertices.length
+    val bcNumVertices = sc.broadcast(nVertices)
+    val bcColSums = sc.broadcast(colSums.collect)
     val degreeRdd = indexedGaussRdd.mapPartitionsWithIndex({ (partIndex, iter) =>
       val localNumVertices = bcNumVertices.value
       val localColSums = bcColSums.value
@@ -138,17 +151,21 @@ object SpectralClustering {
       }.iterator
     }, preservesPartitioning = true)
 
-//    val collectedDegRdd = degreeRdd.map { case (index, dval) => dval}.collect
+    //    val collectedDegRdd = degreeRdd.map { case (index, dval) => dval}.collect
     //    val collectedDegRddParts = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collectPartitions
     //    val collectedDegRddCoalesce = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collect
 
-//    println(printMatrix(collectedDegRdd, nVertices, nVertices))
-//
+    //    println(printMatrix(collectedDegRdd, nVertices, nVertices))
+    //
     degreeRdd
-    //    val localGaussRdd = gaussRdd.collect()
+  }
 
-    // Create degree matrix
-    // This is by summing the columns
+  def getPrincipalEigen(sc: SparkContext,
+                        vertices: Vertices,
+                        indexedGaussRdd: RDD[(Int, Array[Double])],
+                        columnsRdd: RDD[(Int, Array[Double])],
+                        colSumsRdd: RDD[(Int, Double)]) = {
+
 
     //    val labelsRdd = sc.parallelize(vertices)
     //    val verticesVals = vertices.map{ _._2}
@@ -194,7 +211,8 @@ object SpectralClustering {
     val sc = new SparkContext("local[2]", "TestSpark")
     val vertFile = "../data/graphx/new_lr_data.10.txt"
     val sigma = 1.0
-    SpectralClustering.fromFile(sc, vertFile, sigma)
+    val vertices = readVerticesfromFile(vertFile)
+    SpectralClustering.cluster(sc, vertices, sigma)
   }
 
 
