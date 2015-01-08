@@ -1,6 +1,5 @@
 package org.apache.spark.graphx
 
-import org.apache.spark.SparkContext
 import org.scalatest.FunSuite
 
 /*

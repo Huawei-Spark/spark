@@ -28,6 +28,10 @@ object SpectralClustering {
 
   type DVector = Array[Double]
 
+  type LabeledVector = (String, DVector)
+
+  type Vertices = Seq[LabeledVector]
+
   def gaussianDist(c1arr: DVector, c2arr: DVector, sigma: Double) = {
     val c1c2 = c1arr.zip(c2arr)
     val dist = Math.exp((0.5 / Math.pow(sigma, 2.0)) * c1c2.foldLeft(0.0) {
@@ -36,10 +40,6 @@ object SpectralClustering {
     })
     dist
   }
-
-  type LabeledVector = (String, Array[Double])
-
-  type Vertices = Seq[LabeledVector]
 
   def readVerticesfromFile(verticesFile: String): Vertices = {
 
@@ -73,9 +73,9 @@ object SpectralClustering {
   def createGaussianRdd(sc: SparkContext, vertices: Vertices, sigma: Double) = {
     val nVertices = vertices.length
     val gaussRdd = sc.parallelize({
-      val dvect = new Array[Array[Double]](nVertices)
+      val dvect = new Array[DVector](nVertices)
       for (i <- 0 until vertices.size) {
-        dvect(i) = new Array[Double](nVertices)
+        dvect(i) = new DVector(nVertices)
         for (j <- 0 until vertices.size) {
           dvect(i)(j) = if (i != j) {
             gaussianDist(vertices(i)._2, vertices(j)._2, sigma)
@@ -89,7 +89,7 @@ object SpectralClustering {
     gaussRdd
   }
 
-  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedGaussRdd: RDD[(Int, Array[Double])]) = {
+  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedGaussRdd: RDD[(Int, DVector)]) = {
     val nVertices = vertices.length
     val ColsPartitioner = new Partitioner() {
       override def numPartitions: Int = nVertices
@@ -118,19 +118,12 @@ object SpectralClustering {
       }
     }
 
-    //    println(s"colSums: ${colSums.mkString(",")}")
-
     (columnsRdd, colSums)
   }
 
-  //    val indexedCollected = indexedGaussRdd.collect
-
-  //    println(s"indexedGaussRdd.partitions: ${indexedGaussRdd.partitions.mkString(",")}")
-  //    println(s"indexedCollected.size: ${indexedCollected.length} ic(0): ${indexedCollected(0)._2.mkString(",")}")
-
   def createDegreesRdd(sc: SparkContext,
                        vertices: Vertices,
-                       indexedGaussRdd: RDD[(Int, Array[Double])],
+                       indexedGaussRdd: RDD[(Int, DVector)],
                        colSums: RDD[(Int, Double)]) = {
     val nVertices = vertices.length
     val bcNumVertices = sc.broadcast(nVertices)
@@ -151,19 +144,13 @@ object SpectralClustering {
       }.iterator
     }, preservesPartitioning = true)
 
-    //    val collectedDegRdd = degreeRdd.map { case (index, dval) => dval}.collect
-    //    val collectedDegRddParts = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collectPartitions
-    //    val collectedDegRddCoalesce = degreeRdd.map{ case (index, dval) => dval}.coalesce(1).collect
-
-    //    println(printMatrix(collectedDegRdd, nVertices, nVertices))
-    //
     degreeRdd
   }
 
   def getPrincipalEigen(sc: SparkContext,
                         vertices: Vertices,
-                        indexedGaussRdd: RDD[(Int, Array[Double])],
-                        columnsRdd: RDD[(Int, Array[Double])],
+                        indexedGaussRdd: RDD[(Int, DVector)],
+                        columnsRdd: RDD[(Int, DVector)],
                         colSumsRdd: RDD[(Int, Double)]) = {
 
 
@@ -171,7 +158,7 @@ object SpectralClustering {
     //    val verticesVals = vertices.map{ _._2}
     //    val bcFirstCol = sc.broadcast(verticesVals)
     //    val firstColumnProductsRdd = gaussRdd.mapPartitions ({ row =>
-    //      val firstCol = bcFirstCol.value // .asInstanceOf[Array[Double]]
+    //      val firstCol = bcFirstCol.value // .asInstanceOf[DVector]
     //      var sum = 0.0
     //      row.zipWithIndex.foreach { case (rowval, ix) =>
     //        sum += rowval * firstCol(ix)
@@ -183,15 +170,15 @@ object SpectralClustering {
     //    val prodResults = firstColumnProductsRdd.collect
   }
 
-  def printMatrix(darr: Array[Array[Double]], numRows: Int, numCols: Int): String = {
-    val flattenedArr = darr.zipWithIndex.foldLeft(new Array[Double](numRows * numCols)) { case (flatarr, (row, indx)) =>
+  def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
+    val flattenedArr = darr.zipWithIndex.foldLeft(new DVector(numRows * numCols)) { case (flatarr, (row, indx)) =>
       System.arraycopy(row, 0, flatarr, indx * numCols, numCols)
       flatarr
     }
     printMatrix(flattenedArr, numRows, numCols)
   }
 
-  def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String = {
+  def printMatrix(darr: DVector, numRows: Int, numCols: Int): String = {
     val stride = (darr.length / numCols).toInt
     val sb = new StringBuilder
     def leftJust(s: String, len: Int) = {
@@ -214,6 +201,5 @@ object SpectralClustering {
     val vertices = readVerticesfromFile(vertFile)
     SpectralClustering.cluster(sc, vertices, sigma)
   }
-
 
 }
