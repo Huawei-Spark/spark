@@ -29,12 +29,15 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     val vertFile = "../data/graphx/new_lr_data.15.txt"
     val sigma = 1.0
     val nIterations = 5
+     val nClusters = 3
     withSpark { sc =>
       val vertices = SpectralClustering.readVerticesfromFile(vertFile)
       val nVertices = vertices.length
-      val out = SpectralClustering.cluster(sc, vertices, sigma, nIterations)
-      val collectedRdd = out.map{ _._2}.collect
-      println(printMatrix(collectedRdd, nVertices, nVertices))
+      val (rddOut, eigens) =     SpectralClustering.cluster(sc, vertices, nClusters, sigma, nIterations)
+      val collectedRdd = rddOut.map{ _._2}.collect
+      println(s"DegreeMatrix:\n${printMatrix(collectedRdd, nVertices, nVertices)}")
+      val collectedEigens = eigens.collect
+      println(s"EigenVectors:\n${printMatrix(collectedEigens, nVertices, nVertices)}")
     }
   }
 
