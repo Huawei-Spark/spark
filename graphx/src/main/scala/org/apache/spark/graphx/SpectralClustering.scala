@@ -203,6 +203,8 @@ object SpectralClustering {
 
   val calcEigenDiffs = false
 
+  def withinTol(d: Double, tol: Double) =  Math.abs(d) <= tol
+
   def getPrincipalEigen(sc: SparkContext,
                         vertices: Vertices,
                         baseRdd: RDD[IndexedVector],
@@ -250,20 +252,27 @@ object SpectralClustering {
     baseRdd.unpersist()
     import SparkContext._
 
-    eigenRdd.aggregate(new DVector(nVertices))(
-      seqOp = (dvect, indVector) => {
-        dvect(indVector._1) = indVector._2; dvect
-      },
-      combOp = (indVect1: DVector, indVect2: DVector) => indVect1.zip(indVect2).zipWithIndex
-        .foldLeft(new DVector(nVertices)) { case (dvect, ((dv1, dv2), ix)) =>
-        dvect(ix) = if (dv1 != 0.0) {
-          dv1
-        } else {
-          dv2
-        }
-        dvect
-      }
-    )
+//    val aggEigenRdd = eigenRdd.aggregate(new DVector(nVertices))(
+//      seqOp = (dvect, indVector) => {
+//        dvect(indVector._1) = indVector._2; dvect
+//      },
+//      combOp = (indVect1: DVector, indVect2: DVector) => indVect1.zip(indVect2).zipWithIndex
+//        .foldLeft(new DVector(nVertices)) { case (dvect, ((dv1, dv2), ix)) =>
+//        dvect(ix) = if (!withinTol(dv1,1e-8)) {
+//          dv1
+//        } else {
+//          dv2
+//        }
+//        dvect
+//      }
+//    )
+//    println(s"aggEigenRdd: ${aggEigenRdd.mkString(",")}")
+    println(s"eigenRdd: ${eigenRdd.collect.mkString(",")}")
+    val darr = new DVector(nVertices)
+    val collectedEigenRdd = eigenRdd.collect.map(_._2)
+    System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
+    darr
+
     // sc.parallelize(eigenRddCollected)
 
     //    val labelsRdd = sc.parallelize(vertices)
