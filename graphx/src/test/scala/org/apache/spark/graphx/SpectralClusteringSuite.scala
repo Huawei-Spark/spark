@@ -37,7 +37,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       val collectedRdd = rddOut.map{ _._2}.collect
       println(s"DegreeMatrix:\n${printMatrix(collectedRdd, nVertices, nVertices)}")
       val collectedEigens = eigens.collect
-      println(s"EigenVectors:\n${printMatrix(collectedEigens, nVertices, nVertices)}")
+      println(s"EigenVectors:\n${printMatrix(collectedEigens, nClusters, nVertices)}")
     }
   }
 
