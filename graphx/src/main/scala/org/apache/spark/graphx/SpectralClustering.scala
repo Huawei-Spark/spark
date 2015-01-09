@@ -57,9 +57,10 @@ object SpectralClustering {
 
     var eigensRemovedRdd = indexedDegreesRdd
     val collectedIndexedDegreesRdd = indexedDegreesRdd.collect
+    val lambdas = new Array[Double](nClusters)
     val eigens = new Array[RDD[Array[Double]]](nClusters)
     for (ex <- 0 until nClusters) {
-      val eigen = getPrincipalEigen(sc, vertices, eigensRemovedRdd, nPowerIterations)
+      val (lambda, eigen) = getPrincipalEigen(sc, vertices, eigensRemovedRdd, nPowerIterations)
       //      for (subx <- 0 until ex) {
       //        indexedDegreesRdd = subtractProjection(indexedDegreesRdd, eigens(subx))
       //      }
@@ -70,12 +71,13 @@ object SpectralClustering {
       val arrarr = new Array[Array[Double]](1)
       arrarr(0) = new Array[Double](nVertices)
       System.arraycopy(eigen, 0, arrarr(0), 0, nVertices)
+      lambdas(ex) = lambda
       eigens(ex) = sc.parallelize(arrarr, 1)
-      println(s"Eigen=${printMatrix(eigen, 1, nVertices)}")
+      println(s"Lambda=$lambda Eigen=${printMatrix(eigen, 1, nVertices)}")
     }
     val combinedEigens = eigens.reduceLeft(_.union(_))
     gaussRdd.unpersist()
-    (indexedDegreesRdd, combinedEigens)
+    (indexedDegreesRdd, lambdas, combinedEigens)
   }
 
   def readVerticesfromFile(verticesFile: String): Vertices = {
@@ -214,7 +216,7 @@ object SpectralClustering {
   def getPrincipalEigen(sc: SparkContext,
                         vertices: Vertices,
                         baseRdd: RDD[IndexedVector],
-                        nIterations: Int) : DVector = {
+                        nIterations: Int) : (Double, DVector) = {
 
     val nVertices = vertices.length
     baseRdd.cache()
@@ -223,6 +225,7 @@ object SpectralClustering {
       for (ix <- 0 until nVertices) yield (ix, 1.0)
     }.collect()
     var (eigenRddPrior, priorNorm) = (onesVector(nVertices), nVertices * 1.0)
+    var norm = 0.0
     for (iter <- 0 until nIterations) {
       val bcEigenRdd = sc.broadcast(eigenRddCollected)
 
@@ -237,7 +240,7 @@ object SpectralClustering {
         }
       }
       eigenRddCollected = eigenRdd.collect()
-      val norm = eigenRddCollected.foldLeft(0.0) { case (sum, (ix, dval)) =>
+      norm = eigenRddCollected.foldLeft(0.0) { case (sum, (ix, dval)) =>
         sum + dval
       }
       eigenRddCollected = eigenRddCollected.map { case (ix, dval) =>
@@ -277,7 +280,7 @@ object SpectralClustering {
     val collectedEigenRdd = eigenRdd.collect.map(_._2)
     println(s"eigenRdd: ${collectedEigenRdd.mkString(",")}")
     System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
-    darr
+    (norm, darr)
   }
 
   def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
