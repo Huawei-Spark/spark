@@ -123,8 +123,7 @@ object SpectralClustering {
     Math.sqrt(vect.foldLeft(0.0) { case (sum, dval) => sum + dval * dval})
   }
 
-  def projectVector(basisVector: DVector, projectedVector: DVector, optNorm: Option[Double] = None) = {
-    val dnorm = optNorm.getOrElse(norm(basisVector))
+  def projectVector(basisVector: DVector, projectedVector: DVector) = {
     val project = basisVector.zip(projectedVector).map { case (base, proj) => (base * proj)}
     val pnorm = norm(project)
     project.map(_ / pnorm)
@@ -136,14 +135,11 @@ object SpectralClustering {
   }
 
   def subtractProjection(sc: SparkContext, vectorsRdd: RDD[IndexedVector], vect: DVector) = {
-    val vectNorm = norm(vect)
-    val bcVectNorm = sc.broadcast(vectNorm)
     val bcVect = sc.broadcast(vect)
     vectorsRdd.mapPartitions { iter =>
-      val localVectNorm = bcVectNorm.value
       val localVect = bcVect.value
       iter.map { case (ix, row) =>
-        val proj = projectVector(localVect, row, Some(localVectNorm))
+        val proj = projectVector(localVect, row)
         (ix, subtractVector(row, proj))
       }
     }
