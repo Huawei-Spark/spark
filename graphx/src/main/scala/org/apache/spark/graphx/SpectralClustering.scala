@@ -46,14 +46,22 @@ object SpectralClustering {
     }
 
     val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
-    val degreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
+    val indexedDegreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
 
-    var eigensRemovedRdd = indexedGaussRdd
+//    ix = 0
+//    var indexedDegreesRdd = degreesRdd.map { d =>
+//      ix += 1
+//      (ix, d)
+//    }
+//
+
+    var eigensRemovedRdd = indexedDegreesRdd
+    val collectedIndexedDegreesRdd = indexedDegreesRdd.collect
     val eigens = new Array[RDD[Array[Double]]](nClusters)
     for (ex <- 0 until nClusters) {
       val eigen = getPrincipalEigen(sc, vertices, eigensRemovedRdd, nPowerIterations)
       //      for (subx <- 0 until ex) {
-      //        indexedGaussRdd = subtractProjection(indexedGaussRdd, eigens(subx))
+      //        indexedDegreesRdd = subtractProjection(indexedDegreesRdd, eigens(subx))
       //      }
       val collectedEigen = eigen // .collect()
       eigensRemovedRdd = subtractProjection(sc, eigensRemovedRdd, collectedEigen)
@@ -67,7 +75,7 @@ object SpectralClustering {
     }
     val combinedEigens = eigens.reduceLeft(_.union(_))
     gaussRdd.unpersist()
-    (degreesRdd, combinedEigens)
+    (indexedDegreesRdd, combinedEigens)
   }
 
   def readVerticesfromFile(verticesFile: String): Vertices = {
@@ -117,7 +125,9 @@ object SpectralClustering {
 
   def projectVector(basisVector: DVector, projectedVector: DVector, optNorm: Option[Double] = None) = {
     val dnorm = optNorm.getOrElse(norm(basisVector))
-    basisVector.zip(projectedVector).map { case (base, proj) => (base * proj) / dnorm}
+    val project = basisVector.zip(projectedVector).map { case (base, proj) => (base * proj)}
+    val pnorm = norm(project)
+    project.map(_ / pnorm)
   }
 
   def subtractVector(v1: DVector, v2: DVector) = {
@@ -139,7 +149,7 @@ object SpectralClustering {
     }
   }
 
-  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedGaussRdd: RDD[IndexedVector]) = {
+  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedDegreesRdd: RDD[IndexedVector]) = {
     val nVertices = vertices.length
     val ColsPartitioner = new Partitioner() {
       override def numPartitions: Int = nVertices
@@ -151,7 +161,7 @@ object SpectralClustering {
     }
     // Needed for the PairRDDFunctions implicits
     import org.apache.spark.SparkContext._
-    val columnsRdd = indexedGaussRdd.partitionBy(ColsPartitioner) // Is this giving the desired # partitions
+    val columnsRdd = indexedDegreesRdd.partitionBy(ColsPartitioner) // Is this giving the desired # partitions
       .mapPartitions({ iter =>
       var cntr = -1
       iter.map { case (rowIndex, dval) =>
@@ -173,12 +183,12 @@ object SpectralClustering {
 
   def createDegreesRdd(sc: SparkContext,
                        vertices: Vertices,
-                       indexedGaussRdd: RDD[IndexedVector],
+                       indexedDegreesRdd: RDD[IndexedVector],
                        colSums: RDD[(Int, Double)]) = {
     val nVertices = vertices.length
     val bcNumVertices = sc.broadcast(nVertices)
     val bcColSums = sc.broadcast(colSums.collect)
-    val degreeRdd = indexedGaussRdd.mapPartitionsWithIndex({ (partIndex, iter) =>
+    val degreeRdd = indexedDegreesRdd.mapPartitionsWithIndex({ (partIndex, iter) =>
       val localNumVertices = bcNumVertices.value
       val localColSums = bcColSums.value
       var rowctr = -1
@@ -267,28 +277,11 @@ object SpectralClustering {
 //      }
 //    )
 //    println(s"aggEigenRdd: ${aggEigenRdd.mkString(",")}")
-    println(s"eigenRdd: ${eigenRdd.collect.mkString(",")}")
     val darr = new DVector(nVertices)
     val collectedEigenRdd = eigenRdd.collect.map(_._2)
+    println(s"eigenRdd: ${collectedEigenRdd.mkString(",")}")
     System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
     darr
-
-    // sc.parallelize(eigenRddCollected)
-
-    //    val labelsRdd = sc.parallelize(vertices)
-    //    val verticesVals = vertices.map{ _._2}
-    //    val bcFirstCol = sc.broadcast(verticesVals)
-    //    val firstColumnProductsRdd = gaussRdd.mapPartitions ({ row =>
-    //      val firstCol = bcFirstCol.value // .asInstanceOf[DVector]
-    //      var sum = 0.0
-    //      row.zipWithIndex.foreach { case (rowval, ix) =>
-    //        sum += rowval * firstCol(ix)
-    //      }
-    //      Iterator(sum)
-    //    }, preservesPartitioning = true)
-    //
-    //    val prodResults = firstColumnProductsRdd.take(5)
-    //    val prodResults = firstColumnProductsRdd.collect
   }
 
   def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
@@ -303,7 +296,7 @@ object SpectralClustering {
     val stride = (darr.length / numCols)
     val sb = new StringBuilder
     def leftJust(s: String, len: Int) = {
-      "         ".substring(0, len - s.length) + s
+      "         ".substring(0, len - Math.min(len, s.length)) + s
     }
 
     for (r <- 0 until numRows) {
