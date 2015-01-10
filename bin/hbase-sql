@@ -53,3 +53,5 @@ SUBMIT_USAGE_FUNCTION=usage
 gatherSparkSubmitOpts "$@"
 
 exec "$FWDIR"/bin/spark-submit --class $CLASS "${SUBMISSION_OPTS[@]}" spark-internal "${APPLICATION_OPTS[@]}"
+
+
