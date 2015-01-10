@@ -132,6 +132,7 @@ object HBaseSQLCliDriver extends Logging {
       case "!" => // TODO: add support for bash command start with !
       case _ =>
         logInfo(s"Processing $input")
+        // TODO: Bug: throw exception in SELECT when running the CLI second time
         hbaseCtx.sql(input).collect().foreach(println)
     }
   }
