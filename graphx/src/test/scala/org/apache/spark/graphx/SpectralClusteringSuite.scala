@@ -33,9 +33,9 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     val nIterations = 20
     val nClusters = 3
     withSpark { sc =>
-      val vertices = SpectralClustering.readVerticesfromFile(vertFile)
+      val vertices = SpectralClusteringUsingRdd.readVerticesfromFile(vertFile)
       val nVertices = vertices.length
-      val (rddOut, lambdas, eigens) = SpectralClustering.cluster(sc, vertices, nClusters, sigma, nIterations)
+      val (rddOut, lambdas, eigens) = SpectralClusteringUsingRdd.cluster(sc, vertices, nClusters, sigma, nIterations)
       val collectedRdd = rddOut.map {
         _._2
       }.collect
@@ -45,8 +45,8 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     }
   }
 
-  import SpectralClustering._
-  val SP = SpectralClustering
+  import SpectralClusteringUsingRdd._
+  val SP = SpectralClusteringUsingRdd
   val A = Array
   test("VectorProjection") {
     //    def A[T : ClassTag](ts: T*) = Array(ts:_*)
