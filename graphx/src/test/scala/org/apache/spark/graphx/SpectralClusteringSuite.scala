@@ -45,24 +45,47 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     }
   }
 
+  import SpectralClustering._
+  val SP = SpectralClustering
+  val A = Array
   test("VectorProjection") {
     //    def A[T : ClassTag](ts: T*) = Array(ts:_*)
-    type A = Array[Double]
-    val A = Array
-    val dat = A(
+//    type A = Array[Double]
+    var dat = A(
       A(1., 2., 3.),
-      A(1.5, 2., 2.5),
-      A(2., 3.8, 5.6),
-      A(2.5, 3.0, 3.5),
-      A(3.1, 3.7, 4.3),
-      A(3., 6., 9.))
-    val firstEigen = SpectralClustering.subtractProject(dat(0), dat(5))
-    println(s"firstEigen: ${firstEigen.mkString(",")}")
+      A(3., 6., 9.)
+    )
+    var firstEigen = subtractProjection(dat(0), dat(1)) // collinear
+    assert(firstEigen.forall(withinTol(_, 1e-11)))
+    dat = A(
+      A(1., 2., 3.),
+      A(-3., -6., -9.),
+      A(2., 4., 6.)
+    )
+    val proj  = SP.project(dat(0), dat(1)) // orthog
+    firstEigen = SP.subtractProjection(dat(0), dat(1)) // orthog
+    val subVect = SP.subtract(firstEigen,dat(2))
+    println(s"subVect: ${SP.printVect(subVect)}")
+    assert(subVect.forall(SP.withinTol(_, 1e-11)))
+  }
+
+  test("OneEigen") {
+    var dat = A(
+      A(1., 0., 0.),
+      A(0., 1., 0.),
+      A(0., 0., 1.)
+    )
+    withSpark { sc =>
+      var datRdd = sc.parallelize((0 until dat.length).zip(dat))
+      val (eigval, eigvect) = SP.getPrincipalEigen(sc, datRdd, None,
+          10, -1.0)
+      println(s"eigval=$eigval eigvect=${SP.printVect(eigvect)}")
+    }
   }
 
   def printMatrix(darr: Array[Double], numRows: Int, numCols: Int): String =
-    SpectralClustering.printMatrix(darr, numRows, numCols)
+    SP.printMatrix(darr, numRows, numCols)
 
   def printMatrix(darr: Array[Array[Double]], numRows: Int, numCols: Int): String =
-    SpectralClustering.printMatrix(darr, numRows, numCols)
+    SP.printMatrix(darr, numRows, numCols)
 }

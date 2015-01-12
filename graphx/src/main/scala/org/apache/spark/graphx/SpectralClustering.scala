@@ -34,6 +34,10 @@ object SpectralClustering {
 
   type Vertices = Seq[LabeledVector]
 
+  val DefaultMinNormChange: Double = 1e-11
+
+  val DefaultIterations: Int = 20
+
   def cluster(sc: SparkContext, vertices: Vertices, nClusters: Int, sigma: Double,
               nPowerIterations: Int) = {
     val nVertices = vertices.length
@@ -58,7 +62,8 @@ object SpectralClustering {
     val lambdas = new Array[Double](nClusters)
     val eigens = new Array[RDD[Array[Double]]](nClusters)
     for (ex <- 0 until nClusters) {
-      val (lambda, eigen) = getPrincipalEigen(sc, vertices, eigensRemovedRdd, nPowerIterations)
+      val (lambda, eigen) = getPrincipalEigen(sc, eigensRemovedRdd, Some(vertices.length),
+        nPowerIterations)
       val collectedEigen = eigen
       println(s"collectedEigen=\n${collectedEigen.mkString(",")}")
       eigensRemovedRdd = subtractProjection(sc, eigensRemovedRdd, collectedEigen)
@@ -67,7 +72,7 @@ object SpectralClustering {
       println(s"EigensRemovedRDDCollected=\n${
         printMatrix(eigensRemovedRddCollected.map {
           _._2
-        } /*.collect */, nVertices, nVertices)
+        } /*.collect */ , nVertices, nVertices)
       }")
       val arrarr = new Array[Array[Double]](1)
       arrarr(0) = new Array[Double](nVertices)
@@ -126,27 +131,28 @@ object SpectralClustering {
     Math.sqrt(vect.foldLeft(0.0) { case (sum, dval) => sum + Math.pow(dval, 2)})
   }
 
-  def projectVector(basisVector: DVector, inputVect: DVector) = {
+  def project(basisVector: DVector, inputVect: DVector) = {
     val dotprod = basisVector.zip(inputVect).foldLeft(0.0) {
       case (sum, (b, p)) => sum + b * p
     }
-    val pnorm = tol(norm(basisVector))
+    val pnorm = makeNonZero(norm(basisVector))
     val projectedVect = basisVector.map(_ * (dotprod / Math.pow(pnorm, 2)))
     projectedVect
   }
 
-  def subtractVector(v1: DVector, v2: DVector) = {
+  def subtract(v1: DVector, v2: DVector) = {
     val subvect = v1.zip(v2).map { case (v1val, v2val) => v1val - v2val}
     subvect
   }
 
-  def subtractProjection(sc: SparkContext, vectorsRdd: RDD[IndexedVector], vect: DVector) = {
+  def subtractProjection(sc: SparkContext, vectorsRdd: RDD[IndexedVector], vect: DVector):
+  RDD[IndexedVector] = {
     val bcVect = sc.broadcast(vect)
     val subVectRdd = vectorsRdd.mapPartitions { iter =>
       val localVect = bcVect.value
       iter.map { case (ix, row) =>
-        val subproj = subtractProject(row, localVect)
-//        println(s"Subproj for ${row.mkString(",")} =\n${subproj.mkString(",")}")
+        val subproj = subtractProjection(row, localVect)
+        //        println(s"Subproj for ${row.mkString(",")} =\n${subproj.mkString(",")}")
         (ix, subproj)
       }
     }
@@ -154,9 +160,9 @@ object SpectralClustering {
     subVectRdd
   }
 
-  def subtractProject(vect: DVector, basisVect: DVector) = {
-    val proj = projectVector(basisVect, vect)
-    val subVect = subtractVector(vect, proj)
+  def subtractProjection(vect: DVector, basisVect: DVector): DVector = {
+    val proj = project(basisVect, vect)
+    val subVect = subtract(vect, proj)
     subVect
   }
 
@@ -226,7 +232,7 @@ object SpectralClustering {
 
   def withinTol(d: Double, tol: Double) = Math.abs(d) <= tol
 
-  def tol(dval: Double, tol: Double = 1.0e-8) = {
+  def makeNonZero(dval: Double, tol: Double = 1.0e-8) = {
     if (Math.abs(dval) < tol) {
       Math.signum(dval) * tol
     } else {
@@ -235,42 +241,46 @@ object SpectralClustering {
   }
 
   def getPrincipalEigen(sc: SparkContext,
-                        vertices: Vertices,
-                        baseRdd: RDD[IndexedVector],
-                        nIterations: Int,
-                        minNormChange: Float = 1e-11
+                        vectRdd: RDD[IndexedVector],
+                        rddSize: Option[Int] = None,
+                        nIterations: Int = DefaultIterations,
+                        minNormChange: Double = DefaultMinNormChange
                          ): (Double, DVector) = {
 
-    val nVertices = vertices.length
-    baseRdd.cache()
+    vectRdd.cache()
+    val numVects = rddSize.getOrElse(vectRdd.count().toInt)
     var eigenRdd: RDD[(Int, Double)] = null
-    var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until nVertices) yield (ix, 1.0)
+    var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects) yield (ix, 1.0 / numVects)
 
-    var (eigenRddPrior, priorNorm) = (onesVector(nVertices), nVertices * 1.0)
+    // var (eigenRddPrior, priorNorm) = (onesVector(numVects), numVects * 1.0)
+    var (eigenRddPrior, priorNorm) = (onesVector(numVects),  1.0 / Math.sqrt(numVects))
     var norm = 0.0
     var normDiff = 1.0
     for (iter <- 0 until nIterations
-      if normDiff > minNormChange) {
+         if Math.abs(normDiff) >= minNormChange) {
       val bcEigenRdd = sc.broadcast(eigenRddCollected)
 
-      eigenRdd = baseRdd.mapPartitions { iter =>
+      eigenRdd = vectRdd.mapPartitions { iter =>
         val localEigenRdd = bcEigenRdd.value
         iter.map { case (ix, dvect) =>
           //  println(s"computing inner product from ${dvect.length}
           //   items per row on ${dvect.mkString(",")}")
+          val rand = new java.util.Random().nextInt(1000)
           (ix,
             dvect.zip(localEigenRdd).foldLeft(0.0) { case (sum, (ax, (index, ex))) =>
-              sum + ax * ex
+              val newsum = sum + ax * ex
+              println(s"rand=$rand sum=$newsum ax=$ax ex=$ex")
+              newsum
             })
         }
       }
       eigenRddCollected = eigenRdd.collect()
-//      println(s"eigenRddCollected=\n${eigenRddCollected.mkString(",")}")
-      norm = eigenRddCollected.foldLeft(0.0) { case (sum, (ix, dval)) =>
+      println(s"eigenRddCollected=\n${eigenRddCollected.mkString(",")}")
+      norm = Math.sqrt(eigenRddCollected.foldLeft(0.0) { case (sum, (ix, dval)) =>
         sum + dval
-      }
+      })
       eigenRddCollected = eigenRddCollected.map { case (ix, dval) =>
-        (ix, dval / tol(norm))
+        (ix, dval / makeNonZero(norm))
       }
       normDiff = norm - priorNorm
       println(s"Norm is $norm NormDiff=$normDiff")
@@ -284,25 +294,9 @@ object SpectralClustering {
       priorNorm = norm
 
     }
-    baseRdd.unpersist()
-    import SparkContext._
+    vectRdd.unpersist()
 
-    //    val aggEigenRdd = eigenRdd.aggregate(new DVector(nVertices))(
-    //      seqOp = (dvect, indVector) => {
-    //        dvect(indVector._1) = indVector._2; dvect
-    //      },
-    //      combOp = (indVect1: DVector, indVect2: DVector) => indVect1.zip(indVect2).zipWithIndex
-    //        .foldLeft(new DVector(nVertices)) { case (dvect, ((dv1, dv2), ix)) =>
-    //        dvect(ix) = if (!withinTol(dv1,1e-8)) {
-    //          dv1
-    //        } else {
-    //          dv2
-    //        }
-    //        dvect
-    //      }
-    //    )
-    //    println(s"aggEigenRdd: ${aggEigenRdd.mkString(",")}")
-    val darr = new DVector(nVertices)
+    val darr = new DVector(numVects)
     val collectedEigenRdd = eigenRdd.collect.map(_._2)
     println(s"eigenRdd: ${collectedEigenRdd.mkString(",")}")
     System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
@@ -331,6 +325,10 @@ object SpectralClustering {
       sb.append("\n")
     }
     sb.toString
+  }
+
+  def printVect(dvect: DVector) = {
+    dvect.mkString(",")
   }
 
   def main(args: Array[String]) {
