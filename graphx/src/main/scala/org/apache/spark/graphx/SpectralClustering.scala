@@ -36,6 +36,8 @@ object SpectralClustering {
 
   type Vertices = Seq[LabeledVector]
 
+  type DGraph = Graph[DVector, DVector]
+
   val DefaultMinNormChange: Double = 1e-11
 
   val DefaultIterations: Int = 20
@@ -65,13 +67,13 @@ object SpectralClustering {
       vertexIdFromRowOrColId(rx, Row)
     }
 
-    Edge
-    colsRdd.cartesian(rowIds).map { case ((cx, dvect), rx) =>
+    val edgesRdd = colsRdd.cartesian(rowIds).map { case ((cx, dvect), rx) =>
       val edge = Edge(vertexIdFromRowOrColId(cx, Col), rx,
         dvect)
       edge
     }
-//    Graph.fromEdgeTuples(colsRdd)
+    val G = Graph.fromEdges(edgesRdd, new DVector(0))
+    G
   }
 
   def cluster(sc: SparkContext, vertices: Vertices, nClusters: Int, sigma: Double,
@@ -81,16 +83,75 @@ object SpectralClustering {
 
     val rowsRdd = createGaussianRdd(sc, vertices, sigma)
     val (colsRdd, colSums) = createColumnsRdd(sc, rowsRdd)
-//    val graph = edgesRddFromRowsAndColsRdds(rowsRdd, colsRdd)
+    val G = graphFromRowsAndColsRdds(rowsRdd, colsRdd)
 
-//    val vertRdd = Graph.fromEdges()
-//    //    val gaussRdd = createGaussianRdd(sc, vertices, sigma).cache()
-//
-//    var ix = 0
-//    var indexedGaussRdd = gaussRdd.map { d =>
-//      ix += 1
-//      (ix, d)
-//    }
+//    val (eigens, eigvecs) = makeEigens(G)
+  }
+
+//  def makeEigens(G: DGraph) = {
+//  }
+
+  def getPrincipalEigen(sc: SparkContext,
+                        G: DGraph,
+                        optGraphSize: Option[Int] = None,
+                        nIterations: Int = DefaultIterations,
+                        minNormChange: Double = DefaultMinNormChange
+                         ): (Double, DVector) = {
+
+    val graphSize = optGraphSize.getOrElse(G.edges.count().toInt)
+    var eigenRdd: RDD[(Int, Double)] = null
+    var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until graphSize)
+      yield (ix, 1.0 / Math.sqrt(graphSize))
+    val norms = new DVector(graphSize)
+    var normChange = Int.MaxValue
+    for (iter <- 0 until nIterations;
+      if Math.abs(normChange) > minNormChange) {
+      val tmpEigen = G.mapTriplets { et =>
+        //      val scaldot = scalarDot(d1, d2)
+        //      vectorDot(d1, d2).map{ _ / scaldot}
+        normVect(et.srcAttr, et.dstAttr)
+      }
+
+    }
+
+//    printGraph(tmpEigen)
+//    tmpEigen
+    (0, Array(0.0))
+  }
+
+  def printGraph(G: DGraph) = {
+
+  }
+
+  def normDot(d1: DVector, d2: DVector) = {
+    var sum = 0.0
+    var tmpOutv = d1.zip(d2).map { case (d1v, d2v) =>
+      val v = d1v * d2v
+      sum += v
+      v
+    }
+    val norm = Math.sqrt(sum)
+    for (tx <- 0 until tmpOutv.length) {
+      tmpOutv(tx) /= norm
+    }
+    (norm, tmpOutv)
+  }
+
+  def scalarDot(d1: DVector, d2: DVector) = {
+    Math.sqrt(d1.zip(d2).foldLeft(0.0){ case (sum, (d1v, d2v)) =>
+        sum + d1v*d2v
+    })
+  }
+
+  def vectorDot(d1: DVector, d2: DVector) = {
+    d1.zip(d2).map{ case (d1v, d2v) =>
+       d1v*d2v
+    }
+  }
+
+  def normVect(d1: DVector, d2: DVector) = {
+    val scaldot = scalarDot(d1, d2)
+    vectorDot(d1, d2).map{ _ / scaldot}
   }
 
   //   val vertexRdd : RDD[(Int,DVector)] = sc.parallelize(

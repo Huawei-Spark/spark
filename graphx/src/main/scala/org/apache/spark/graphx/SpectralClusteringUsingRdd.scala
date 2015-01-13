@@ -50,7 +50,7 @@ object SpectralClusteringUsingRdd {
     }
 
     val (columnsRdd, colSumsRdd) = createColumnsRdds(sc, vertices, indexedGaussRdd)
-    val indexedDegreesRdd = createDegreesRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
+    val indexedDegreesRdd = createLaplacianRdd(sc, vertices, indexedGaussRdd, colSumsRdd)
 
     var eigensRemovedRdd = indexedDegreesRdd
     val collectedIndexedDegreesRdd = indexedDegreesRdd.collect
@@ -199,21 +199,21 @@ object SpectralClusteringUsingRdd {
     (columnsRdd, colSums)
   }
 
-  def createDegreesRdd(sc: SparkContext,
+  def createLaplacianRdd(sc: SparkContext,
                        vertices: Vertices,
                        indexedDegreesRdd: RDD[IndexedVector],
                        colSums: RDD[(Int, Double)]) = {
     val nVertices = vertices.length
     val bcNumVertices = sc.broadcast(nVertices)
     val bcColSums = sc.broadcast(colSums.collect)
-    val degreeRdd = indexedDegreesRdd.mapPartitionsWithIndex({ (partIndex, iter) =>
+    val laplaceRdd = indexedDegreesRdd.mapPartitionsWithIndex({ (partIndex, iter) =>
       val localNumVertices = bcNumVertices.value
       val localColSums = bcColSums.value
       var rowctr = -1
       iter.toList.map { case (dindex, dval) =>
         for (ix <- 0 until dval.length) {
           if (ix != partIndex) {
-            dval(ix) = -1.0 * dval(ix)
+            dval(ix) = -1.0 * dval(ix) / localColSums(partIndex)._2
           } else {
             dval(ix) = localColSums(partIndex)._2
           }
@@ -222,7 +222,7 @@ object SpectralClusteringUsingRdd {
       }.iterator
     }, preservesPartitioning = true)
 
-    degreeRdd
+    laplaceRdd
   }
 
   def onesVector(len: Int): DVector = {
