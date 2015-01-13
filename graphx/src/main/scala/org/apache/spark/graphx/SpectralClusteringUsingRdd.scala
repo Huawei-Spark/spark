@@ -212,11 +212,13 @@ object SpectralClusteringUsingRdd {
       var rowctr = -1
       iter.toList.map { case (dindex, dval) =>
         for (ix <- 0 until dval.length) {
-          if (ix != partIndex) {
-            dval(ix) = -1.0 * dval(ix) / localColSums(partIndex)._2
-          } else {
-            dval(ix) = localColSums(partIndex)._2
-          }
+          dval(ix) = (1.0 / localColSums(partIndex)._2) *
+            (if (ix != partIndex) {
+              -1.0 * dval(ix)
+            } else {
+              1.0
+            }
+              )
         }
         (rowctr, dval)
       }.iterator
