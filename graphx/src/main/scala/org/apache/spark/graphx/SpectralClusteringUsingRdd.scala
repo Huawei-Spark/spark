@@ -95,7 +95,6 @@ object SpectralClusteringUsingRdd {
       (toks(0), arr)
     }.toList
     println(s"Read in ${vertices.length} from $verticesFile")
-    //    println(vertices.map { case (x, arr) => s"($x,${arr.mkString(",")})"}.mkString("[", ",\n", "]"))
     vertices
   }
 
@@ -156,7 +155,8 @@ object SpectralClusteringUsingRdd {
         (ix, subproj)
       }
     }
-    println(s"Subtracted VectorsRdd\n${printMatrix(subVectRdd.collect.map(_._2), vect.length, vect.length)}")
+    println(s"Subtracted VectorsRdd\n${printMatrix(subVectRdd.collect.map(_._2), 
+      vect.length, vect.length)}")
     subVectRdd
   }
 
@@ -166,7 +166,8 @@ object SpectralClusteringUsingRdd {
     subVect
   }
 
-  def createColumnsRdds(sc: SparkContext, vertices: Vertices, indexedDegreesRdd: RDD[IndexedVector]) = {
+  def createColumnsRdds(sc: SparkContext, vertices: Vertices, 
+                        indexedDegreesRdd: RDD[IndexedVector]) = {
     val nVertices = vertices.length
     val ColsPartitioner = new Partitioner() {
       override def numPartitions: Int = nVertices
@@ -178,7 +179,7 @@ object SpectralClusteringUsingRdd {
     }
     // Needed for the PairRDDFunctions implicits
     import org.apache.spark.SparkContext._
-    val columnsRdd = indexedDegreesRdd.partitionBy(ColsPartitioner) // Is this giving the desired # partitions
+    val columnsRdd = indexedDegreesRdd.partitionBy(ColsPartitioner) 
       .mapPartitions({ iter =>
       var cntr = -1
       iter.map { case (rowIndex, dval) =>
@@ -250,7 +251,8 @@ object SpectralClusteringUsingRdd {
     vectRdd.cache()
     val numVects = rddSize.getOrElse(vectRdd.count().toInt)
     var eigenRdd: RDD[(Int, Double)] = null
-    var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects) yield (ix, 1.0 / numVects)
+    var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects) 
+      yield (ix, 1.0 / numVects)
 
     // var (eigenRddPrior, priorNorm) = (onesVector(numVects), numVects * 1.0)
     var (eigenRddPrior, priorNorm) = (onesVector(numVects),  1.0 / Math.sqrt(numVects))
@@ -288,7 +290,8 @@ object SpectralClusteringUsingRdd {
         val eigenDiff = eigenRddCollected.zip(eigenRddPrior).map { case ((ix, enew), eold) =>
           enew - eold
         }
-        println(s"Norm is $norm NormDiff=$normDiff EigenRddCollected: ${eigenRddCollected.mkString(",")} EigenDiffs: ${eigenDiff.mkString(",")}")
+        println(s"Norm is $norm NormDiff=$normDiff EigenRddCollected: "
+          + s"${eigenRddCollected.mkString(",")} EigenDiffs: ${eigenDiff.mkString(",")}")
         System.arraycopy(eigenRddCollected, 0, eigenRddPrior, 0, eigenRddCollected.length)
       }
       priorNorm = norm
@@ -304,8 +307,9 @@ object SpectralClusteringUsingRdd {
   }
 
   def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
-    val flattenedArr = darr.zipWithIndex.foldLeft(new DVector(numRows * numCols)) { case (flatarr, (row, indx)) =>
-      System.arraycopy(row, 0, flatarr, indx * numCols, numCols)
+    val flattenedArr = darr.zipWithIndex.foldLeft(new DVector(numRows * numCols)) { 
+      case (flatarr, (row, indx)) =>
+        System.arraycopy(row, 0, flatarr, indx * numCols, numCols)
       flatarr
     }
     printMatrix(flattenedArr, numRows, numCols)
@@ -342,3 +346,4 @@ object SpectralClusteringUsingRdd {
   }
 
 }
+

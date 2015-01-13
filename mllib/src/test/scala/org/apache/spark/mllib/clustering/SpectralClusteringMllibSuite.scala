@@ -16,7 +16,6 @@
 */
 package org.apache.spark.mllib.clustering
 import org.apache.spark.mllib.linalg.distributed.{IndexedRow, IndexedRowMatrix}
-import org.apache.spark.mllib.util.LocalSparkContext
 import org.apache.spark.rdd.{ZippedWithIndexRDDPartition, ParallelCollectionPartition, RDD}
 import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
 import org.apache.spark._
@@ -31,7 +30,7 @@ object SpectralClusteringMllibSuite {
 //    testee.testGaussianSimilarity(sc)
   }
 }
-class SpectralClusteringMllibSuite extends FunSuite with LocalSparkContext {
+class SpectralClusteringMllibSuite extends FunSuite { 
   import SpectralClustering._
   val NCols = 3 // 100
   val NRows = 8 // 10000
