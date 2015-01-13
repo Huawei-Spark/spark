@@ -270,6 +270,7 @@
     </pluginRepository>
   </pluginRepositories>
 <<<<<<< HEAD
+<<<<<<< HEAD
   <dependencies>
     <!--
       This is a dummy dependency that is used along with the shading plug-in
@@ -303,6 +304,8 @@
   </dependencies>
 =======
 >>>>>>> poc for Gaussian sim
+=======
+>>>>>>> 75237e88590ecda64c57f5fcb5d514b6257eec90
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -1226,6 +1229,7 @@
     </pluginManagement>
 
     <plugins>
+<<<<<<< HEAD
       <!-- This plugin dumps the test classpath into a file -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -1289,6 +1293,8 @@
           </execution>
         </executions>
       </plugin>
+=======
+>>>>>>> 75237e88590ecda64c57f5fcb5d514b6257eec90
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>

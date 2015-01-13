@@ -73,6 +73,19 @@ private[hive] abstract class AbstractSparkSQLDriver(
 
   override def getSchema: Schema = tableSchema
 
+<<<<<<< HEAD:sql/hive-thriftserver/src/main/scala/org/apache/spark/sql/hive/thriftserver/AbstractSparkSQLDriver.scala
+=======
+//  override def getResults(res: JArrayList[String]): Boolean = {
+//    if (hiveResponse == null) {
+//      false
+//    } else {
+//      res.addAll(hiveResponse)
+//      hiveResponse = null
+//      true
+//    }
+//  }
+
+>>>>>>> 75237e88590ecda64c57f5fcb5d514b6257eec90:sql/hive-thriftserver/src/main/scala/org/apache/spark/sql/hive/thriftserver/SparkSQLDriver.scala
   override def destroy() {
     super.destroy()
     hiveResponse = null
