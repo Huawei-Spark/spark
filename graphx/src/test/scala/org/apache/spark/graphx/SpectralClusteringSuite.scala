@@ -27,24 +27,6 @@ import scala.reflect.ClassTag
  */
 class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
 
-  test("fifteenVerticesTest") {
-    val vertFile = "../data/graphx/new_lr_data.15.txt"
-    val sigma = 1.0
-    val nIterations = 20
-    val nClusters = 3
-    withSpark { sc =>
-      val vertices = SpectralClusteringUsingRdd.readVerticesfromFile(vertFile)
-      val nVertices = vertices.length
-      val (rddOut, lambdas, eigens) = SpectralClusteringUsingRdd.cluster(sc, vertices, nClusters, sigma, nIterations)
-      val collectedRdd = rddOut.map {
-        _._2
-      }.collect
-      println(s"DegreeMatrix:\n${printMatrix(collectedRdd, nVertices, nVertices)}")
-      val collectedEigens = eigens.collect
-      println(s"Eigenvalues = ${lambdas.mkString(",")} EigenVectors:\n${printMatrix(collectedEigens, nClusters, nVertices)}")
-    }
-  }
-
   import SpectralClusteringUsingRdd._
   val SP = SpectralClusteringUsingRdd
   val A = Array
@@ -80,6 +62,49 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       val (eigval, eigvect) = SP.getPrincipalEigen(sc, datRdd, None,
           10, -1.0)
       println(s"eigval=$eigval eigvect=${SP.printVect(eigvect)}")
+    }
+  }
+
+  test("simpleMatrixTest") {
+    val dat1 = A(
+      A(3., 2., 4.),
+      A(2., 0., 2.),
+      A(4., 2., 3.)
+    )
+    val dat2 = A(
+      A(1., 1, -2.),
+      A(-1.,2., 1.),
+      A(0., 1., -1.)
+    )
+    val dats = Array(dat1, dat2)
+    for (dat <- dats) {
+      val sigma = 1.0
+      val nIterations = 20
+      val nClusters = 2
+      withSpark { sc =>
+        var datRdd = /* sc.parallelize( */(0 until dat.length).zip(dat).map{ case (ix, dvect) =>
+          (ix.toString, dvect)}.toSeq /*) */
+        val (rdd, eigvals, eigvect) = SP.cluster(sc, datRdd, 2, sigma, nIterations)
+        println(s"eigvals=${eigvals.mkString(",")} eigvects=${eigvect.collect.foreach{e => SP.printVect(e)}}")
+      }
+    }
+  }
+
+  test("fifteenVerticesTest") {
+    val vertFile = "../data/graphx/new_lr_data.15.txt"
+    val sigma = 1.0
+    val nIterations = 20
+    val nClusters = 3
+    withSpark { sc =>
+      val vertices = SpectralClusteringUsingRdd.readVerticesfromFile(vertFile)
+      val nVertices = vertices.length
+      val (rddOut, lambdas, eigens) = SpectralClusteringUsingRdd.cluster(sc, vertices, nClusters, sigma, nIterations)
+      val collectedRdd = rddOut.map {
+        _._2
+      }.collect
+      println(s"DegreeMatrix:\n${printMatrix(collectedRdd, nVertices, nVertices)}")
+      val collectedEigens = eigens.collect
+      println(s"Eigenvalues = ${lambdas.mkString(",")} EigenVectors:\n${printMatrix(collectedEigens, nClusters, nVertices)}")
     }
   }
 
