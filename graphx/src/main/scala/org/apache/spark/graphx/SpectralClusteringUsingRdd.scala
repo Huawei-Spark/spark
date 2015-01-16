@@ -167,12 +167,25 @@ object SpectralClusteringUsingRdd {
   }
 
   object Linalg {
-    def add(v1: DVector, v2: DVector) = {
-      v1.zip(v2).map{ case (a,b) => a + b}
-    }
+    def add(v1: DVector, v2: DVector) =
+      v1.zip(v2).map { x => x._1 + x._2}
 
     def mult(v1: DVector, d: Double) = {
-      v1.map{ _ * d}
+      v1.map {
+        _ * d
+      }
+    }
+
+    def mult(v1: DVector, v2: DVector) = {
+      v1.zip(v2).map { case (v1v, v2v) => v1v * v2v}
+    }
+
+    def multColByRow(v1: DVector, v2: DVector) = {
+      val mat = for (v1v <- v1)
+      yield mult(v2, v1v)
+      //      println(s"Col by Row:\n${printMatrix(mat,
+      //        v1.length, v1.length)}")
+      mat
     }
 
     def norm(vect: DVector): Double = {
@@ -187,12 +200,6 @@ object SpectralClusteringUsingRdd {
     def dot(v1: DVector, v2: DVector) = {
       v1.zip(v2).foldLeft(0.0) {
         case (sum, (b, p)) => sum + b * p
-      }
-    }
-
-    def dot2(v1: DVector, v2: DVector) = {
-      v1.zip(v2).foldLeft(0.0) {
-        case (sum, (b, p)) => sum + b * p / 2
       }
     }
 
@@ -215,28 +222,28 @@ object SpectralClusteringUsingRdd {
     }
 
     def getPrincipalEigen(sc: SparkContext,
-                          colMajorRdd: RDD[IndexedVector],
+                          vectRdd: RDD[IndexedVector],
                           rddSize: Option[Int] = None,
                           nIterations: Int = DefaultIterations,
                           minNormAccel: Double = DefaultMinNormAccel
                            ): (Double, DVector) = {
 
-      colMajorRdd.cache()
-      val rowMajorRdd = Linalg.transpose(colMajorRdd)
-      val numVects = rddSize.getOrElse(colMajorRdd.count().toInt)
+      vectRdd.cache()
+      val rowMajorRdd = Linalg.transpose(vectRdd)
+      val numVects = rddSize.getOrElse(vectRdd.count().toInt)
       var eigenRdd: RDD[(Int, Double)] = null
       var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects)
-        yield (ix, 1.0 / /*Math.sqrt(*/numVects)
+      yield (ix, 1.0 / /*Math.sqrt(*/ numVects)
 
       var eigenRddCollectedPrior = Array.fill(numVects)(1.0 / Math.sqrt(numVects))
-      var priorNorm = manhattanNorm(eigenRddCollectedPrior)
+      var priorNorm = norm(eigenRddCollectedPrior)
       var cnorm = 0.0
       var normDiffVelocity = Double.MaxValue
       var priorNormDiffVelocity = 0.0
       var normDiffAccel = Double.MaxValue
       for (iter <- 0 until nIterations) {
-//           if Math.abs(normDiffAccel) >= minNormAccel
-//             || iter < nIterations / 2) {
+        //           if Math.abs(normDiffAccel) >= minNormAccel
+        //             || iter < nIterations / 2) {
         val bcEigenRdd = sc.broadcast(eigenRddCollected)
 
         eigenRdd = rowMajorRdd.mapPartitions { piter =>
@@ -249,7 +256,7 @@ object SpectralClusteringUsingRdd {
         }
         eigenRddCollected = eigenRdd.collect()
         println(s"eigenRddCollected=\n${eigenRddCollected.map(_._2).mkString(",")}")
-        cnorm = manhattanNorm(eigenRddCollected.map(_._2).toArray)
+        cnorm = norm(eigenRddCollected.map(_._2).toArray)
         eigenRddCollected = eigenRddCollected.map { case (ix, dval) =>
           (ix, dval / makeNonZero(cnorm))
         }
@@ -260,9 +267,9 @@ object SpectralClusteringUsingRdd {
           val eigenDiff = eigenRddCollected.zip(eigenRddCollectedPrior).map { case ((ix, enew), eold) =>
             enew - eold
           }
-//          println(s"Norm is $cnorm NormDiff=$normDiffVelocity EigenRddCollected: "
-//            + s"${eigenRddCollected.mkString(",")} EigenDiffs: ${eigenDiff.mkString(",")}")
-//          println(s"eigenRddCollectedPrior: ${eigenRddCollectedPrior.mkString(",")}")
+          //          println(s"Norm is $cnorm NormDiff=$normDiffVelocity EigenRddCollected: "
+          //            + s"${eigenRddCollected.mkString(",")} EigenDiffs: ${eigenDiff.mkString(",")}")
+          //          println(s"eigenRddCollectedPrior: ${eigenRddCollectedPrior.mkString(",")}")
           System.arraycopy(eigenRddCollected.map {
             _._2
           }.toArray, 0, eigenRddCollectedPrior, 0, eigenRddCollected.length)
@@ -271,58 +278,62 @@ object SpectralClusteringUsingRdd {
         println(s"norm is $cnorm")
 
       }
-      colMajorRdd.unpersist()
+      vectRdd.unpersist()
 
-//      val darr = new DVector(numVects)
-      val eigenVect  = eigenRddCollected.map(_._2).toArray
+      //      val darr = new DVector(numVects)
+      val eigenVect = eigenRddCollected.map(_._2).toArray
       val pdiff = eigenRddCollectedPrior.zip(eigenVect).foldLeft(0.0) { case (sum, (e1v, e2v)) =>
         sum + Math.abs(e1v - e2v)
       }
-      assert(withinTol(pdiff),s"Why is the prior eigenValue not nearly equal to present one:  diff=$pdiff")
-      val lambda = dot(colMajorRdd.take(1)(0)._2, eigenVect)/  eigenVect(0)
-//      assert(withinTol(lambdaRatio - 1.0),
-//        "According to A *X = lambda * X we should have (A *X / X) ratio  = lambda " +
-//          s"but that did not happen: instead ratio=$lambdaRatio")
-//      val lambda = Math.signum(lambdaRatio) * cnorm
+      assert(withinTol(pdiff), s"Why is the prior eigenValue not nearly equal to present one:  diff=$pdiff")
+      val lambda = dot(vectRdd.take(1)(0)._2, eigenVect) / eigenVect(0)
+      //      assert(withinTol(lambdaRatio - 1.0),
+      //        "According to A *X = lambda * X we should have (A *X / X) ratio  = lambda " +
+      //          s"but that did not happen: instead ratio=$lambdaRatio")
+      //      val lambda = Math.signum(lambdaRatio) * cnorm
       //    println(s"eigenRdd: ${collectedEigenRdd.mkString(",")}")
-//      System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
-//      (cnorm, darr)
+      //      System.arraycopy(collectedEigenRdd, 0, darr, 0, darr.length)
+      //      (cnorm, darr)
       (lambda, eigenVect)
     }
 
-  def transpose(indexedRdd: RDD[IndexedVector]) = {
-    val nVertices = indexedRdd.count.toInt
-    val ColsPartitioner = new Partitioner() {
-      override def numPartitions: Int = nVertices
+    def transpose(indexedRdd: RDD[IndexedVector]) = {
+      val nVertices = indexedRdd.count.toInt
+      val ColsPartitioner = new Partitioner() {
+        override def numPartitions: Int = nVertices
 
-      override def getPartition(key: Any): Int = {
-        val index = key.asInstanceOf[Int]
-        index % nVertices
+        override def getPartition(key: Any): Int = {
+          val index = key.asInstanceOf[Int]
+          index % nVertices
+        }
       }
+      // Needed for the PairRDDFunctions implicits
+      import org.apache.spark.SparkContext._
+      val columnsRdd = indexedRdd
+        .mapPartitionsWithIndex({ (rx, iter) =>
+        var cntr = rx - 1
+        iter.map { case (rowIndex, dval) =>
+          cntr += 1
+          (cntr, dval)
+        }
+      }, preservesPartitioning = false)
+        .partitionBy(ColsPartitioner)
+
+      columnsRdd
     }
-    // Needed for the PairRDDFunctions implicits
-    import org.apache.spark.SparkContext._
-    val columnsRdd = indexedRdd
-      .mapPartitionsWithIndex({ (rx,iter) =>
-      var cntr = rx  - 1
-      iter.map { case (rowIndex, dval) =>
-        cntr += 1
-        (cntr, dval)
-      }
-    }, preservesPartitioning = false)
-    .partitionBy(ColsPartitioner)
-
-    columnsRdd
-  }
 
     def transpose(mat: DMatrix) = {
       val matT = mat
         .flatten
         .zipWithIndex
-        .groupBy{ _._2 % 3 }
-        .toSeq.sortBy{_._1}
+        .groupBy {
+        _._2 % 3
+      }
+        .toSeq.sortBy {
+        _._1
+      }
         .map(_._2)
-      //  .map(_.toSeq.sortBy(_._1))
+        //  .map(_.toSeq.sortBy(_._1))
         .map(_.map(_._1))
         .toArray
       matT
@@ -393,7 +404,7 @@ object SpectralClusteringUsingRdd {
       subVect
     }
 
-    val printEigensRemovedRdd: Boolean = false
+    val printDeflatedRdd: Boolean = false
 
     val printInputMatrix: Boolean = false
 
@@ -417,7 +428,7 @@ object SpectralClusteringUsingRdd {
         //      println(s"collectedEigen=\n${eigen.mkString(",")}")
         deflatedRdd = subtractProjection(sc, deflatedRdd, eigen)
         //      deflatedRdd = sc.parallelize(deflatedRddCollected, nVertices)
-        if (printEigensRemovedRdd) {
+        if (printDeflatedRdd) {
           val deflatedRddCollected = deflatedRdd.collect
           println(s"EigensRemovedRDDCollected=\n${
             printMatrix(deflatedRddCollected.map {
@@ -435,6 +446,50 @@ object SpectralClusteringUsingRdd {
       val combinedEigens = eigens.reduceLeft(_.union(_))
       (lambdas, combinedEigens)
     }
+
+    def localPIC(matIn: DMatrix, nClusters: Int, nIterations: Int,
+                 optExpected: Option[(DVector, DMatrix)]) = {
+
+      var mat = matIn.map(identity)
+      val numVects = mat.length
+      var eigen = Array.fill(numVects) {
+        1.0 / Math.sqrt(numVects)
+      }
+
+      val (expLambda, expdat) = optExpected.getOrElse((new DVector(0), new DMatrix(0)))
+      var cnorm = -1.0
+      for (k <- 0 until nClusters) {
+        for (iter <- 0 until nIterations) {
+          eigen = mat.map { dvect =>
+            dot(dvect, eigen)
+          }
+          cnorm = makeNonZero(norm(eigen))
+          eigen = eigen.map(_ / cnorm)
+        }
+        val lambda = dot(mat.take(1)(0), eigen) / eigen(0)
+        println(s"lambda=$lambda eigen=${printVect(eigen)}")
+        if (expLambda.length > 0) {
+          val compareVect = eigen.zip(expdat(k)).map { case (a, b) => a / b}
+          println(s"Ratio  to expected: lambda=${lambda / expLambda(k)} " +
+            s"Vect=${compareVect.mkString("[", ",", "]")}")
+        }
+        if (k < nClusters - 1) {
+          //        mat = mat.map(subtractProjection(_, mult(eigen, lambda)))
+          val eigT = eigen
+          val projected = multColByRow(eigen, eigT).map(mult(_, lambda))
+          //        println(s"projected matrix:\n${printMatrix(projected,
+          //          eigen.length, eigen.length)}")
+          mat = mat.zip(projected).map { case (mrow, prow) =>
+            subtract(mrow, prow)
+          }
+          println(s"Updated matrix:\n${
+            printMatrix(mat,
+              eigen.length, eigen.length)
+          }")
+        }
+      }
+    }
+
   }
 
 }

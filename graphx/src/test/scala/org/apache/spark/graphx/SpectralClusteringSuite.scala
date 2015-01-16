@@ -1,5 +1,6 @@
 package org.apache.spark.graphx
 
+import org.apache.spark.graphx.SpectralClustering.DVector
 import org.scalatest.FunSuite
 
 import scala.reflect.ClassTag
@@ -26,8 +27,6 @@ import scala.reflect.ClassTag
  *
  */
 class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
-
-  import SpectralClusteringUsingRdd._
 
   val SP = SpectralClusteringUsingRdd
   val LA = SP.Linalg
@@ -131,7 +130,19 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     dvect.toSeq.grouped(nrows).map(_.toArray).toArray
   }
 
+  test("positiveEigenValues") {
+    var dat2r = makeMat(3, A(2., 1.5, 2, .5, 3, .5, 1., .5, 4.))
+
+    val expLambda = A(5.087874, 2.810807, 1.101319)
+    val expdat = LA.transpose(makeMat(3, A(0.6196451, -0.2171220,  0.9402498, 0.3200200, -0.8211316, -0.1699035, 0.7166779,  0.5278267, -0.2950646)))
+    val nClusters = 3
+    val nIterations = 50
+    val numVects = 3
+
+    LA.localPIC(dat2r, nClusters, nIterations, Some((expLambda, expdat)))
+  }
   test("manualPowerIt") {
+
     // R code
     //
     //> x = t(matrix(c(-2,-.5,2,.5,-3,.5,-1.,.5,4),nrow=3,ncol=3))
@@ -152,41 +163,34 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     //[3,] 0.94210116 0.02368917 -0.09857872
     //
 
-//    var dat2r = A(
-//      A(-2.0, -0.5, 2.0),
-//      A(0.5, -3.0, 0.5),
-//      A(-0.5, 0.5, 4.0)
-//    )
+    //x = t(matrix(c(-2.384081,  0.387542, -2.124275, -0.612458, -3.032928,  0.170814,  0.875725,  0.170814,  0.709039 ),nrow=3,ncol=3))
+    //> eigen(x)
+    //$values
+    //[1] -2.6400564672 -2.0684340334  0.0005205006
+    //
+    //$vectors
+    //           [,1]       [,2]       [,3]
+    //[1,] -0.5192257  0.8053757  0.6396646
+    //[2,]  0.8496238 -0.5503942 -0.1713433
+    //[3,]  0.0924343 -0.2200823 -0.7493135
 
-    var dat2r = makeMat(3, A(-2.,-.5,2,.5,-3,.5,-1.,.5,4.))
+    //    var dat2r = A(
+    //      A(-2.0, -0.5, 2.0),
+    //      A(0.5, -3.0, 0.5),
+    //      A(-0.5, 0.5, 4.0)
+    //    )
 
-    var expdat = LA.transpose(makeMat(3, A(0.32182428, 0.56847491, -0.85380536, 0.09420476,
+    var dat2r = makeMat(3, A(-2., -.5, 2, .5, -3, .5, -1., .5, 4.))
+
+    val expLambda = A(3.708394, -2.639960, -2.068434)
+    val expdat = LA.transpose(makeMat(3, A(0.32182428, 0.56847491, -0.85380536, 0.09420476,
       0.82235947, -0.51117379, 0.94210116, 0.02368917, -0.09857872)))
     val nClusters = 3
     val nIterations = 30
-    val numVects =3
+    val numVects = 3
 
-    var mat = dat2r.map(identity)
-    var eigen = Array.fill(numVects){1.0 / Math.sqrt(numVects)}
+    LA.localPIC(dat2r, nClusters, nIterations, Some((expLambda, expdat)))
 
-    var cnorm = -1.0
-    for (k <- 0 until nClusters) {
-      for (iter <- 0 until nIterations) {
-        eigen = mat.map { dvect =>
-          val d = LA.dot(dvect, eigen)
-          d
-        }
-        cnorm = LA.makeNonZero(LA.norm(eigen))
-        eigen = eigen.map(_  / cnorm)
-      }
-      val lambda = LA.dot(mat.take(1)(0), eigen) / eigen(0)
-      println(s"lambda=$lambda eigen=${LA.printVect(eigen)}")
-      val compareVect = eigen.zip(expdat(k)).map{ case (a,b) => a / b}
-      println(s"Ratio  to expected: ${compareVect.mkString(",")}")
-      if (k < nClusters - 1) {
-        mat = LA.transpose(LA.transpose(mat).map(LA.subtractProjection(_, eigen)))
-      }
-    }
   }
 
   test("fifteenVerticesTest") {
