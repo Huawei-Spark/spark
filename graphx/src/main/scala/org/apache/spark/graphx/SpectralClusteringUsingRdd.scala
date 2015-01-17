@@ -20,6 +20,8 @@ package org.apache.spark.graphx
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partitioner, SparkContext}
 
+import scala.util.Random
+
 /**
  * SpectralClustering
  *
@@ -323,12 +325,13 @@ object SpectralClusteringUsingRdd {
     }
 
     def transpose(mat: DMatrix) = {
+      val nCols = mat(0).length
       val matT = mat
         .flatten
         .zipWithIndex
         .groupBy {
-        _._2 % 3
-      }
+          _._2 % nCols
+        }
         .toSeq.sortBy {
         _._1
       }
@@ -357,7 +360,7 @@ object SpectralClusteringUsingRdd {
 
       for (r <- 0 until numRows) {
         for (c <- 0 until numCols) {
-          sb.append(leftJust(f"${darr(c * stride + r)}%.6f", 9) + " ")
+          sb.append(leftJust(f"${darr(r * stride + c)}%.6f", 9) + " ")
         }
         sb.append("\n")
       }
@@ -452,13 +455,17 @@ object SpectralClusteringUsingRdd {
 
       var mat = matIn.map(identity)
       val numVects = mat.length
-      var eigen = Array.fill(numVects) {
-        1.0 / Math.sqrt(numVects)
-      }
 
       val (expLambda, expdat) = optExpected.getOrElse((new DVector(0), new DMatrix(0)))
       var cnorm = -1.0
       for (k <- 0 until nClusters) {
+        val r = new Random()
+        var eigen = Array.fill(numVects) {
+          r.nextDouble
+        }
+        val enorm = norm(eigen)
+        eigen.map{ e => e / enorm}
+
         for (iter <- 0 until nIterations) {
           eigen = mat.map { dvect =>
             dot(dvect, eigen)
@@ -474,20 +481,100 @@ object SpectralClusteringUsingRdd {
             s"Vect=${compareVect.mkString("[", ",", "]")}")
         }
         if (k < nClusters - 1) {
-          //        mat = mat.map(subtractProjection(_, mult(eigen, lambda)))
-          val eigT = eigen
-          val projected = multColByRow(eigen, eigT).map(mult(_, lambda))
-          //        println(s"projected matrix:\n${printMatrix(projected,
-          //          eigen.length, eigen.length)}")
-          mat = mat.zip(projected).map { case (mrow, prow) =>
-            subtract(mrow, prow)
-          }
-          println(s"Updated matrix:\n${
-            printMatrix(mat,
-              eigen.length, eigen.length)
-          }")
+          // TODO: decide between deflate/deflate2
+          mat = schurComplement(mat, lambda, eigen)
         }
       }
+    }
+
+    def subtract(mat1: DMatrix, mat2: DMatrix) = {
+      mat1.zip(mat2).map { case (m1row, m2row) =>
+        m1row.zip(m2row).map { case (m1v, m2v) => m1v - m2v}
+      }
+    }
+
+    def deflate(mat: DMatrix, lambda: Double, eigen: DVector) = {
+      //        mat = mat.map(subtractProjection(_, mult(eigen, lambda)))
+      val eigT = eigen
+      val projected = multColByRow(eigen, eigT).map(mult(_, lambda))
+      //        println(s"projected matrix:\n${printMatrix(projected,
+      //          eigen.length, eigen.length)}")
+      val matOut = mat.zip(projected).map { case (mrow, prow) =>
+        subtract(mrow, prow)
+      }
+      println(s"Updated matrix:\n${
+        printMatrix(mat,
+          eigen.length, eigen.length)
+      }")
+      matOut
+    }
+
+    def mult(mat1: DMatrix, mat2: DMatrix) = {
+      val mat2T = transpose(mat2)
+      val outmatT = for {row <- mat1}
+      yield {
+        val outRow = mat2T.map { col =>
+          dot(row, col)
+        }
+        outRow
+      }
+      outmatT
+    }
+
+    //    def mult(mat: DMatrix, vect: DVector): DMatrix  = {
+    //      val outMat = mat.map { m =>
+    //        mult(m, vect)
+    //      }
+    //      outMat
+    //    }
+    //
+    //    def mult(vect: DVector, mat: DMatrix): DMatrix = {
+    //      for {d <- vect.zip(transpose(mat)) }
+    //        yield mult(d._2, d._1)
+    //    }
+
+    def scale(mat: DMatrix, d: Double): DMatrix = {
+      for (row <- mat) yield mult(row, d)
+    }
+
+    def transpose(vector: DVector) = {
+      vector.map { d => Array(d)}
+    }
+
+    def toMat(dvect: Array[Double], ncols: Int) = {
+      val m = dvect.toSeq.grouped(ncols).map(_.toArray).toArray
+      m
+    }
+
+    def schurComplement(mat: DMatrix, lambda: Double, eigen: DVector) = {
+      val eigT = toMat(eigen, eigen.length) // The sense is reversed
+      val eig = transpose(eigT)
+      val projected = mult(eig, eigT)
+      println(s"projected matrix:\n${
+        printMatrix(projected,
+          eigen.length, eigen.length)
+      }")
+      val numerat1 = mult(mat, projected)
+      val numerat2 = mult(numerat1, mat)
+      println(s"numerat2=\n${
+        printMatrix(numerat2,
+          eigen.length, eigen.length)
+      }")
+      val denom1 = mult(eigT, mat)
+      val denom2 = mult(denom1, toMat(eigen, 1))
+      val denom = denom2(0)(0)
+      println(s"denom is $denom")
+      val projMat = scale(numerat2, 1.0 / denom)
+      println(s"Updated matrix:\n${
+        printMatrix(projMat,
+          eigen.length, eigen.length)
+      }")
+      val defMat = subtract(mat, projMat)
+      println(s"deflated matrix:\n${
+        printMatrix(defMat,
+          eigen.length, eigen.length)
+      }")
+      defMat
     }
 
   }

@@ -126,21 +126,47 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     }
   }
 
-  def makeMat(nrows: Int, dvect: Array[Double]) = {
-    dvect.toSeq.grouped(nrows).map(_.toArray).toArray
+  test("matrix mult") {
+    val m1 = toMat(A(1., 2., 3., 4., 5., 6., 7., 8., 9.), 3)
+    val m2 = toMat(A(3., 1., 2., 3., 4., 5., 6., 7., 8.), 3)
+    val mprod = LA.mult(m1, m2)
+    println(s"Matrix1:\n ${printMatrix(mprod, 3, 3)}")
+    val m21 = toMat(A(1., 2., 3., 4., 5., 6., 7., 8., 9.), 3)
+    val m22 = toMat(A(10., 11., 12., 13., 14., 15.), 2)
+    val mprod2 = LA.mult(m21, m22)
+    println(s"Matrix2:\n ${printMatrix(mprod2, 3, 3)}")
   }
 
   test("positiveEigenValues") {
-    var dat2r = makeMat(3, A(2., 1.5, 2, .5, 3, .5, 1., .5, 4.))
+    var dat2r = toMat(A(2., 1.5, 2, .5, 3, .5, 1., .5, 4.), 3)
 
     val expLambda = A(5.087874, 2.810807, 1.101319)
-    val expdat = LA.transpose(makeMat(3, A(0.6196451, -0.2171220,  0.9402498, 0.3200200, -0.8211316, -0.1699035, 0.7166779,  0.5278267, -0.2950646)))
+    val expdat = LA.transpose(toMat(A(0.6196451, -0.2171220, 0.9402498, 0.3200200, -0.8211316, -0.1699035, 0.7166779, 0.5278267, -0.2950646), 3))
     val nClusters = 3
-    val nIterations = 50
+    val nIterations = 20
     val numVects = 3
 
     LA.localPIC(dat2r, nClusters, nIterations, Some((expLambda, expdat)))
   }
+
+  def toMat(dvect: Array[Double], ncols: Int) = {
+    val m = dvect.toSeq.grouped(ncols).map(_.toArray).toArray
+    m
+  }
+
+  test("positiveEigenValuesTaketwo") {
+    val dat2r = toMat(A(2., 1.5, 2, .5, 3, .5, 1., .5, 2.), 3)
+
+    val expLambda = A(4.2058717, 2.2358331, 0.5582952)
+    val expdat = LA.transpose(toMat(A(-0.7438459, 0.4718612, -0.82938843,
+      -0.4947461, -0.6777315, 0.05601231, -0.4493547, 0.5639389, 0.55585740), 3))
+    val nClusters = 3
+    val nIterations = 20
+    val numVects = 3
+
+    LA.localPIC(dat2r, nClusters, nIterations, Some((expLambda, expdat)))
+  }
+
   test("manualPowerIt") {
 
     // R code
@@ -180,11 +206,11 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     //      A(-0.5, 0.5, 4.0)
     //    )
 
-    var dat2r = makeMat(3, A(-2., -.5, 2, .5, -3, .5, -1., .5, 4.))
+    var dat2r = toMat(A(-2., -.5, 2, .5, -3, .5, -1., .5, 4.), 3)
 
     val expLambda = A(3.708394, -2.639960, -2.068434)
-    val expdat = LA.transpose(makeMat(3, A(0.32182428, 0.56847491, -0.85380536, 0.09420476,
-      0.82235947, -0.51117379, 0.94210116, 0.02368917, -0.09857872)))
+    val expdat = LA.transpose(toMat(A(0.32182428, 0.56847491, -0.85380536, 0.09420476,
+      0.82235947, -0.51117379, 0.94210116, 0.02368917, -0.09857872), 3))
     val nClusters = 3
     val nIterations = 30
     val numVects = 3
