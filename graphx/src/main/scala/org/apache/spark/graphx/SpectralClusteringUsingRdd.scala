@@ -231,12 +231,18 @@ object SpectralClusteringUsingRdd {
                            ): (Double, DVector) = {
 
       vectRdd.cache()
-      val rowMajorRdd = Linalg.transpose(vectRdd)
+      val rowMajorRdd = vectRdd.map(identity) // Linalg.transpose(vectRdd)
       val numVects = rddSize.getOrElse(vectRdd.count().toInt)
       var eigenRdd: RDD[(Int, Double)] = null
+      val rand = new Random()
       var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects)
-      yield (ix, 1.0 / /*Math.sqrt(*/ numVects)
+      yield (ix, rand.nextDouble)
+      val enorm = norm(eigenRddCollected.map(_._2).toArray)
+      eigenRddCollected = eigenRddCollected.map{ case (ix,d) =>
+        (ix, d / enorm)
+      }
 
+//      var eigenRddCollectedPrior =  eigenRddCollected.map(_._2).toArray
       var eigenRddCollectedPrior = Array.fill(numVects)(1.0 / Math.sqrt(numVects))
       var priorNorm = norm(eigenRddCollectedPrior)
       var cnorm = 0.0
@@ -461,6 +467,7 @@ object SpectralClusteringUsingRdd {
       for (k <- 0 until nClusters) {
         val r = new Random()
         var eigen = Array.fill(numVects) {
+//          1.0
           r.nextDouble
         }
         val enorm = norm(eigen)
@@ -473,7 +480,9 @@ object SpectralClusteringUsingRdd {
           cnorm = makeNonZero(norm(eigen))
           eigen = eigen.map(_ / cnorm)
         }
-        val lambda = dot(mat.take(1)(0), eigen) / eigen(0)
+        val signum = Math.signum(dot(mat(0), eigen))
+        val lambda = dot(mat(0), eigen) / eigen(0)
+        eigen = eigen.map(_ * signum)
         println(s"lambda=$lambda eigen=${printVect(eigen)}")
         if (expLambda.length > 0) {
           val compareVect = eigen.zip(expdat(k)).map { case (a, b) => a / b}
@@ -481,7 +490,7 @@ object SpectralClusteringUsingRdd {
             s"Vect=${compareVect.mkString("[", ",", "]")}")
         }
         if (k < nClusters - 1) {
-          // TODO: decide between deflate/deflate2
+          // TODO: decide between deflate/schurComplement
           mat = schurComplement(mat, lambda, eigen)
         }
       }
