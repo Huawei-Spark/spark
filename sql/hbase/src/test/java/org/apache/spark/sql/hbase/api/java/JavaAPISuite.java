@@ -18,9 +18,18 @@
 package org.apache.spark.sql.hbase.api.java;
 
 import java.io.Serializable;
+import java.util.List;
+import java.util.NoSuchElementException;
 
+import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.MiniHBaseCluster;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.sql.*;
 import org.apache.spark.sql.SQLConf;
-import org.apache.spark.sql.hbase.HBaseSQLContext;
+import org.apache.spark.sql.catalyst.plans.logical.Except;
+import org.apache.spark.sql.hbase.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -29,29 +38,62 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.hbase.TestHbase.*;
 
-public class JavaAPISuite implements Serializable {
-    private transient JavaSparkContext sc;
-    private transient SQLContext sqlContext;
+public class JavaAPISuite extends HBaseIntegrationTestBase implements Serializable {
+  private transient JavaSparkContext sc;
+  private transient HBaseSQLContext hsc;
+//    private transient SQLContext sqlContext;
+  private transient MiniHBaseCluster cluster;
+  private transient HBaseAdmin hbaseAdmin;
+
+  String hb_staging_table = "HbStagingTable";
+  String staging_table = "StagingTable";
+  String create_sql = "CREATE TABLE "+staging_table+"(strcol STRING, bytecol String, shortcol String, intcol String, " +
+          "longcol string, floatcol string, doublecol string, PRIMARY KEY(doublecol, strcol, intcol))" +
+          " MAPPED BY ("+hb_staging_table+", COLS=[bytecol=cf1.hbytecol, " +
+          "shortcol=cf1.hshortcol, longcol=cf2.hlongcol, floatcol=cf2.hfloatcol])";
+  String insert_sql = "INSERT INTO "+staging_table+" VALUES (\"strcol\" , \"bytecol\" , \"shortcol\" , \"intcol\" ," +
+          "  \"longcol\" , \"floatcol\" , \"doublecol\")";
+  String retrieve_sql = "SELECT * FROM "+staging_table;
 
     @Before
     public void setUp() {
-        sc = new JavaSparkContext("local", "JavaAPISuite");
-        sqlContext = new HBaseSQLContext(sc);
+      System.setProperty("spark.hadoop.hbase.zookeeper.quorum", "localhost");
+
+      sc = new JavaSparkContext("local[2]", "JavaAPISuite", new SparkConf(true));
+      hsc = new HBaseSQLContext(sc);
+
+      HBaseTestingUtility testUtil = new HBaseTestingUtility(hsc.configuration());
+
+      int nRegionServers= 1;
+      int nDataNodes = 1;
+      int nMasters = 1;
+
+//      HBaseMainTest.main(null);
+
+      try{
+        cluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes);
+        hbaseAdmin = new HBaseAdmin(hsc.configuration());
+      }catch (Exception e){
+        e.printStackTrace();
+      }
+
+
+
     }
 
     @After
     public void tearDown() {
-        sc.stop();
-        sc = null;
     }
 
-    @Test
-    public void test1() {
-//        boolean originalValue = sqlContext.getConf(SQLConf.CODEGEN_ENABLED(), "false"); //codegenEnabled
-//        sqlContext.setConf(SQLConf.CODEGEN_ENABLED(), "true");
-//        Row results = sqlContext.sql("SELECT col1 FROM ta GROUP BY col1").collect();
-//        assert(results.size() == 14);
-//        sqlContext.setConf(SQLConf.CODEGEN_ENABLED(), originalValue);
-    }
+  @Test
+  public void testCreate_Insert_Retrieve_Table() {
+    hsc.sql(create_sql).collect();
+    hsc.sql(insert_sql).collect();
+    Row[] row = hsc.sql(retrieve_sql).collect();
+
+    assert(row[0].toString().equals("[strcol,bytecol,shortcol,intcol,longcol,floatcol,doublecol]"));
+  }
+
 }
