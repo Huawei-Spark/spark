@@ -24,8 +24,10 @@ import scala.reflect.runtime.universe.typeTag
 /**
  * Almost identical to BinaryType except for a different ordering to be consistent
  * with that of HBase's internal ordering
+ * This is a data type for Low-Level HBase entities.
+ * It should not be used in High-Level processing
  */
-case object HBaseBytesType extends NativeType with PrimitiveType {
+private[hbase] case object HBaseBytesType extends NativeType with PrimitiveType {
   override def defaultSize: Int = 4096
   private[sql] type JvmType = Array[Byte]
   // TODO: can not use ScalaReflectionLock now for its accessibility

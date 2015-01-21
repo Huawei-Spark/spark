@@ -79,13 +79,13 @@ class CatalogTestSuite extends HBaseIntegrationTestBase {
     // check the data type
     assert(result.keyColumns(0).dataType === StringType)
     assert(result.keyColumns(1).dataType === IntegerType)
-    assert(result.nonKeyColumns(0).dataType === FloatType)
-    assert(result.nonKeyColumns(1).dataType === BooleanType)
+    assert(result.nonKeyColumns(1).dataType === FloatType)
+    assert(result.nonKeyColumns(0).dataType === BooleanType)
 
     val relation = catalog.lookupRelation(Seq(tableName))
     val subquery = relation.asInstanceOf[Subquery]
     val hbRelation = subquery.child.asInstanceOf[LogicalRelation].relation.asInstanceOf[HBaseRelation]
-    assert(hbRelation.nonKeyColumns.map(_.family) == List("family2", "family1"))
+    assert(hbRelation.nonKeyColumns.map(_.family) == List("family1", "family2"))
     val keyColumns = Seq(KeyColumn("column1", StringType, 0), KeyColumn("column2", IntegerType, 1))
     assert(hbRelation.keyColumns.equals(keyColumns))
     assert(relation.childrenResolved)

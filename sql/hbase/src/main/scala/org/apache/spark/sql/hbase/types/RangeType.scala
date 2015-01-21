@@ -56,7 +56,7 @@ class PartitionRange[T](start: Option[T], startInclusive: Boolean,
                         val id: Int, dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt)
 
-class RangeType[T] extends PartialOrderingDataType {
+private[hbase] class RangeType[T] extends PartialOrderingDataType {
   override def defaultSize: Int = 4096
   private[sql] type JvmType = Range[T]
   // TODO: can not use ScalaReflectionLock now for its accessibility

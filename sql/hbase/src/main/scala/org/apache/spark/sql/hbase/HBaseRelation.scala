@@ -104,7 +104,8 @@ private[hbase] case class HBaseRelation(
     .asInstanceOf[Seq[NonKeyColumn]].sortWith(
       (a: NonKeyColumn, b: NonKeyColumn) => {
         val empty = new HBaseRawType(0)
-        KeyValue.COMPARATOR.compareRows(new KeyValue(empty, a.familyRaw, a.qualifierRaw, empty),
+        KeyValue.COMPARATOR.compare(
+          new KeyValue(empty, a.familyRaw, a.qualifierRaw, empty),
           new KeyValue(empty, b.familyRaw, b.qualifierRaw, empty)) < 0
       }
     )
