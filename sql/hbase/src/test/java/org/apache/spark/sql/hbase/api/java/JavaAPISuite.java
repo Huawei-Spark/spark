@@ -18,17 +18,10 @@
 package org.apache.spark.sql.hbase.api.java;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.NoSuchElementException;
-
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.function.Function;
-import org.apache.spark.sql.*;
-import org.apache.spark.sql.SQLConf;
-import org.apache.spark.sql.catalyst.plans.logical.Except;
 import org.apache.spark.sql.hbase.*;
 import org.junit.After;
 import org.junit.Before;
@@ -36,14 +29,10 @@ import org.junit.Test;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SQLContext;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.hbase.TestHbase.*;
 
 public class JavaAPISuite extends HBaseIntegrationTestBase implements Serializable {
   private transient JavaSparkContext sc;
   private transient HBaseSQLContext hsc;
-//    private transient SQLContext sqlContext;
   private transient MiniHBaseCluster cluster;
   private transient HBaseAdmin hbaseAdmin;
 
@@ -69,8 +58,6 @@ public class JavaAPISuite extends HBaseIntegrationTestBase implements Serializab
       int nRegionServers= 1;
       int nDataNodes = 1;
       int nMasters = 1;
-
-//      HBaseMainTest.main(null);
 
       try{
         cluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes);
