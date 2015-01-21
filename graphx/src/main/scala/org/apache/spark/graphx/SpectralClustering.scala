@@ -99,6 +99,7 @@ object SpectralClustering {
     var priorNormVelocity = Double.MaxValue
     var normVelocity = Double.MaxValue
     var normAccel = Double.MaxValue
+    val DummyVertexId = -99L
     var vnorm: Double = -1.0
     var outG: DGraph = null
     var prevG: DGraph = G
@@ -107,17 +108,19 @@ object SpectralClustering {
     for (iter <- 0 until nIterations
          if Math.abs(normAccel) > epsilon) {
 
-      val tmpEigen = prevG.aggregateMessages[Double](ctx => ctx.sendToSrc(
-        ctx.attr * ctx.srcAttr),
+      val tmpEigen = prevG.aggregateMessages[Double](ctx => ctx.sendToDst(
+        ctx.attr * ctx.dstAttr),
         _ + _)
       println(s"tmpEigen[$iter]: ${tmpEigen.collect.mkString(",")}\n")
-      val folded = tmpEigen.fold((-1L, 0.0)) { case ((vout, sum), (vid, dval)) =>
+      val vnorm = Math.sqrt(
+        tmpEigen.fold((DummyVertexId, 0.0)) { case ((vout, sum), (vid, dval)) =>
         (vout, sum + dval * dval)
-      }
-      vnorm = Math.sqrt(folded._2)
+      }._2)
       println(s"vnorm[$iter]=$vnorm")
-      outG = prevG.joinVertices(tmpEigen) { case (vid, wval, tmpEig) =>
-        val normedEig = tmpEig / vnorm
+      outG = prevG.outerJoinVertices(tmpEigen) { case (vid, wval, optTmpEigJ) =>
+        val normedEig = optTmpEigJ.getOrElse{
+          println("We got null estimated eigenvector element");
+          -1.0 }/ vnorm
         println(s"Updating vertex[$vid] from $wval to $normedEig")
         normedEig
       }
