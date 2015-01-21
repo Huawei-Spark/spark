@@ -28,7 +28,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
-import org.apache.spark.sql.hbase.catalyst.types.PartitionRange
+import org.apache.spark.sql.hbase.types.PartitionRange
 import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
 import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation, RelationProvider}
 

@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.Logging
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.hbase.catalyst.types.HBaseBytesType
+import org.apache.spark.sql.hbase.types.HBaseBytesType
 import org.apache.spark.sql.hbase.util.BytesUtils
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 

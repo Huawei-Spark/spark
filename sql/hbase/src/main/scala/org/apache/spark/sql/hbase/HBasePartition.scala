@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.{Logging, Partition}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.catalyst.types.{HBaseBytesType, PartitionRange, Range}
+import org.apache.spark.sql.hbase.types.{HBaseBytesType, PartitionRange, Range}
 
 
 private[hbase] class HBasePartition(

@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase.catalyst.expressions
 import org.apache.spark.sql.catalyst.errors.TreeNodeException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.hbase.catalyst.types._
+import org.apache.spark.sql.hbase.types._
 
 object PartialPredicateOperations {
   // Partial reduction is nullness-based, i.e., uninterested columns are assigned nulls,

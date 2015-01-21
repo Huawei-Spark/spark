@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.hbase.catalyst.types
+package org.apache.spark.sql.hbase.types
 
 import org.apache.spark.sql.types._
 

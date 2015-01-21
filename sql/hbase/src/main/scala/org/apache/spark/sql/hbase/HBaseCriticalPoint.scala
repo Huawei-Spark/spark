@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.catalyst.types.Range
+import org.apache.spark.sql.hbase.types.Range
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
