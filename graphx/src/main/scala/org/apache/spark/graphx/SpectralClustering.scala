@@ -17,8 +17,7 @@
 
 package org.apache.spark.graphx
 
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.{Partitioner, SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 /**
@@ -44,21 +43,47 @@ object SpectralClustering {
   val DefaultIterations: Int = 20
   val DefaultMinAffinity = 1e-11
 
-  def cluster(sc: SparkContext, points: Points,
+  def cluster(sc: SparkContext,
+              points: Points,
               nClusters: Int,
               nIterations: Int = DefaultIterations,
               sigma: Double = DefaultSigma,
               minAffinity: Double = DefaultMinAffinity) = {
     val nVertices = points.length
-    val wRdd = createNormalizedAffinityMatrix(sc, points, sigma)
+
+    val (wRdd, rowSums) = createNormalizedAffinityMatrix(sc, points, sigma)
+    val initialVt = createInitialVector(sc, points.map(_._1), rowSums )
     val edgesRdd = createSparseEdgesRdd(sc, wRdd, minAffinity)
-    val G = createGraphFromEdges(edgesRdd)
+
+    val G = createGraphFromEdges(sc, edgesRdd, points.size, Some(initialVt))
     getPrincipalEigen(sc, G)
   }
 
-  def createGraphFromEdges(edgesRdd: RDD[DEdge]) = {
-    val G = Graph.fromEdges(edgesRdd, -1.0)
+  def createInitialVector(sc: SparkContext,
+              labels: Seq[VertexId],
+                           rowSums: Seq[Double]) = {
+    val volume = rowSums.fold(0.0) {
+      _ + _
+    }
+    val initialVt = labels.zip(rowSums.map(_ / volume))
+    initialVt
+  }
+
+  def createGraphFromEdges(sc: SparkContext,
+                           edgesRdd: RDD[DEdge],
+                           nPoints: Int,
+                           optInitialVt: Option[Seq[(VertexId, Double)]] = None) = {
+
+    assert(nPoints > 0, "Must provide number of points from the original dataset")
+    val G = if (optInitialVt.isDefined) {
+      val initialVt = optInitialVt.get
+      val vertsRdd = sc.parallelize(initialVt)
+      Graph(vertsRdd, edgesRdd)
+    } else {
+      Graph.fromEdges(edgesRdd, -1.0)
+    }
     G
+
   }
 
   val printMatrices = true
@@ -66,7 +91,7 @@ object SpectralClustering {
   def getPrincipalEigen(sc: SparkContext,
                         G: DGraph,
                         nIterations: Int = DefaultIterations,
-                        minNormChange: Double = DefaultMinNormChange
+                        optMinNormChange: Option[Double] = None
                          ): (DGraph, Double, DVector) = {
 
     var priorNorm = Double.MaxValue
@@ -77,8 +102,10 @@ object SpectralClustering {
     var vnorm: Double = -1.0
     var outG: DGraph = null
     var prevG: DGraph = G
-    for (iter <- 0 until nIterations;
-         if Math.abs(normAccel) > minNormChange) {
+    val epsilon = optMinNormChange
+      .getOrElse( 1e-5 / G.vertices.count())
+    for (iter <- 0 until nIterations
+         if Math.abs(normAccel) > epsilon) {
 
       val tmpEigen = prevG.aggregateMessages[Double](ctx => ctx.sendToSrc(
         ctx.attr * ctx.srcAttr),
@@ -103,6 +130,7 @@ object SpectralClustering {
       }
       normVelocity = vnorm - priorNorm
       normAccel = normVelocity - priorNormVelocity
+      println(s"normAccel[$iter]= $normAccel")
       priorNorm = vnorm
       priorNormVelocity = vnorm - priorNorm
     }
@@ -164,7 +192,7 @@ object SpectralClustering {
     val labels = wRdd.map { case (vid, vect) => vid}.collect
     val edgesRdd = wRdd.flatMap { case (vid, vect) =>
       for ((dval, ix) <- vect.zipWithIndex
-           if Math.abs(dval - minAffinity) >= 0)
+           if Math.abs(dval) >=  minAffinity)
       yield Edge(vid, labels(ix), dval)
     }
     edgesRdd
@@ -172,11 +200,11 @@ object SpectralClustering {
 
   def createNormalizedAffinityMatrix(sc: SparkContext, points: Points, sigma: Double) = {
     val nVertices = points.length
-    val colCounts = for (bcx <- 0 until nVertices)
-    yield sc.accumulator[Double](bcx, s"ColCounts$bcx")
+    val rowSums = for (bcx <- 0 until nVertices)
+      yield sc.accumulator[Double](bcx, s"ColCounts$bcx")
     val affinityRddNotNorm = sc.parallelize({
       val ivect = new Array[IndexedVector](nVertices)
-      var colSum = 0.0
+      var rsum = 0.0
       for (i <- 0 until points.size) {
         ivect(i) = new IndexedVector(points(i)._1, new DVector(nVertices))
         for (j <- 0 until points.size) {
@@ -186,9 +214,9 @@ object SpectralClustering {
             0.0
           }
           ivect(i)._2(j) = dist
-          colSum += dist
+          rsum += dist
         }
-        colCounts(i) += colSum
+        rowSums(i) += rsum
       }
       ivect.zipWithIndex.map { case (vect, ix) =>
         (ix, vect)
@@ -196,10 +224,10 @@ object SpectralClustering {
     }, nVertices)
     val affinityRdd = affinityRddNotNorm.map { case (rowx, (vid, vect)) =>
       (vid, vect.map {
-        _ / colCounts(rowx).value
+        _ / rowSums(rowx).value
       })
     }
-    affinityRdd
+    (affinityRdd, rowSums.map{_.value})
   }
 
   def norm(vect: DVector): Double = {

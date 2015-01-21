@@ -31,12 +31,12 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
 
   test("graphxSingleEigen") {
     val dat1 = A(
-      A(0, 0., .8, 0.),
-      A(.4, 0, .7, 0.),
-      A(0., 0., 0, 2.0),
-      A(1.1, .5, .4, 0)
+      A(0, 0.4, .8, 0.9),
+      A(.4, 0, .7, 0.5),
+      A(0.8, 0.7, 0, 0.75),
+      A(0.9, .5, .75, 0)
     )
-    val D = LA.transpose(dat1).zipWithIndex.map { case (dvect, ix) =>
+    val D = /*LA.transpose(dat1)*/dat1.zipWithIndex.map { case (dvect, ix) =>
       val sum = dvect.foldLeft(0.0) {
         _ + _
       }
@@ -56,7 +56,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     //    val dats = Array((dat2, expDat2), (dat1, expDat1))
     val SC = SpectralClustering
     val sigma = 1.0
-    val nIterations = 2 // 20
+    val nIterations = 10 // 20
     val nClusters = 3
     withSpark { sc =>
       val affinityRdd = sc.parallelize(DxDat1.zipWithIndex).map { case (dvect, ix) =>
@@ -68,8 +68,12 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       val edgesRdd = SC.createSparseEdgesRdd(sc, affinityRdd)
       val edgesRddCollected = edgesRdd.collect()
       println(s"edges=${edgesRddCollected.mkString(",")}")
-      val G = SC.createGraphFromEdges(edgesRdd)
-      val (g2, norm, eigvect) = SC.getPrincipalEigen(sc, G, 3)
+      val rowSums = dat1.map { vect =>
+        vect.foldLeft(0.0){ _ + _ }
+      }
+      val initialVt = SC.createInitialVector(sc, affinityRdd.map{_._1}.collect, rowSums )
+      val G = SC.createGraphFromEdges(sc, edgesRdd, nVertices, Some(initialVt))
+      val (g2, norm, eigvect) = SC.getPrincipalEigen(sc, G, nIterations)
       println(s"lambda=$norm eigvect=${eigvect.mkString(",")}")
     }
   }
