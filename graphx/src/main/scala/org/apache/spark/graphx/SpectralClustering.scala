@@ -52,7 +52,7 @@ object SpectralClustering {
     val nVertices = points.length
 
     val (wRdd, rowSums) = createNormalizedAffinityMatrix(sc, points, sigma)
-    val initialVt = createInitialVector(sc, points.map(_._1), rowSums )
+    val initialVt = createInitialVector(sc, points.map(_._1), rowSums)
     val edgesRdd = createSparseEdgesRdd(sc, wRdd, minAffinity)
 
     val G = createGraphFromEdges(sc, edgesRdd, points.size, Some(initialVt))
@@ -60,8 +60,8 @@ object SpectralClustering {
   }
 
   def createInitialVector(sc: SparkContext,
-              labels: Seq[VertexId],
-                           rowSums: Seq[Double]) = {
+                          labels: Seq[VertexId],
+                          rowSums: Seq[Double]) = {
     val volume = rowSums.fold(0.0) {
       _ + _
     }
@@ -104,7 +104,7 @@ object SpectralClustering {
     var outG: DGraph = null
     var prevG: DGraph = G
     val epsilon = optMinNormChange
-      .getOrElse( 1e-5 / G.vertices.count())
+      .getOrElse(1e-5 / G.vertices.count())
     for (iter <- 0 until nIterations
          if Math.abs(normAccel) > epsilon) {
 
@@ -118,15 +118,16 @@ object SpectralClustering {
         (vid, s + d)
       }
       println(s"tmpEigen[$iter]: ${tmpEigen.collect.mkString(",")}\n")
-      val vnorm = Math.sqrt(
+      val vnorm = /*Math.sqrt(*/
         tmpEigen.fold((DummyVertexId, 0.0)) { case ((vout, sum), (vid, dval)) =>
-        (vout, sum + dval * dval)
-      }._2)
+          (vid, sum + Math.abs(dval))}._2 /* * dval)
+        }._2)  */
       println(s"vnorm[$iter]=$vnorm")
       outG = prevG.outerJoinVertices(tmpEigen) { case (vid, wval, optTmpEigJ) =>
-        val normedEig = optTmpEigJ.getOrElse{
+        val normedEig = optTmpEigJ.getOrElse {
           println("We got null estimated eigenvector element");
-          -1.0 }/ vnorm
+          -1.0
+        } / vnorm
         println(s"Updating vertex[$vid] from $wval to $normedEig")
         normedEig
       }
@@ -201,7 +202,7 @@ object SpectralClustering {
     val labels = wRdd.map { case (vid, vect) => vid}.collect
     val edgesRdd = wRdd.flatMap { case (vid, vect) =>
       for ((dval, ix) <- vect.zipWithIndex
-           if Math.abs(dval) >=  minAffinity)
+           if Math.abs(dval) >= minAffinity)
       yield Edge(vid, labels(ix), dval)
     }
     edgesRdd
@@ -210,7 +211,7 @@ object SpectralClustering {
   def createNormalizedAffinityMatrix(sc: SparkContext, points: Points, sigma: Double) = {
     val nVertices = points.length
     val rowSums = for (bcx <- 0 until nVertices)
-      yield sc.accumulator[Double](bcx, s"ColCounts$bcx")
+    yield sc.accumulator[Double](bcx, s"ColCounts$bcx")
     val affinityRddNotNorm = sc.parallelize({
       val ivect = new Array[IndexedVector](nVertices)
       var rsum = 0.0
@@ -236,7 +237,9 @@ object SpectralClustering {
         _ / rowSums(rowx).value
       })
     }
-    (affinityRdd, rowSums.map{_.value})
+    (affinityRdd, rowSums.map {
+      _.value
+    })
   }
 
   def norm(vect: DVector): Double = {
