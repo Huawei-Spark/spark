@@ -26,6 +26,7 @@ import scala.reflect.runtime.universe.typeTag
  * with that of HBase's internal ordering
  */
 case object HBaseBytesType extends NativeType with PrimitiveType {
+  override def defaultSize: Int = 4096
   private[sql] type JvmType = Array[Byte]
   // TODO: can not use ScalaReflectionLock now for its accessibility
   // @transient private[sql] lazy val tag = ScalaReflectionLock.synchronized { typeTag[JvmType] }
