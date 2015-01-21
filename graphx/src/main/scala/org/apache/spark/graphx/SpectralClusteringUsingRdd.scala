@@ -169,6 +169,7 @@ object SpectralClusteringUsingRdd {
   }
 
   object Linalg {
+
     def add(v1: DVector, v2: DVector) =
       v1.zip(v2).map { x => x._1 + x._2}
 
@@ -347,6 +348,9 @@ object SpectralClusteringUsingRdd {
         .toArray
       matT
     }
+
+    def printMatrix(mat: Array[Array[Double]]) : String
+      = printMatrix(mat, mat.length, mat.length)
 
     def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
       val flattenedArr = darr.zipWithIndex.foldLeft(new DVector(numRows * numCols)) {

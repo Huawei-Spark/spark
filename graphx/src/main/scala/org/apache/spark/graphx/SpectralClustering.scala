@@ -17,6 +17,7 @@
 
 package org.apache.spark.graphx
 
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{Partitioner, SparkContext}
 import org.apache.spark.rdd.RDD
 
@@ -26,80 +27,96 @@ import org.apache.spark.rdd.RDD
  */
 object SpectralClustering {
 
-  type RCId = Int
-
   type DVector = Array[Double]
 
-  type DEdge = Edge[DVector]
-  type LabeledVector = (VertexId, DVector)
+  type DEdge = Edge[Double]
+  type LabeledPoint = (VertexId, DVector)
 
-  type IndexedVector = (Int, DVector)
+  type Points = Seq[LabeledPoint]
 
-  type Vertices = Seq[LabeledVector]
+  type DGraph = Graph[Double, Double]
 
-  type DGraph = Graph[DVector, DVector]
+  type IndexedVector = (Long, DVector)
 
   val DefaultMinNormChange: Double = 1e-11
 
+  val DefaultSigma = 1.0
   val DefaultIterations: Int = 20
+  val DefaultMinAffinity = 1e-11
 
-  def cluster(sc: SparkContext, vertices: Vertices, nClusters: Int, sigma: Double,
-              nPowerIterations: Int) = {
-    val nVertices = vertices.length
-    val edgesRdd = createGaussianEdgesRdd(sc, vertices, sigma)
+  def cluster(sc: SparkContext, points: Points,
+              nClusters: Int,
+              nIterations: Int = DefaultIterations,
+              sigma: Double = DefaultSigma,
+              minAffinity: Double = DefaultMinAffinity) = {
+    val nVertices = points.length
+    val wRdd = createNormalizedAffinityMatrix(sc, points, sigma)
+    val edgesRdd = createSparseEdgesRdd(sc, wRdd, minAffinity)
     val G = createGraphFromEdges(edgesRdd)
-
+    getPrincipalEigen(sc, G)
   }
 
   def createGraphFromEdges(edgesRdd: RDD[DEdge]) = {
-    val G = Graph.fromEdges(edgesRdd, -1L)
+    val G = Graph.fromEdges(edgesRdd, -1.0)
+    G
   }
+
+  val printMatrices = true
 
   def getPrincipalEigen(sc: SparkContext,
                         G: DGraph,
-//                        optGraphSize: Option[Int] = None,
                         nIterations: Int = DefaultIterations,
                         minNormChange: Double = DefaultMinNormChange
-                         ): (Double, DVector) = {
+                         ): (DGraph, Double, DVector) = {
 
-//    val graphSize = optGraphSize.getOrElse(G.edges.count().toInt)
-    val graphSize = G.edges.count().toInt
-    var eigenRdd: RDD[(Int, Double)] = null
-    var eigEst: Seq[(Int, Double)] = for (ix <- 0 until graphSize)
-      yield (ix, 1.0 / Math.sqrt(graphSize))
-    val norms = new DVector(graphSize)
-    var normChange = Int.MaxValue
+    var priorNorm = Double.MaxValue
+    var norm = Double.MaxValue
+    var priorNormVelocity = Double.MaxValue
+    var normVelocity = Double.MaxValue
+    var normAccel = Double.MaxValue
+    var vnorm: Double = -1.0
+    var outG: DGraph = null
+    var prevG: DGraph = G
     for (iter <- 0 until nIterations;
-         if Math.abs(normChange) > minNormChange) {
-      val bcEigEst = sc.broadcast(eigEst)
-      //   *   aggregateMessages[Int](ctx => ctx.sendToDst(1), _ + _)
-      val tmpEigen = G.aggregateMessages[Double]( ctx => ctx.sendToSrc(
-        scalarDot(ctx.attr, ctx.srcAttr)),  (_,_) => Double.NaN)
-      val collectedVerts = tmpEigen.collect.map(_._2)
-      val vnorm = norm(collectedVerts)
-      print(s"Vertices[$iter]:\n${printMatrix(collectedVerts,graphSize,graphSize)}")
+         if Math.abs(normAccel) > minNormChange) {
+
+      val tmpEigen = prevG.aggregateMessages[Double](ctx => ctx.sendToSrc(
+        ctx.attr * ctx.srcAttr),
+        _ + _)
+      println(s"tmpEigen[$iter]: ${tmpEigen.collect.mkString(",")}\n")
+      val folded = tmpEigen.fold((-1L, 0.0)) { case ((vout, sum), (vid, dval)) =>
+        (vout, sum + dval * dval)
+      }
+      vnorm = Math.sqrt(folded._2)
+      println(s"vnorm[$iter]=$vnorm")
+      outG = prevG.joinVertices(tmpEigen) { case (vid, wval, tmpEig) =>
+        val normedEig = tmpEig / vnorm
+        println(s"Updating vertex[$vid] from $wval to $normedEig")
+        normedEig
+      }
+      prevG = outG
+
+      if (printMatrices) {
+        val localVertices = outG.vertices.collect
+        val graphSize = localVertices.size
+        print(s"Vertices[$iter]: ${localVertices.mkString(",")}\n")
+      }
+      normVelocity = vnorm - priorNorm
+      normAccel = normVelocity - priorNormVelocity
+      priorNorm = vnorm
+      priorNormVelocity = vnorm - priorNorm
     }
-    G.
+    (outG, vnorm, outG.vertices.collect.map {
+      _._2
+    })
   }
 
-  def printGraph(G: DGraph) = {
-
-  }
-
-//  def normDot(d1: DVector, d2: DVector) = {
-//    var sum = 0.0
-//    var tmpOutv = d1.zip(d2).map { case (d1v, d2v) =>
-//      val v = d1v * d2v
-//      sum += v
-//      v
-//    }
-//    val norm = Math.sqrt(sum)
-//    for (tx <- 0 until tmpOutv.length) {
-//      tmpOutv(tx) /= norm
-//    }
-//    (norm, tmpOutv)
-//  }
-
+  //  def printGraph(G: DGraph) = {
+  //    val collectedVerts = G.vertices.collect
+  //    val nVertices = collectedVerts.length
+  //      val msg = s"Graph Vertices:\n${printMatrix(collectedVerts, nVertices, nVertices)}"
+  //  }
+  //
   def scalarDot(d1: DVector, d2: DVector) = {
     Math.sqrt(d1.zip(d2).foldLeft(0.0) { case (sum, (d1v, d2v)) =>
       sum + d1v * d2v
@@ -119,148 +136,74 @@ object SpectralClustering {
     }
   }
 
-  def readVerticesfromFile(verticesFile: String): Vertices = {
+  def readVerticesfromFile(verticesFile: String): Points = {
 
     import scala.io.Source
     val vertices = Source.fromFile(verticesFile).getLines.map { l =>
       val toks = l.split("\t")
       val arr = toks.slice(1, toks.length).map(_.toDouble)
       (toks(0).toLong, arr)
-    }.toList
+    }.toSeq
     println(s"Read in ${vertices.length} from $verticesFile")
     //    println(vertices.map { case (x, arr) => s"($x,${arr.mkString(",")})"}
     // .mkString("[", ",\n", "]"))
     vertices
   }
 
-  def verticesToEdges(vertices: Vertices): Seq[DEdge] = {
-    val nVertices = vertices.length
-    vertices.zipWithIndex.map { case ((vid, darr), ix) =>
-      new DEdge(vid, vertices((ix + 1) % nVertices)._1, darr)
-    }
-  }
-
   def gaussianDist(c1arr: DVector, c2arr: DVector, sigma: Double) = {
     val c1c2 = c1arr.zip(c2arr)
     val dist = Math.exp((0.5 / Math.pow(sigma, 2.0)) * c1c2.foldLeft(0.0) {
       case (dist: Double, (c1: Double, c2: Double)) =>
-        dist - Math.pow(c1 - c2, 2)
+        dist + Math.pow(c1 - c2, 2)
     })
     dist
   }
 
-  def createGaussianEdgesRdd(sc: SparkContext, vertices: Vertices, sigma: Double) = {
-    val nVertices = vertices.length
-    val coordinateEdges = verticesToEdges(vertices)
-    val bcCoordinateEdges = sc.broadcast(coordinateEdges)
-    val edgesRdd = sc.parallelize(coordinateEdges, nVertices)
-    edgesRdd.mapPartitions { iter =>
-      val localEdgesRdd = bcCoordinateEdges.value
-      iter.map { case edge =>
-        val darr = new DVector(nVertices)
-        for (j <- 0 until nVertices) {
-          darr(j) = if (edge.srcId != localEdgesRdd(j).srcId) {
-            gaussianDist(darr, localEdgesRdd(j).attr, sigma)
+  def createSparseEdgesRdd(sc: SparkContext, wRdd: RDD[IndexedVector],
+                           minAffinity: Double = DefaultMinAffinity) = {
+    val labels = wRdd.map { case (vid, vect) => vid}.collect
+    val edgesRdd = wRdd.flatMap { case (vid, vect) =>
+      for ((dval, ix) <- vect.zipWithIndex
+           if Math.abs(dval - minAffinity) >= 0)
+      yield Edge(vid, labels(ix), dval)
+    }
+    edgesRdd
+  }
+
+  def createNormalizedAffinityMatrix(sc: SparkContext, points: Points, sigma: Double) = {
+    val nVertices = points.length
+    val colCounts = for (bcx <- 0 until nVertices)
+    yield sc.accumulator[Double](bcx, s"ColCounts$bcx")
+    val affinityRddNotNorm = sc.parallelize({
+      val ivect = new Array[IndexedVector](nVertices)
+      var colSum = 0.0
+      for (i <- 0 until points.size) {
+        ivect(i) = new IndexedVector(points(i)._1, new DVector(nVertices))
+        for (j <- 0 until points.size) {
+          val dist = if (i != j) {
+            gaussianDist(points(i)._2, points(j)._2, sigma)
           } else {
             0.0
           }
+          ivect(i)._2(j) = dist
+          colSum += dist
         }
-        val newEdge = new DEdge(edge.srcId, edge.dstId, darr)
-        newEdge
+        colCounts(i) += colSum
       }
+      ivect.zipWithIndex.map { case (vect, ix) =>
+        (ix, vect)
+      }
+    }, nVertices)
+    val affinityRdd = affinityRddNotNorm.map { case (rowx, (vid, vect)) =>
+      (vid, vect.map {
+        _ / colCounts(rowx).value
+      })
     }
+    affinityRdd
   }
 
   def norm(vect: DVector): Double = {
     Math.sqrt(vect.foldLeft(0.0) { case (sum, dval) => sum + Math.pow(dval, 2)})
-  }
-
-  def onesVector(len: Int): DVector = {
-    Array.fill(len)(1.0)
-  }
-
-  val calcEigenDiffs = false
-
-  def withinTol(d: Double, tol: Double) = Math.abs(d) <= tol
-
-  def makeNonZero(dval: Double, tol: Double = 1.0e-8) = {
-    if (Math.abs(dval) < tol) {
-      Math.signum(dval) * tol
-    } else {
-      dval
-    }
-  }
-
-  def project(basisVector: DVector, inputVect: DVector) = {
-    val dotprod = basisVector.zip(inputVect).foldLeft(0.0) {
-      case (sum, (b, p)) => sum + b * p
-    }
-    val pnorm = makeNonZero(norm(basisVector))
-    val projectedVect = basisVector.map(_ * (dotprod / Math.pow(pnorm, 2)))
-    projectedVect
-  }
-
-  def subtract(v1: DVector, v2: DVector) = {
-    val subvect = v1.zip(v2).map { case (v1val, v2val) => v1val - v2val}
-    subvect
-  }
-
-  def subtractProjection(sc: SparkContext, vectorsRdd: RDD[IndexedVector], vect: DVector):
-  RDD[IndexedVector] = {
-    val bcVect = sc.broadcast(vect)
-    val subVectRdd = vectorsRdd.mapPartitions { iter =>
-      val localVect = bcVect.value
-      iter.map { case (ix, row) =>
-        val subproj = subtractProjection(row, localVect)
-        //        println(s"Subproj for ${row.mkString(",")} =\n${subproj.mkString(",")}")
-        (ix, subproj)
-      }
-    }
-    println(s"Subtracted VectorsRdd\n${
-      printMatrix(subVectRdd.collect.map(_._2), vect.length,
-        vect.length)
-    }")
-    subVectRdd
-  }
-
-  def subtractProjection(vect: DVector, basisVect: DVector): DVector = {
-    val proj = project(basisVect, vect)
-    val subVect = subtract(vect, proj)
-    subVect
-  }
-
-  def createColumnsRdds(sc: SparkContext, vertices: Vertices,
-                        indexedDegreesRdd: RDD[IndexedVector]) = {
-    val nVertices = vertices.length
-    val ColsPartitioner = new Partitioner() {
-      override def numPartitions: Int = nVertices
-
-      override def getPartition(key: Any): Int = {
-        val index = key.asInstanceOf[Int]
-        index % nVertices
-      }
-    }
-    // Needed for the PairRDDFunctions implicits
-    import org.apache.spark.SparkContext._
-    // Does the following give the desired # partitions
-    val columnsRdd = indexedDegreesRdd.partitionBy(ColsPartitioner)
-      .mapPartitions({ iter =>
-      var cntr = -1
-      iter.map { case (rowIndex, dval) =>
-        cntr += 1
-        (cntr, dval)
-      }
-    }, preservesPartitioning = true)
-
-    val colSums = columnsRdd.mapPartitions { iter =>
-      iter.map { case (rowIndex, darr) =>
-        (rowIndex, darr.foldLeft(0.0) { case (sum, dval) =>
-          sum + dval
-        })
-      }
-    }
-
-    (columnsRdd, colSums)
   }
 
   def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {

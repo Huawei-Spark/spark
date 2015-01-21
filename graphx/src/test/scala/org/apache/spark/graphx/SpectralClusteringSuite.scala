@@ -1,9 +1,6 @@
 package org.apache.spark.graphx
 
-import org.apache.spark.graphx.SpectralClustering.DVector
 import org.scalatest.FunSuite
-
-import scala.reflect.ClassTag
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -31,6 +28,52 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
   val SP = SpectralClusteringUsingRdd
   val LA = SP.Linalg
   val A = Array
+
+  test("graphxSingleEigen") {
+    val dat1 = A(
+      A(0, 0., .8, 0.),
+      A(.4, 0, .7, 0.),
+      A(0., 0., 0, 2.0),
+      A(1.1, .5, .4, 0)
+    )
+    val D = LA.transpose(dat1).zipWithIndex.map { case (dvect, ix) =>
+      val sum = dvect.foldLeft(0.0) {
+        _ + _
+      }
+      dvect.zipWithIndex.map { case (d, dx) =>
+        if (ix == dx) {
+          1.0 / sum
+        } else {
+          0.0
+        }
+      }
+    }
+    print(s"D =\n ${LA.printMatrix(D)}")
+
+    val DxDat1 = LA.mult(D, dat1)
+    print(s"D * Dat1 =\n ${LA.printMatrix(DxDat1)}")
+
+    //    val dats = Array((dat2, expDat2), (dat1, expDat1))
+    val SC = SpectralClustering
+    val sigma = 1.0
+    val nIterations = 2 // 20
+    val nClusters = 3
+    withSpark { sc =>
+      val affinityRdd = sc.parallelize(DxDat1.zipWithIndex).map { case (dvect, ix) =>
+        (ix.toLong, dvect)
+      }
+      val wCollected = affinityRdd.collect
+      val nVertices = dat1(0).length
+      println(s"AffinityMatrix:\n${printMatrix(wCollected.map(_._2), nVertices, nVertices)}")
+      val edgesRdd = SC.createSparseEdgesRdd(sc, affinityRdd)
+      val edgesRddCollected = edgesRdd.collect()
+      println(s"edges=${edgesRddCollected.mkString(",")}")
+      val G = SC.createGraphFromEdges(edgesRdd)
+      val (g2, norm, eigvect) = SC.getPrincipalEigen(sc, G, 3)
+      println(s"lambda=$norm eigvect=${eigvect.mkString(",")}")
+    }
+  }
+
   test("VectorArithmeticAndProjections") {
     //    def A[T : ClassTag](ts: T*) = Array(ts:_*)
     //    type A = Array[Double]
@@ -51,14 +94,14 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     var proj = LA.subtractProjection(dat(0), dat(3)) // orthog
     println(s"proj after subtracting orthogonal vector should  be same " +
       s"as input (1.,2.,3.) ${proj.mkString(",")}")
-    assert(proj.zip(dat(0)).map { case (a, b) => a - b}.forall(LA.withinTol(_, 1e-11)))
+    assert(proj.zip(dat(0)).map { case (a, b) => a - b} .forall(LA.withinTol(_, 1e-11)))
 
     val addMultVect = LA.add(dat(0), LA.mult(dat(3), 3.0))
-    assert(addMultVect.zip(dat(4)).map { case (a, b) => a - b}.forall(LA.withinTol(_, 1e-11)),
-      "AddMult was not within tolerance")
+    assert(addMultVect.zip(dat(4)).map { case (a, b) => a - b} .forall(LA.withinTol(_, 1e-11)),
+    "AddMult was not within tolerance")
     proj = LA.subtractProjection(addMultVect, dat(3)) // orthog
     println(s"proj should  be same as parallel input (1.,2.,3.) ${proj.mkString(",")}")
-    assert(proj.zip(dat(0)).map { case (a, b) => a - b}.forall(LA.withinTol(_, 1e-11)))
+    assert(proj.zip(dat(0)).map { case (a, b) => a - b} .forall(LA.withinTol(_, 1e-11)))
   }
 
   def compareVectors(v1: Array[Double], v2: Array[Double]) = {
@@ -76,9 +119,9 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
   test("eigensTest") {
     var dat0 = toMat(A(2., 1.5, 2, .5, 3, .5, 1., .5, 4.), 3)
     val expDat0 = (A(-0.7438459, -0.4947461, -0.4493547),
-       toMat(A(  0.5533067, 0.3680148, 0.3342507,
-        0.3680148, 0.2447737, 0.2223165, 0.3342507, 0.2223165, 0.2019197),3)
-       )
+      toMat(A(0.5533067, 0.3680148, 0.3342507,
+        0.3680148, 0.2447737, 0.2223165, 0.3342507, 0.2223165, 0.2019197), 3)
+      )
     val dat1 = A(
       A(3.0, 2.0, 4.0),
       A(2.0, 0.0, 2.0),
@@ -109,7 +152,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
           A(0.5773503, 0.9525793, 7.071068e-01)
         ))
     val dats = Array((dat0, expDat0))
-//    val dats = Array((dat2, expDat2), (dat1, expDat1))
+    //    val dats = Array((dat2, expDat2), (dat1, expDat1))
     for ((dat, expdat) <- dats) {
       val sigma = 1.0
       val nIterations = 10 // 20
@@ -170,7 +213,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     val numVects = 3
 
     LA.localPIC(dat2r, nClusters, nIterations, Some((expLambda, expdat)))
-   }
+  }
 
   test("manualPowerIt") {
 
