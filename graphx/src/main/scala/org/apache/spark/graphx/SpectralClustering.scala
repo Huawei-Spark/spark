@@ -108,9 +108,15 @@ object SpectralClustering {
     for (iter <- 0 until nIterations
          if Math.abs(normAccel) > epsilon) {
 
-      val tmpEigen = prevG.aggregateMessages[Double](ctx => ctx.sendToDst(
+      val tmpEigenSrc = prevG.aggregateMessages[Double](ctx => ctx.sendToSrc(
+        ctx.attr * ctx.srcAttr),
+        _ + _)
+      val tmpEigenDst = prevG.aggregateMessages[Double](ctx => ctx.sendToDst(
         ctx.attr * ctx.dstAttr),
         _ + _)
+      val tmpEigen = tmpEigenSrc.join(tmpEigenDst).map { case (vid, (s, d)) =>
+        (vid, s + d)
+      }
       println(s"tmpEigen[$iter]: ${tmpEigen.collect.mkString(",")}\n")
       val vnorm = Math.sqrt(
         tmpEigen.fold((DummyVertexId, 0.0)) { case ((vout, sum), (vid, dval)) =>
