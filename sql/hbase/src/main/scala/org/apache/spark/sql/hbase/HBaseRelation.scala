@@ -328,13 +328,29 @@ private[hbase] case class HBaseRelation(
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
             if (leftFilterList.isDefined) {
-              filters.add(leftFilterList.get)
+              val filterList = leftFilterList.get
+              val size = filterList.getFilters.size
+              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ALL) {
+                for (i <- 0 until size) {
+                  filters.add(filterList.getFilters.get(i))
+                }
+              } else {
+                filters.add(filterList)
+              }
             }
           }
           if (right != null) {
             val rightFilterList = buildFilterListFromPred(Some(right))
             if (rightFilterList.isDefined) {
-              filters.add(rightFilterList.get)
+              val filterList = rightFilterList.get
+              val size = filterList.getFilters.size
+              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ALL) {
+                for (i <- 0 until size) {
+                  filters.add(filterList.getFilters.get(i))
+                }
+              } else {
+                filters.add(filterList)
+              }
             }
           }
           result = Option(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
@@ -342,13 +358,29 @@ private[hbase] case class HBaseRelation(
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
             if (leftFilterList.isDefined) {
-              filters.add(leftFilterList.get)
+              val filterList = leftFilterList.get
+              val size = filterList.getFilters.size
+              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ONE) {
+                for (i <- 0 until size) {
+                  filters.add(filterList.getFilters.get(i))
+                }
+              } else {
+                filters.add(filterList)
+              }
             }
           }
           if (right != null) {
             val rightFilterList = buildFilterListFromPred(Some(right))
             if (rightFilterList.isDefined) {
-              filters.add(rightFilterList.get)
+              val filterList = rightFilterList.get
+              val size = filterList.getFilters.size
+              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ONE) {
+                for (i <- 0 until size) {
+                  filters.add(filterList.getFilters.get(i))
+                }
+              } else {
+                filters.add(filterList)
+              }
             }
           }
           result = Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
