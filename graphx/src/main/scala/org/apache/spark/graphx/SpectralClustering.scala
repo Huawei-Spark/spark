@@ -43,6 +43,8 @@ object SpectralClustering {
   val DefaultIterations: Int = 20
   val DefaultMinAffinity = 1e-11
 
+  val LA = SpectralClusteringUsingRdd.Linalg
+
   def cluster(sc: SparkContext,
               points: Points,
               nClusters: Int,
@@ -59,6 +61,15 @@ object SpectralClustering {
     getPrincipalEigen(sc, G)
   }
 
+  /*
+
+vnorm[0]=2.019968019268192
+Updating vertex[0] from 0.2592592592592593 to 0.2597973189724011
+Updating vertex[1] from 0.19753086419753088 to 0.1695805301675885
+Updating vertex[3] from 0.2654320987654321 to 0.27258531045499795
+Updating vertex[2] from 0.2777777777777778 to 0.29803684040501227
+
+   */
   def createInitialVector(sc: SparkContext,
                           labels: Seq[VertexId],
                           rowSums: Seq[Double]) = {
@@ -108,20 +119,16 @@ object SpectralClustering {
     for (iter <- 0 until nIterations
          if Math.abs(normAccel) > epsilon) {
 
-      val tmpEigenSrc = prevG.aggregateMessages[Double](ctx => ctx.sendToSrc(
-        ctx.attr * ctx.srcAttr),
+      val tmpEigen = prevG.aggregateMessages[Double](ctx => {
+        ctx.sendToSrc(ctx.attr * ctx.srcAttr);
+        ctx.sendToDst(ctx.attr * ctx.dstAttr)
+      },
         _ + _)
-      val tmpEigenDst = prevG.aggregateMessages[Double](ctx => ctx.sendToDst(
-        ctx.attr * ctx.dstAttr),
-        _ + _)
-      val tmpEigen = tmpEigenSrc.join(tmpEigenDst).map { case (vid, (s, d)) =>
-        (vid, s + d)
-      }
       println(s"tmpEigen[$iter]: ${tmpEigen.collect.mkString(",")}\n")
-      val vnorm = /*Math.sqrt(*/
-        tmpEigen.fold((DummyVertexId, 0.0)) { case ((vout, sum), (vid, dval)) =>
-          (vid, sum + Math.abs(dval))}._2 /* * dval)
-        }._2)  */
+      val vnorm =
+        prevG.vertices.map{ _._2}.fold(0.0) { case (sum, dval) =>
+          sum + Math.abs(dval)
+        }
       println(s"vnorm[$iter]=$vnorm")
       outG = prevG.outerJoinVertices(tmpEigen) { case (vid, wval, optTmpEigJ) =>
         val normedEig = optTmpEigJ.getOrElse {

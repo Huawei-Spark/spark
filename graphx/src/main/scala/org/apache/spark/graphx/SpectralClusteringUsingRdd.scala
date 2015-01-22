@@ -239,11 +239,11 @@ object SpectralClusteringUsingRdd {
       var eigenRddCollected: Seq[(Int, Double)] = for (ix <- 0 until numVects)
       yield (ix, rand.nextDouble)
       val enorm = norm(eigenRddCollected.map(_._2).toArray)
-      eigenRddCollected = eigenRddCollected.map{ case (ix,d) =>
+      eigenRddCollected = eigenRddCollected.map { case (ix, d) =>
         (ix, d / enorm)
       }
 
-//      var eigenRddCollectedPrior =  eigenRddCollected.map(_._2).toArray
+      //      var eigenRddCollectedPrior =  eigenRddCollected.map(_._2).toArray
       var eigenRddCollectedPrior = Array.fill(numVects)(1.0 / Math.sqrt(numVects))
       var priorNorm = norm(eigenRddCollectedPrior)
       var cnorm = 0.0
@@ -337,8 +337,8 @@ object SpectralClusteringUsingRdd {
         .flatten
         .zipWithIndex
         .groupBy {
-          _._2 % nCols
-        }
+        _._2 % nCols
+      }
         .toSeq.sortBy {
         _._1
       }
@@ -349,8 +349,8 @@ object SpectralClusteringUsingRdd {
       matT
     }
 
-    def printMatrix(mat: Array[Array[Double]]) : String
-      = printMatrix(mat, mat.length, mat.length)
+    def printMatrix(mat: Array[Array[Double]]): String
+    = printMatrix(mat, mat.length, mat.length)
 
     def printMatrix(darr: Array[DVector], numRows: Int, numCols: Int): String = {
       val flattenedArr = darr.zipWithIndex.foldLeft(new DVector(numRows * numCols)) {
@@ -471,11 +471,11 @@ object SpectralClusteringUsingRdd {
       for (k <- 0 until nClusters) {
         val r = new Random()
         var eigen = Array.fill(numVects) {
-//          1.0
+          //          1.0
           r.nextDouble
         }
         val enorm = norm(eigen)
-        eigen.map{ e => e / enorm}
+        eigen.map { e => e / enorm}
 
         for (iter <- 0 until nIterations) {
           eigen = mat.map { dvect =>
@@ -497,6 +497,16 @@ object SpectralClusteringUsingRdd {
           // TODO: decide between deflate/schurComplement
           mat = schurComplement(mat, lambda, eigen)
         }
+      }
+    }
+
+    def compareVectors(v1: Array[Double], v2: Array[Double]) = {
+      v1.zip(v2).forall { case (v1v, v2v) => withinTol(v1v - v2v)}
+    }
+
+    def compareMatrices(m1: DMatrix, m2: DMatrix) = {
+      m1.zip(m2).forall { case (m1v, m2v) =>
+        m1v.zip(m2v).forall { case (m1vv, m2vv) => withinTol(m1vv - m2vv)}
       }
     }
 
@@ -588,6 +598,10 @@ object SpectralClusteringUsingRdd {
           eigen.length, eigen.length)
       }")
       defMat
+    }
+
+    def printVertices(vertices: Array[(VertexId, Double)]) = {
+      vertices.map { case (vid, dval) => s"($vid,$dval)"}.mkString(" , ")
     }
 
   }

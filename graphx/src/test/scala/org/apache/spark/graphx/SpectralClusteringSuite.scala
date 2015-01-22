@@ -56,7 +56,7 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     //    val dats = Array((dat2, expDat2), (dat1, expDat1))
     val SC = SpectralClustering
     val sigma = 1.0
-    val nIterations = 10 // 20
+    val nIterations = 20
     val nClusters = 3
     withSpark { sc =>
       val affinityRdd = sc.parallelize(DxDat1.zipWithIndex).map { case (dvect, ix) =>
@@ -73,6 +73,21 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
       }
       val initialVt = SC.createInitialVector(sc, affinityRdd.map{_._1}.collect, rowSums )
       val G = SC.createGraphFromEdges(sc, edgesRdd, nVertices, Some(initialVt))
+      val printVtVectors: Boolean = true
+      if (printVtVectors) {
+        val vCollected = G.vertices.collect()
+        val graphInitialVt = vCollected.map {
+          _._2
+        }
+        println(s"     initialVT vertices: ${LA.printVertices(initialVt.toArray)}")
+        println(s"graphInitialVt vertices: ${LA.printVertices(vCollected)}")
+        val initialVtVect = initialVt.map {
+          _._2
+        }.toArray
+        println(s"graphInitialVt=${graphInitialVt.mkString(",")}\n"
+          + s"initialVt=${initialVt.mkString(",")}")
+        assert(LA.compareVectors(graphInitialVt, initialVtVect))
+      }
       val (g2, norm, eigvect) = SC.getPrincipalEigen(sc, G, nIterations)
       println(s"lambda=$norm eigvect=${eigvect.mkString(",")}")
     }
@@ -106,18 +121,6 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
     proj = LA.subtractProjection(addMultVect, dat(3)) // orthog
     println(s"proj should  be same as parallel input (1.,2.,3.) ${proj.mkString(",")}")
     assert(proj.zip(dat(0)).map { case (a, b) => a - b} .forall(LA.withinTol(_, 1e-11)))
-  }
-
-  def compareVectors(v1: Array[Double], v2: Array[Double]) = {
-    v1.zip(v2).forall { case (v1v, v2v) => LA.withinTol(v1v - v2v)}
-  }
-
-  type DMatrix = Array[Array[Double]]
-
-  def compareMatrices(m1: DMatrix, m2: DMatrix) = {
-    m1.zip(m2).forall { case (m1v, m2v) =>
-      m1v.zip(m2v).forall { case (m1vv, m2vv) => LA.withinTol(m1vv - m2vv)}
-    }
   }
 
   test("eigensTest") {
@@ -172,8 +175,8 @@ class SpectralClusteringSuite extends FunSuite with LocalSparkContext {
         val printedEigens = LA.printMatrix(collectedEigens, 3, 3)
         println(s"eigvals=${eigvals.mkString(",")} eigvects=\n$printedEigens}")
 
-        assert(compareVectors(eigvals, expdat._1))
-        assert(compareMatrices(eigvects.collect, expdat._2))
+        assert(LA.compareVectors(eigvals, expdat._1))
+        assert(LA.compareMatrices(eigvects.collect, expdat._2))
       }
     }
   }
