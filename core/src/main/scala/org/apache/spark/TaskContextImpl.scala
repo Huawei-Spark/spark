@@ -126,10 +126,10 @@ private[spark] class TaskContextImpl(
         ArrayBuffer[String]("No external resources registered for Executor %s at %s"
           .format(executorId, slaveHostname)).toIterator
       } else if (resourceName.isDefined) {
-        if (resources.get.containsKey(resourceName.get))
+        if (resources.get.containsKey(resourceName.get)) {
           ArrayBuffer[String](resources.get.get(resourceName.get)
             ._1.cleanup(slaveHostname.get, executorId.get)).toIterator
-        else
+        } else
           ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
            .format(resourceName.get, executorId.get, slaveHostname.get)).toIterator
       } else {

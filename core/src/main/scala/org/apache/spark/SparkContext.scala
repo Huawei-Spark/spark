@@ -458,18 +458,21 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
    * @param executorId
    * @return
    */
-  private[spark] def getExtResourceInfo(executorId: String): Option[Map[String, ExtResourceInfo]] = {
+  private[spark] def getExtResourceInfo(executorId: String)
+    : Option[Map[String, ExtResourceInfo]] = {
     try {
       if (executorId == SparkContext.DRIVER_IDENTIFIER) {
         val path = env.actorSystem./("ExecutorActor").toString
         val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, path, env.actorSystem)
-        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump, actorRef,
-          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump,
+          actorRef, AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf),
+          AkkaUtils.askTimeout(conf)))
       } else {
         val (host, port) = env.blockManager.master.getActorSystemHostPortForExecutor(executorId).get
         val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, host, port, env.actorSystem)
-        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump, actorRef,
-          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump,
+          actorRef, AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf),
+          AkkaUtils.askTimeout(conf)))
       }
     } catch {
       case e: Exception =>
@@ -493,13 +496,15 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
       if (executorId == SparkContext.DRIVER_IDENTIFIER) {
         val path = env.actorSystem./("ExecutorActor").toString
         val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, path, env.actorSystem)
-        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName), actorRef,
-          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName),
+          actorRef, AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf),
+            AkkaUtils.askTimeout(conf)))
       } else {
         val (host, port) = env.blockManager.master.getActorSystemHostPortForExecutor(executorId).get
         val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, host, port, env.actorSystem)
-        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName), actorRef,
-          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName),
+          actorRef, AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf),
+          AkkaUtils.askTimeout(conf)))
       }
 
     } catch {
@@ -1810,7 +1815,8 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
       val addedFilePaths = addedFiles.keys.toSeq
       val addedExtResourceNames = addedExtResources.keys.map(_.name).toSeq
       val environmentDetails =
-        SparkEnv.environmentDetails(conf, schedulingMode, addedJarPaths, addedFilePaths, addedExtResourceNames)
+        SparkEnv.environmentDetails(conf, schedulingMode, addedJarPaths,
+           addedFilePaths, addedExtResourceNames)
       val environmentUpdate = SparkListenerEnvironmentUpdate(environmentDetails)
       listenerBus.post(environmentUpdate)
     }

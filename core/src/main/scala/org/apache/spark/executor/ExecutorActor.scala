@@ -47,7 +47,8 @@ class ExecutorActor(executorId: String,
 ) extends Actor with ActorLogReceive with Logging {
 
   def getExtResourceInfo(): Map[String, ExtResourceInfo] = {
-    val res = resource.map(r => (r._1, r._2._1.getResourceInfo(slaveHostname, executorId, r._2._2))).toMap
+    val res = resource.map(r => (r._1, r._2._1.getResourceInfo(slaveHostname,
+      executorId, r._2._2))).toMap
     res
   }
 
@@ -58,10 +59,10 @@ class ExecutorActor(executorId: String,
           .format(executorId, slaveHostname)).toIterator
       } else if (resourceName.isDefined) {
         val resName = resourceName.get
-        if (resource.containsKey(resName))
+        if (resource.containsKey(resName)) {
           ArrayBuffer[String](resource.get(resName)
             ._1.cleanup(slaveHostname, executorId)).toIterator
-        else
+        } else
           ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
             .format(resourceName.get, executorId, slaveHostname)).toIterator
       } else {

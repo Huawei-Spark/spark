@@ -70,33 +70,20 @@ class JdbcRDDExtRsc[T: ClassTag](
   override def compute(thePart: Partition, context: TaskContext) = new NextIterator[T] {
     val contextImpl = TaskContext.get().asInstanceOf[TaskContextImpl]
     val x = Class.forName("com.mysql.jdbc.Driver", true, Utils.getContextOrSparkClassLoader)
-    println(x.toString)
-    println("get driver class "+ x)
 
     context.addTaskCompletionListener{ context => closeIfNeeded() }
     val part = thePart.asInstanceOf[JdbcPartitionExt]
     //    val conn = getConnection()
-    //Todo: sma : exception handling
+    //Todo: exception handling
     if (!contextImpl.resources.isDefined) throw new Exception("No available ExtResources")
 
     val extRsc = contextImpl.resources.get.get(extRscName)
     if (extRsc==null) throw new Exception(s"No such resource : $extRscName")
     val rsc = extRsc._1
-    println("++++ rdd compute: param size : "+rsc.params.size )
-    println("Object Id =  :" + rsc)
-//    Thread.dumpStack()
-    //sma : debug
-    println("before extRsc: ins: " +rsc.getInstancesStat(rsc.shared, rsc.partitionAffined))
-    println("before extRsc useinstance: " + rsc.getInstancesInUseStat(rsc.shared, rsc.partitionAffined))
 
-
-    //Todo: sma : exception handling
+    //Todo: exception handling
     val conn = rsc.getInstance(context.partitionId, context.attemptId).asInstanceOf[Connection]
     val stmt = conn.prepareStatement(sql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
-
-    //sma : debug
-    println("after extRsc: ins: " +rsc.getInstancesStat(rsc.shared, rsc.partitionAffined))
-    println("after extRsc useinstance: " + rsc.getInstancesInUseStat(rsc.shared, rsc.partitionAffined))
 
     // setFetchSize(Integer.MIN_VALUE) is a mysql driver specific way to force streaming results,
     // rather than pulling entire resultset into memory.
@@ -115,13 +102,11 @@ class JdbcRDDExtRsc[T: ClassTag](
         mapRow(rs)
       } else {
         finished = true
-        println("++++ jdbcRddExtRsc.getNext : finished in partition : "+part.index)
         null.asInstanceOf[T]
       }
     }
 
     override def close() {
-      println("++++ jdbcRddExtRsc.close")
       try {
         if (null != rs && ! rs.isClosed()) {
           rs.close()

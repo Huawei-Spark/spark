@@ -31,8 +31,9 @@ case class ExtResourceInfo(slaveHostname: String, executorId: String,
                            partitionAffined: Boolean, instanceCount: Int,
                            instanceUseCount: Int)  {
   override def toString = {
-    ("host: %s\texecutorid: %s\tresource name: %s\ttimestamp: %d\tsharable: %s\tpartitionAffined: " +
-      "%s\tinstanceCount: %d\tinstances in use: %d").format(slaveHostname, executorId,  name, timestamp,
+    ("host: %s\texecutorid: %s\tresource name: %s\ttimestamp: %d\tsharable: %s\tpartitionAffined: "
+      + "%s\tinstanceCount: %d\tinstances in use: %d").format(slaveHostname,
+        executorId,  name, timestamp,
         sharable.toString, partitionAffined.toString, instanceCount, instanceUseCount)
   }
 }
@@ -156,10 +157,12 @@ case class ExtResource[T](
           val instanceUseCnt = instances.asInstanceOf[
             HashMap[Int, ResourceRefCountPerPartition[T]]]
             .values.map(_.refCnt).foldLeft(0)(_ + _)
-          ExtResourceInfo(host, executorId, name, timestamp, true, true, instanceCnt, instanceUseCnt)
+          ExtResourceInfo(host, executorId, name, timestamp, true, true,
+                          instanceCnt, instanceUseCnt)
         }
         case (true, false) => {
-          ExtResourceInfo(host, executorId, name, timestamp, true, false, instances.asInstanceOf[HashSet[T]].size, instancesInUse.asInstanceOf[Int])
+          ExtResourceInfo(host, executorId, name, timestamp, true, false,
+            instances.asInstanceOf[HashSet[T]].size, instancesInUse.asInstanceOf[Int])
         }
         case (false, true) =>
           val usedCount = instancesInUse.asInstanceOf[
@@ -168,7 +171,8 @@ case class ExtResource[T](
             instances.asInstanceOf[HashMap[Int, ArrayBuffer[T]]].values.map(_.size)
             .foldLeft(0)(_ + _) + usedCount, usedCount)
         case (false, false) =>
-          val usedCount = instancesInUse.asInstanceOf[HashMap[Long, ArrayBuffer[T]]].values.map(_.size).foldLeft(0)(_ + _)
+          val usedCount = instancesInUse.
+          asInstanceOf[HashMap[Long, ArrayBuffer[T]]].values.map(_.size).foldLeft(0)(_ + _)
           ExtResourceInfo(host, executorId, name, timestamp, false, false,
             instances.asInstanceOf[ArrayBuffer[T]].size + usedCount, usedCount)
       }
@@ -196,22 +200,23 @@ case class ExtResource[T](
           case (false, true) =>{
             val hml = instances.asInstanceOf[HashMap[Int, ArrayBuffer[T]]]
             var resList = hml.getOrElseUpdate(split, ArrayBuffer(init(split, params)))
-            if (resList.isEmpty)
+            if (resList.isEmpty) {
               init(split, params)
-            else
+            } else
               resList.remove(0)
           }
           case (true, true) =>{
             val res = instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]]
-              .getOrElseUpdate(split, new ResourceRefCountPerPartition[T](instance=init(split, params)))
+              .getOrElseUpdate(split,
+                new ResourceRefCountPerPartition[T](instance=init(split, params)))
             res.refCnt += 1
             res.instance
           }
           case (true, false) => {
             val res = instances.asInstanceOf[HashSet[T]]
-            if(res.size>0)
+            if(res.size>0) {
               res.head
-            else{
+            } else {
               val rsc = init(-1, params)
               res += rsc
               rsc
@@ -271,10 +276,11 @@ case class ExtResource[T](
 
   def cleanup(slaveHostname: String, executorId: String): String = {
     val errorString
-         =  "Executor %s at %s : External Resource %s has instances in use and can't be cleaned up now"
+      =  "Executor %s at %s : External Resource %s has instances in use and can't be cleaned up now"
       .format(executorId, slaveHostname, name)
     val successString
-         =  "Executor %s at %s : External Resource %s cleanup succeeds".format(executorId, slaveHostname, name)
+         =  "Executor %s at %s : External Resource %s cleanup succeeds".format(executorId,
+            slaveHostname, name)
 
     synchronized {
       instances = getInstancesStat(shared, partitionAffined)
@@ -283,9 +289,10 @@ case class ExtResource[T](
       (shared, partitionAffined) match {
         case (true, true) =>
           // an all-or-nothing cleanup mechanism
-          if (instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]].values.exists(_.refCnt >0))
+          if (instances.asInstanceOf[HashMap[Int,
+            ResourceRefCountPerPartition[T]]].values.exists(_.refCnt >0)) {
             return errorString
-          else {
+          } else {
             instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]]
               .foreach(r=>term(r._1, r._2.instance, params))
             instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]].clear
@@ -296,24 +303,25 @@ case class ExtResource[T](
             return errorString
           }else {
             val res = instances.asInstanceOf[HashSet[T]]
-            if (res.size>0)
+            if (res.size>0) {
               term(-1, res.head, params)
+            }
             res.clear()
           }
         case (false, true) =>
-          if (!instancesInUse.asInstanceOf[HashMap[Long, Pair[Int, ArrayBuffer[T]]]].isEmpty)
+          if (!instancesInUse.asInstanceOf[HashMap[Long, Pair[Int, ArrayBuffer[T]]]].isEmpty) {
           // an all-or-nothing cleanup mechanism
             return errorString
-          else {
+          } else {
             instances.asInstanceOf[HashMap[Int, ArrayBuffer[T]]].foreach(l =>l._2.foreach(
               e => term(l._1, e, params)))
             instances.asInstanceOf[HashMap[Int, ArrayBuffer[T]]].clear
           }
         case (false, false) =>
-          if (!instancesInUse.asInstanceOf[HashMap[Long, ArrayBuffer[T]]].isEmpty)
+          if (!instancesInUse.asInstanceOf[HashMap[Long, ArrayBuffer[T]]].isEmpty) {
           // an all-or-nothing cleanup mechanism
             return errorString
-          else {
+          } else {
             instances.asInstanceOf[ArrayBuffer[T]].foreach(term(-1, _, params))
             instances.asInstanceOf[ArrayBuffer[T]].clear
           }

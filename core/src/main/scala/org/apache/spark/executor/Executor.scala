@@ -60,7 +60,8 @@ private[spark] class Executor(
   // Each map holds the master's timestamp for the version of that file or JAR we got.
   private val currentFiles: HashMap[String, Long] = new HashMap[String, Long]()
   private val currentJars: HashMap[String, Long] = new HashMap[String, Long]()
-  private val currentResources: ConcurrentHashMap[String, Pair[ExtResource[_], Long]] = new ConcurrentHashMap[String, Pair[ExtResource[_], Long]]()
+  private val currentResources: ConcurrentHashMap[String, Pair[ExtResource[_], Long]]
+    = new ConcurrentHashMap[String, Pair[ExtResource[_], Long]]()
 
   private val EMPTY_BYTE_BUFFER = ByteBuffer.wrap(new Array[Byte](0))
 
@@ -396,7 +397,8 @@ private[spark] class Executor(
         }
       }
 
-      val (extRsc, taskByte) = Task.deserializeExtResourceWithDependencies(serializedTask, in, dataIn)
+      val (extRsc, taskByte) = Task.deserializeExtResourceWithDependencies(serializedTask,
+        in, dataIn)
 
       for ((resource, timestamp) <- extRsc) {
         if (currentResources.getOrElse(resource.name, (null, -1L))._2 < timestamp){
