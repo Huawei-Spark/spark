@@ -62,9 +62,10 @@ class ExecutorActor(executorId: String,
         if (resource.containsKey(resName)) {
           ArrayBuffer[String](resource.get(resName)
             ._1.cleanup(slaveHostname, executorId)).toIterator
-        } else
+        } else {
           ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
             .format(resourceName.get, executorId, slaveHostname)).toIterator
+        }
       } else {
         resource.map(_._2._1.cleanup(slaveHostname, executorId)).toIterator
       }

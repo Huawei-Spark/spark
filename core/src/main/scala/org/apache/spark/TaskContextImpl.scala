@@ -119,19 +119,20 @@ private[spark] class TaskContextImpl(
 
   def cleanupResources(resourceName: Option[String]) : Iterator[String] = {
     synchronized {
-      if (!resources.isDefined)
+      if (!resources.isDefined) {
         ArrayBuffer[String]("No external resources available to tasks for Executor %s at %s"
           .format(executorId, slaveHostname)).toIterator
-      else if (resources.get.isEmpty) {
+      } else if (resources.get.isEmpty) {
         ArrayBuffer[String]("No external resources registered for Executor %s at %s"
           .format(executorId, slaveHostname)).toIterator
       } else if (resourceName.isDefined) {
         if (resources.get.containsKey(resourceName.get)) {
           ArrayBuffer[String](resources.get.get(resourceName.get)
             ._1.cleanup(slaveHostname.get, executorId.get)).toIterator
-        } else
+        } else {
           ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
            .format(resourceName.get, executorId.get, slaveHostname.get)).toIterator
+        }
       } else {
         resources.get.map(_._2._1.cleanup(slaveHostname.get, executorId.get)).toIterator
       }

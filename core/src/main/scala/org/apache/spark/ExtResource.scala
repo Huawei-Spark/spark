@@ -202,8 +202,9 @@ case class ExtResource[T](
             var resList = hml.getOrElseUpdate(split, ArrayBuffer(init(split, params)))
             if (resList.isEmpty) {
               init(split, params)
-            } else
+            } else {
               resList.remove(0)
+            }
           }
           case (true, true) =>{
             val res = instances.asInstanceOf[HashMap[Int, ResourceRefCountPerPartition[T]]]

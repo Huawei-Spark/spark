@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.examples
 
 import java.nio.ByteBuffer
@@ -35,11 +52,12 @@ object ExtResourceSerializationTest {
 
     val (taskFiles, taskJars, in, dataIn) = Task.deserializeWithDependencies(serializedTask)
 
-    val (taskResources, bytes) = Task.deserializeExtResourceWithDependencies( serializedTask, in, dataIn)
+    val (taskResources, bytes) = Task.deserializeExtResourceWithDependencies(
+         serializedTask, in, dataIn)
 
     for ((resource_, timestamp) <- taskResources) {
       val resource = resource_.asInstanceOf[ExtResource[_]]
-      println("++++ updateDependencies : currentResources: "+ resource.name)
+      println("++++ updateDependencies : currentResources: " + resource.name)
 
 
       val conn= resource.init(1, resource.params).asInstanceOf[Connection]
@@ -76,13 +94,12 @@ object ExtResourceSerializationTest {
     val myparams: Array[String] = Array(driver, url, username, password)
 
     def myinit(split: Int, params: Seq[String]): Connection = {
-      require(params.size>3, s"parameters error, current param size: "+ params.size)
+      require(params.size>3, s"parameters error, current param size: " + params.size)
       var connection:Connection = null
       try {
-        //        val loader = Option(Thread.currentThread().getContextClassLoader).getOrElse(getClass.getClassLoader)
         val x = Class.forName(params(0))
         println(x.toString)
-        println("get driver class "+ x)
+        println("get driver class " + x)
         connection = DriverManager.getConnection(params(1), params(2), params(3))
       } catch {
         case e: Throwable => e.printStackTrace

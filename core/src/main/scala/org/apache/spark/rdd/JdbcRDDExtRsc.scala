@@ -24,7 +24,8 @@ import scala.reflect.ClassTag
 import org.apache.spark._
 import org.apache.spark.util.{Utils, NextIterator}
 
-private[spark] class JdbcPartitionExt(idx: Int, val lower: Long, val upper: Long) extends Partition {
+private[spark] class JdbcPartitionExt(idx: Int, val lower: Long,
+                                      val upper: Long) extends Partition {
   override def index = idx
 }
 // TODO: Expose a jdbcRDD function in SparkContext and mark this as semi-private
