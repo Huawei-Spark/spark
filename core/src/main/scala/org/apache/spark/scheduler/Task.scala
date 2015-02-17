@@ -53,7 +53,7 @@ private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) ex
   final def run(taskAttemptId: Long, attemptNumber: Int): T = {
     context = new TaskContextImpl(stageId = stageId, partitionId = partitionId,
       taskAttemptId = taskAttemptId, attemptNumber = attemptNumber, runningLocally = false,
-      this.resources, this.executorId, this.slaveHostname)
+      resources=this.resources, executorId=this.executorId, executorHostname=this.executorHostname)
     TaskContextHelper.setTaskContext(context)
     context.taskMetrics.setHostname(Utils.localHostName())
     taskThread = Thread.currentThread()
@@ -89,7 +89,7 @@ private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) ex
 
   @transient var resources : Option[ConcurrentHashMap[String, Pair[ExtResource[_], Long]]] = None
   @transient var executorId : Option[String] = None
-  @transient var slaveHostname : Option[String] = None
+  @transient var executorHostname : Option[String] = None
 
   /**
    * Whether the task has been killed.

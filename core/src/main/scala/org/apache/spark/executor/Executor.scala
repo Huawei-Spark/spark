@@ -30,7 +30,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.util.control.NonFatal
 
-import akka.actor.Props
+import akka.actor.{Props, ActorSystem}
 
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
@@ -96,7 +96,7 @@ private[spark] class Executor(
 
   // Create an actor for receiving RPCs from the driver
   private val executorActor = env.actorSystem.actorOf(
-    Props(new ExecutorActor(executorId, slaveHostname, currentResources)), "ExecutorActor")
+    Props(new ExecutorActor(executorId, executorHostname, currentResources)), "ExecutorActor")
 
   // Create our ClassLoader
   // do this after SparkEnv creation so can access the SecurityManager
@@ -143,7 +143,7 @@ private[spark] class Executor(
     isStopped = true
     threadPool.shutdown()
     // terminate live external resources
-    currentResources.foreach(_._2._1.cleanup(slaveHostname, executorId))
+    currentResources.foreach(_._2._1.cleanup(executorHostname, executorId))
     
     if (!isLocal) {
       env.stop()
@@ -203,7 +203,7 @@ private[spark] class Executor(
         env.mapOutputTracker.updateEpoch(task.epoch)
         task.resources = Some(currentResources)
         task.executorId = Some(executorId)
-        task.slaveHostname = Some(slaveHostname)
+        task.executorHostname = Some(executorHostname)
 
 
         // Run the actual task and measure its runtime.
