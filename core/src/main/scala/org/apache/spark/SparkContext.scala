@@ -265,6 +265,9 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   private[spark] val addedFiles = HashMap[String, Long]()
   private[spark] val addedJars = HashMap[String, Long]()
 
+  private val nextExtResourceId = new AtomicInteger(0)
+  private[spark] val addedExtResources = HashMap[ExtResource[_], Long]()
+
   // Keeps track of all persisted RDDs
   private[spark] val persistentRdds = new TimeStampedWeakValueHashMap[Int, RDD[_]]
   private[spark] val metadataCleaner =
@@ -1100,6 +1103,41 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   }
 
   /**
+   * Add an (external) resource to be used with this Spark job on every node;
+   * overwrite if the resource already exists
+   */
+  def addOrReplaceResource(res: ExtResource[_]) {
+    val ts = System.currentTimeMillis
+    addedExtResources(res) = ts
+
+    logInfo("Added resource " + res.name + " with timestamp " + ts)
+
+    postEnvironmentUpdate()
+  }
+
+  def listResourceRDD() : RDD[ExtResourceInfo] = new ExtResourceListRDD(this)
+  // cleanup all outstanding resources
+  def cleanupAllResourceRDD() : RDD[String] = new ExtResourceCleanupRDD(this)
+  def cleanupResourceRDD(resourceName: String) : RDD[String] 
+    = new ExtResourceCleanupRDD(this, Some(resourceName))
+
+  /**
+   * Add an (external) resource to be used with this Spark job on every node.
+   */
+  def addResource(res: ExtResource[_]) {
+    val ts: Long= System.currentTimeMillis
+    if (addedExtResources.containsKey(res)) {
+      logError("Error adding resource (" + res.name + "): already added ")
+    } else {
+      addedExtResources(res) = ts
+
+      logInfo("Added resource " + res.name + " with timestamp " + ts)
+
+      postEnvironmentUpdate()
+    }
+  }
+
+  /**
    * :: DeveloperApi ::
    * Register a listener to receive up-calls from events that happen during execution.
    */
@@ -1718,8 +1756,9 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
       val schedulingMode = getSchedulingMode.toString
       val addedJarPaths = addedJars.keys.toSeq
       val addedFilePaths = addedFiles.keys.toSeq
-      val environmentDetails = SparkEnv.environmentDetails(conf, schedulingMode, addedJarPaths,
-        addedFilePaths)
+      val addedExtResourceNames = addedExtResources.keys.map(_.name).toSeq
+      val environmentDetails =
+        SparkEnv.environmentDetails(conf, schedulingMode, addedJarPaths, addedFilePaths, addedExtResourceNames)
       val environmentUpdate = SparkListenerEnvironmentUpdate(environmentDetails)
       listenerBus.post(environmentUpdate)
     }
@@ -1730,6 +1769,11 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     persistentRdds.clearOldValues(cleanupTime)
   }
 
+  def getExecutorsAndLocations(): Seq[TaskLocation] = {
+    // all supported task schedulers are actually TaskSchedulerImpl ?
+    taskScheduler.asInstanceOf[TaskSchedulerImpl].getExecutorIdsAndLocations()
+  }
+  
   // In order to prevent multiple SparkContexts from being active at the same time, mark this
   // context as having finished construction.
   // NOTE: this must be placed at the end of the SparkContext constructor.

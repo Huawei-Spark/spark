@@ -460,8 +460,11 @@ private[spark] class TaskSetManager(
           }
           // Serialize and return the task
           val startTime = clock.getTime()
+          // We rely on the DAGScheduler to catch non-serializable closures and RDDs, so in here
+          // we assume the task can be serialized without exceptions.
           val serializedTask: ByteBuffer = try {
-            Task.serializeWithDependencies(task, sched.sc.addedFiles, sched.sc.addedJars, ser)
+            Task.serializeWithDependencies(
+              task, sched.sc.addedFiles, sched.sc.addedJars, sched.sc.addedExtResources, ser)
           } catch {
             // If the task cannot be serialized, then there's no point to re-attempt the task,
             // as it will always fail. So just abort the whole task-set.
@@ -471,6 +474,7 @@ private[spark] class TaskSetManager(
               abort(s"$msg Exception during serialization: $e")
               throw new TaskNotSerializableException(e)
           }
+
           if (serializedTask.limit > TaskSetManager.TASK_SIZE_TO_WARN_KB * 1024 &&
               !emittedTaskSizeWarning) {
             emittedTaskSizeWarning = true

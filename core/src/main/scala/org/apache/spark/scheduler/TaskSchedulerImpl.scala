@@ -515,6 +515,13 @@ private[spark] class TaskSchedulerImpl(
 
   override def applicationId(): String = backend.applicationId()
 
+def getExecutorIdsAndLocations() : Seq[TaskLocation] = {
+    executorIdToHost.foreach(str => println(s"+++++ getExecutorIdsAndLocations : $str._1 and $str._2" ))
+    val eSize = executorIdToHost.size
+    println(s"++++ sma: executorIdToHosts size : $eSize")
+    executorIdToHost.map(e=>TaskLocation(e._1, e._2)).toSeq
+  }
+
 }
 
 

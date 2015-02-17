@@ -17,16 +17,16 @@
 
 package org.apache.spark.scheduler
 
-import java.io.{ByteArrayOutputStream, DataInputStream, DataOutputStream}
+import java.io._
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.mutable.HashMap
 
-import org.apache.spark.{TaskContextHelper, TaskContextImpl, TaskContext}
+import org.apache.spark.{ExtResource, TaskContextHelper, TaskContextImpl, TaskContext}
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.serializer.SerializerInstance
-import org.apache.spark.util.ByteBufferInputStream
-import org.apache.spark.util.Utils
+import org.apache.spark.util.{ByteBufferInputStream, Utils}
 
 
 /**
@@ -43,7 +43,6 @@ import org.apache.spark.util.Utils
  * @param partitionId index of the number in the RDD
  */
 private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) extends Serializable {
-
   /**
    * Called by Executor to run this task.
    *
@@ -53,7 +52,8 @@ private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) ex
    */
   final def run(taskAttemptId: Long, attemptNumber: Int): T = {
     context = new TaskContextImpl(stageId = stageId, partitionId = partitionId,
-      taskAttemptId = taskAttemptId, attemptNumber = attemptNumber, runningLocally = false)
+      taskAttemptId = taskAttemptId, attemptNumber = attemptNumber, runningLocally = false,
+      this.resources, this.executorId, this.slaveHostname)
     TaskContextHelper.setTaskContext(context)
     context.taskMetrics.setHostname(Utils.localHostName())
     taskThread = Thread.currentThread()
@@ -86,6 +86,10 @@ private[spark] abstract class Task[T](val stageId: Int, var partitionId: Int) ex
   // A flag to indicate whether the task is killed. This is used in case context is not yet
   // initialized when kill() is invoked.
   @volatile @transient private var _killed = false
+
+  @transient var resources : Option[ConcurrentHashMap[String, Pair[ExtResource[_], Long]]] = None
+  @transient var executorId : Option[String] = None
+  @transient var slaveHostname : Option[String] = None
 
   /**
    * Whether the task has been killed.
@@ -124,11 +128,13 @@ private[spark] object Task {
       task: Task[_],
       currentFiles: HashMap[String, Long],
       currentJars: HashMap[String, Long],
+      currentExtResources: HashMap[ExtResource[_], Long],
       serializer: SerializerInstance)
     : ByteBuffer = {
 
-    val out = new ByteArrayOutputStream(4096)
-    val dataOut = new DataOutputStream(out)
+    synchronized {
+      val out = new ByteArrayOutputStream(4096)
+      val dataOut = new ObjectOutputStream(out)
 
     // Write currentFiles
     dataOut.writeInt(currentFiles.size)
@@ -144,11 +150,29 @@ private[spark] object Task {
       dataOut.writeLong(timestamp)
     }
 
+//      Write currentExtResources
+//      If the init/term closures are big, serde per task won't be efficient
+      dataOut.writeInt(currentExtResources.size)
+      for ((resource, timestamp) <- currentExtResources) {
+        dataOut.writeObject(resource)
+        dataOut.writeLong(timestamp)
+      }
     // Write the task itself and finish
     dataOut.flush()
     val taskBytes = serializer.serialize(task).array()
     out.write(taskBytes)
     ByteBuffer.wrap(out.toByteArray)
+    }
+  }
+
+
+  class ObjectInputStreamWithCustomClassLoader(
+                                                in: ByteBufferInputStream
+                                                ) extends ObjectInputStream(in) {
+    override def resolveClass(desc: java.io.ObjectStreamClass): Class[_] = {
+      try { Class.forName(desc.getName, false, Thread.currentThread.getContextClassLoader) }
+      catch { case ex: ClassNotFoundException => super.resolveClass(desc) }
+    }
   }
 
   /**
@@ -159,27 +183,50 @@ private[spark] object Task {
    * @return (taskFiles, taskJars, taskBytes)
    */
   def deserializeWithDependencies(serializedTask: ByteBuffer)
-    : (HashMap[String, Long], HashMap[String, Long], ByteBuffer) = {
+    : (HashMap[String, Long], HashMap[String, Long], 
+     ByteBufferInputStream, ObjectInputStreamWithCustomClassLoader) = {
 
-    val in = new ByteBufferInputStream(serializedTask)
-    val dataIn = new DataInputStream(in)
 
-    // Read task's files
-    val taskFiles = new HashMap[String, Long]()
-    val numFiles = dataIn.readInt()
-    for (i <- 0 until numFiles) {
-      taskFiles(dataIn.readUTF()) = dataIn.readLong()
+    synchronized {
+      val in = new ByteBufferInputStream(serializedTask)
+      val dataIn = new ObjectInputStreamWithCustomClassLoader(in)
+
+      // Read task's files
+      val taskFiles = new HashMap[String, Long]()
+      val numFiles = dataIn.readInt()
+      for (i <- 0 until numFiles) {
+        taskFiles(dataIn.readUTF()) = dataIn.readLong()
+      }
+
+      // Read task's JARs
+      val taskJars = new HashMap[String, Long]()
+      val numJars = dataIn.readInt()
+      for (i <- 0 until numJars) {
+        taskJars(dataIn.readUTF()) = dataIn.readLong()
+      }
+      (taskFiles, taskJars, in, dataIn)
     }
-
-    // Read task's JARs
-    val taskJars = new HashMap[String, Long]()
-    val numJars = dataIn.readInt()
-    for (i <- 0 until numJars) {
-      taskJars(dataIn.readUTF()) = dataIn.readLong()
-    }
-
-    // Create a sub-buffer for the rest of the data, which is the serialized Task object
-    val subBuffer = serializedTask.slice()  // ByteBufferInputStream will have read just up to task
-    (taskFiles, taskJars, subBuffer)
   }
+
+  def deserializeExtResourceWithDependencies(serializedTask: ByteBuffer,
+        in: ByteBufferInputStream, dataIn: ObjectInputStreamWithCustomClassLoader):
+      (HashMap[ExtResource[_], Long], ByteBuffer) = {
+    synchronized {
+//      Read task's external resources
+//      If the init/term closures are big, serde per task won't be efficient
+      val taskResources = new HashMap[ExtResource[_], Long]()
+      val numResources = dataIn.readInt()
+      for (i <- 0 until numResources) {
+        taskResources(dataIn.readObject().asInstanceOf[ExtResource[_]]) = dataIn.readLong()
+      }
+
+      dataIn.close()
+      in.close()
+
+//      Create a sub-buffer for the rest of the data, which is the serialized Task object
+      val subBuffer = serializedTask.slice() // ByteBufferInputStream will have read just up to task
+      (taskResources, subBuffer)
+    }
+  }
+
 }

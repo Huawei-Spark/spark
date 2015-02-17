@@ -17,6 +17,10 @@
 
 package org.apache.spark
 
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.mutable.{ArrayBuffer, HashMap}
+
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.util.{TaskCompletionListener, TaskCompletionListenerException}
 
@@ -28,6 +32,9 @@ private[spark] class TaskContextImpl(
     override val taskAttemptId: Long,
     override val attemptNumber: Int,
     val runningLocally: Boolean = false,
+    val resources: Option[ConcurrentHashMap[String, Pair[ExtResource[_], Long]]] = None,
+    val executorId: Option[String] = None,
+    val slaveHostname: Option[String] = None,
     val taskMetrics: TaskMetrics = TaskMetrics.empty)
   extends TaskContext
   with Logging {
@@ -91,6 +98,44 @@ private[spark] class TaskContextImpl(
 
   override def isRunningLocally(): Boolean = runningLocally
 
+<<<<<<< HEAD
   override def isInterrupted(): Boolean = interrupted
+=======
+  override def isInterrupted: Boolean = interrupted
+  
+  def getExtResourceUsageInfo() : Iterator[ExtResourceInfo] = {
+    synchronized {
+      if (resources.isDefined && slaveHostname.isDefined
+        && executorId.isDefined){
+        val smap = mapAsScalaMap(resources.get)
+        smap.map(r=>r._2._1.getResourceInfo(slaveHostname.get,
+                    executorId.get, r._2._2)).toIterator
+      }
+      else{
+        ArrayBuffer[ExtResourceInfo]().toIterator
+      }
+    }
+  }
+
+  def cleanupResources(resourceName: Option[String]) : Iterator[String] = {
+    synchronized {
+      if (!resources.isDefined)
+        ArrayBuffer[String]("No external resources available to tasks for Executor %s at %s"
+          .format(executorId, slaveHostname)).toIterator
+      else if (resources.get.isEmpty) {
+        ArrayBuffer[String]("No external resources registered for Executor %s at %s"
+          .format(executorId, slaveHostname)).toIterator
+      } else if (resourceName.isDefined) {
+        if (resources.get.contains(resourceName.get))
+          ArrayBuffer[String](resources.get.get(resourceName.get)
+            ._1.cleanup(slaveHostname.get, executorId.get)).toIterator
+        else
+          ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
+           .format(resourceName.get, executorId.get, slaveHostname.get)).toIterator
+      } else {
+        resources.get.map(_._2._1.cleanup(slaveHostname.get, executorId.get)).toIterator
+      }
+    }
+  }
 }
 
