@@ -95,7 +95,7 @@ private[spark] class Executor(
 
   // Create an actor for receiving RPCs from the driver
   private val executorActor = env.actorSystem.actorOf(
-    Props(new ExecutorActor(executorId)), "ExecutorActor")
+    Props(new ExecutorActor(executorId, slaveHostname, currentResources)), "ExecutorActor")
 
   // Create our ClassLoader
   // do this after SparkEnv creation so can access the SecurityManager

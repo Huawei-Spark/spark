@@ -48,7 +48,8 @@ import org.apache.mesos.MesosNativeLibrary
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.deploy.{LocalSparkCluster, SparkHadoopUtil}
-import org.apache.spark.executor.TriggerThreadDump
+
+import org.apache.spark.executor.{TriggerExtResourceCleanup, TriggerExtResourceInfoDump, TriggerThreadDump}
 import org.apache.spark.input.{StreamInputFormat, PortableDataStream, WholeTextFileInputFormat,
   FixedLengthBinaryInputFormat}
 import org.apache.spark.partial.{ApproximateEvaluator, PartialResult}
@@ -448,6 +449,62 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     } catch {
       case e: Exception =>
         logError(s"Exception getting thread dump from executor $executorId", e)
+        None
+    }
+  }
+
+  /**
+   * retrieve external resource information from executor
+   * @param executorId
+   * @return
+   */
+  private[spark] def getExtResourceInfo(executorId: String): Option[Map[String, ExtResourceInfo]] = {
+    try {
+      if (executorId == SparkContext.DRIVER_IDENTIFIER) {
+        val path = env.actorSystem./("ExecutorActor").toString
+        val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, path, env.actorSystem)
+        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump, actorRef,
+          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+      } else {
+        val (host, port) = env.blockManager.master.getActorSystemHostPortForExecutor(executorId).get
+        val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, host, port, env.actorSystem)
+        Some(AkkaUtils.askWithReply[Map[String, ExtResourceInfo]](TriggerExtResourceInfoDump, actorRef,
+          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+      }
+    } catch {
+      case e: Exception =>
+        logError(s"Exception getting ExtResourceInfo dump from executor $executorId", e)
+        None
+    }
+  }
+
+
+  /**
+   * to clean up the external resource in executor if it's not being used for long
+   * time. this need to be extremely careful. make sure external resource is not being
+   * used in the mean time
+   * @param executorId
+   * @param resourceName
+   * @return
+   */
+  private[spark] def cleanupExtResourceInfo(executorId: String,
+      resourceName: Option[String] = None): Option[Iterator[String]] = {
+    try {
+      if (executorId == SparkContext.DRIVER_IDENTIFIER) {
+        val path = env.actorSystem./("ExecutorActor").toString
+        val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, path, env.actorSystem)
+        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName), actorRef,
+          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+      } else {
+        val (host, port) = env.blockManager.master.getActorSystemHostPortForExecutor(executorId).get
+        val actorRef = AkkaUtils.makeExecutorRef("ExecutorActor", conf, host, port, env.actorSystem)
+        Some(AkkaUtils.askWithReply[Iterator[String]](TriggerExtResourceCleanup(resourceName), actorRef,
+          AkkaUtils.numRetries(conf), AkkaUtils.retryWaitMs(conf), AkkaUtils.askTimeout(conf)))
+      }
+
+    } catch {
+      case e: Exception =>
+        logError(s"Exception cleaning up ExtResourceInfo from executor $executorId", e)
         None
     }
   }
@@ -1115,11 +1172,6 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     postEnvironmentUpdate()
   }
 
-  def listResourceRDD() : RDD[ExtResourceInfo] = new ExtResourceListRDD(this)
-  // cleanup all outstanding resources
-  def cleanupAllResourceRDD() : RDD[String] = new ExtResourceCleanupRDD(this)
-  def cleanupResourceRDD(resourceName: String) : RDD[String] 
-    = new ExtResourceCleanupRDD(this, Some(resourceName))
 
   /**
    * Add an (external) resource to be used with this Spark job on every node.

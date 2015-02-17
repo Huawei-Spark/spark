@@ -31,8 +31,8 @@ case class ExtResourceInfo(slaveHostname: String, executorId: String,
                            partitionAffined: Boolean, instanceCount: Int,
                            instanceUseCount: Int)  {
   override def toString = {
-    ("host: %s\texecutor: %s\tname: %s\ttimestamp: %d\tsharable: %s\tpartitionAffined: " +
-      "%s\tinstanceCount %d\tinstances in use%d").format(slaveHostname, executorId,  name, timestamp,
+    ("host: %s\texecutorid: %s\tresource name: %s\ttimestamp: %d\tsharable: %s\tpartitionAffined: " +
+      "%s\tinstanceCount: %d\tinstances in use: %d").format(slaveHostname, executorId,  name, timestamp,
         sharable.toString, partitionAffined.toString, instanceCount, instanceUseCount)
   }
 }

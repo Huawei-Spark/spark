@@ -17,25 +17,68 @@
 
 package org.apache.spark.executor
 
+import java.util.concurrent.ConcurrentHashMap
+
 import akka.actor.Actor
-import org.apache.spark.Logging
+import org.apache.spark.{ExtResource, ExtResourceInfo, Logging}
 
 import org.apache.spark.util.{Utils, ActorLogReceive}
+import scala.collection.JavaConversions._
+
+import scala.collection.mutable.ArrayBuffer
+
 
 /**
  * Driver -> Executor message to trigger a thread dump.
  */
 private[spark] case object TriggerThreadDump
 
+private[spark] case object TriggerExtResourceInfoDump
+
+private[spark] case class TriggerExtResourceCleanup(resourceName: Option[String] = None)
+
 /**
  * Actor that runs inside of executors to enable driver -> executor RPC.
  */
 private[spark]
-class ExecutorActor(executorId: String) extends Actor with ActorLogReceive with Logging {
+class ExecutorActor(executorId: String,
+    slaveHostname: String,
+    resource: ConcurrentHashMap[String, Pair[ExtResource[_], Long]]
+) extends Actor with ActorLogReceive with Logging {
+
+  def getExtResourceInfo(): Map[String, ExtResourceInfo] = {
+    val res = resource.map(r => (r._1, r._2._1.getResourceInfo(slaveHostname, executorId, r._2._2))).toMap
+    res
+  }
+
+  def extResourceCleanup(resourceName: Option[String]): Iterator[String] = {
+    synchronized {
+      if (resource.size()<=0){
+        ArrayBuffer[String]("No external resources registered for Executor %s at %s"
+          .format(executorId, slaveHostname)).toIterator
+      } else if (resourceName.isDefined) {
+        val resName = resourceName.get
+        if (resource.containsKey(resName))
+          ArrayBuffer[String](resource.get(resName)
+            ._1.cleanup(slaveHostname, executorId)).toIterator
+        else
+          ArrayBuffer[String]("No external resources %s registered for Executor %s at %s"
+            .format(resourceName.get, executorId, slaveHostname)).toIterator
+      } else {
+        resource.map(_._2._1.cleanup(slaveHostname, executorId)).toIterator
+      }
+    }
+  }
 
   override def receiveWithLogging = {
     case TriggerThreadDump =>
       sender ! Utils.getThreadDump()
+    case TriggerExtResourceInfoDump => {
+      sender ! getExtResourceInfo()
+    }
+    case TriggerExtResourceCleanup(resourceName) => {
+      sender ! extResourceCleanup(resourceName)
+    }
   }
 
 }

@@ -261,4 +261,14 @@ private[spark] object AkkaUtils extends Logging {
     s"$protocol://$systemName@$host:$port/user/$actorName"
   }
 
+  def makeExecutorRef(
+                       name: String,
+                       conf: SparkConf,
+                       inputUrl: String,
+                       actorSystem: ActorSystem): ActorRef = {
+    val executorActorSystemName = SparkEnv.executorActorSystemName
+    val timeout = AkkaUtils.lookupTimeout(conf)
+    logInfo(s"Connecting to $name: $inputUrl")
+    Await.result(actorSystem.actorSelection(inputUrl).resolveOne(timeout), timeout)
+  }
 }

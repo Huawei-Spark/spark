@@ -37,7 +37,6 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.partial.{ApproximateActionListener, ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.rdd.{AdminRDD, ExecutorPartition}
 import org.apache.spark.storage._
 import org.apache.spark.util._
 import org.apache.spark.storage.BlockManagerMessages.BlockManagerHeartbeat
@@ -1299,14 +1298,6 @@ class DAGScheduler(
     if (!visited.add((rdd,partition))) {
       // Nil has already been returned for previously visited partitions.
       return Nil
-    }
-
-    // For an admin RDD, the TaskLocations are explicitly set
-    // This needs to be called before checking on cached locations
-    // since the locations and executors could be dynamic and fluid
-    // for failed nodes etc.
-    if (rdd.isInstanceOf[AdminRDD[_]]) {
-      return rdd.partitions.map(_.asInstanceOf[ExecutorPartition].taskLocation)
     }
 
     // If the partition is cached, return the cache locations

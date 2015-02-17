@@ -516,7 +516,7 @@ private[spark] class TaskSchedulerImpl(
   override def applicationId(): String = backend.applicationId()
 
   def getExecutorIdsAndLocations() : Seq[TaskLocation] = {
-    executorIdToHost.map(e=>TaskLocation(e._1, e._2)).toSeq
+    executorIdToHost.map(e=>TaskLocation(e._2, e._1)).toSeq
   }
 
 }
