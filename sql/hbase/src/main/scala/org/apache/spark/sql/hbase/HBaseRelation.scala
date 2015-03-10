@@ -22,8 +22,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
 import org.apache.log4j.Logger
-
-import org.apache.spark.Partition
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
 
@@ -97,7 +95,6 @@ private[hbase] case class HBaseRelation(
      hbaseTableName: String,
      allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
-
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
   @transient lazy val keyColumns = allColumns.filter(_.isInstanceOf[KeyColumn])
@@ -284,14 +281,209 @@ private[hbase] case class HBaseRelation(
     ret
   }
 
-  def buildFilter(
-                   projList: Seq[NamedExpression],
-                   pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
+  /**
+   * build filter list based on critical point ranges
+   * @param output the projection list
+   * @param filterPred the predicate
+   * @param cprs the sequence of critical point ranges
+   * @return the filter list and expression tuple
+   */
+  def buildCPRFilterList(output: Seq[Attribute], filterPred: Option[Expression],
+                         cprs: Seq[MDCriticalPointRange[_]]):
+  (Option[FilterList], Option[Expression]) = {
+    val finalFilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+    //    val projectionFilterList = buildProjectionFilterList(output, filterPred)
+    val cprFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
+    var expressionList: List[Expression] = List[Expression]()
+    for (cpr <- cprs) {
+      val cprAndPushableFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+      val startKey: Option[Any] = cpr.lastRange.start
+      val endKey: Option[Any] = cpr.lastRange.end
+      val startInclusive = cpr.lastRange.startInclusive
+      val endInclusive = cpr.lastRange.endInclusive
+      val keyType: NativeType = cpr.lastRange.dt
+      val predicate = cpr.lastRange.pred
+
+      val (pushable, nonPushable) = if (predicate != null) {
+        buildCPRPushdownFilterList(predicate)
+      } else {
+        (None, None)
+      }
+
+      val items: Seq[(Any, NativeType)] = cpr.prefix
+      val head: Seq[(HBaseRawType, NativeType)] = items.map {
+        case (itemValue, itemType) => {
+          (DataTypeUtils.dataToBytes(itemValue, itemType), itemType)
+        }
+      }
+
+      val headExpression: Seq[Expression] = items.zipWithIndex.map { case (item, index) => {
+        val keyCol = keyColumns.find(_.order == index).get
+
+        val left = output.find(_.name == keyCol.sqlName).get
+        val right = Literal(item._1, item._2)
+        EqualTo(left, right)
+      }
+      }
+
+      val tailExpression: Expression = {
+        val index = items.size
+        val keyCol = keyColumns.find(_.order == index).get
+        val left = output.find(_.name == keyCol.sqlName).get
+        val startInclusive = cpr.lastRange.startInclusive
+        val endInclusinve = cpr.lastRange.endInclusive
+        if (cpr.lastRange.isPoint) {
+          val right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          EqualTo(left, right)
+        } else if (cpr.lastRange.start.isDefined && cpr.lastRange.end.isDefined) {
+          var right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          val leftExpression = if (startInclusive) {
+            GreaterThanOrEqual(left, right)
+          } else {
+            GreaterThan(left, right)
+          }
+          right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
+          val rightExpress = if (endInclusinve) {
+            LessThanOrEqual(left, right)
+          } else {
+            LessThan(left, right)
+          }
+          And(leftExpression, rightExpress)
+        } else if (cpr.lastRange.start.isDefined) {
+          val right = Literal(cpr.lastRange.start.get, cpr.lastRange.dt)
+          if (startInclusive) {
+            GreaterThanOrEqual(left, right)
+          } else {
+            GreaterThan(left, right)
+          }
+        } else if (cpr.lastRange.end.isDefined) {
+          val right = Literal(cpr.lastRange.end.get, cpr.lastRange.dt)
+          if (endInclusinve) {
+            LessThanOrEqual(left, right)
+          } else {
+            LessThan(left, right)
+          }
+        } else {
+          null
+        }
+      }
+
+      val combinedExpression: Seq[Expression] = headExpression :+ tailExpression
+      var andExpression: Expression = combinedExpression.reduceLeft(
+        (e1: Expression, e2: Expression) => And(e1, e2))
+
+      if (nonPushable.isDefined) {
+        andExpression = And(andExpression, nonPushable.get)
+      }
+      expressionList = expressionList :+ andExpression
+
+      val filter = {
+        if (cpr.lastRange.isPoint) {
+          // the last range is a point
+          val tail: (HBaseRawType, NativeType) =
+            (DataTypeUtils.dataToBytes(startKey.get, keyType), keyType)
+          val rowKeys = head :+ tail
+          val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
+          if (cpr.prefix.size == keyColumns.size - 1) {
+            // full dimension of row key
+            new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(row))
+          }
+          else {
+            new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(row))
+          }
+        } else {
+          // the last range is not a point
+          val startFilter: RowFilter = if (startKey.isDefined) {
+            val tail: (HBaseRawType, NativeType) =
+              (DataTypeUtils.dataToBytes(startKey.get, keyType), keyType)
+            val rowKeys = head :+ tail
+            val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
+            if (cpr.prefix.size == keyColumns.size - 1) {
+              // full dimension of row key
+              if (startInclusive) {
+                new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL, new BinaryComparator(row))
+              } else {
+                new RowFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(row))
+              }
+            }
+            else {
+              if (startInclusive) {
+                new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
+                  new BinaryPrefixComparator(row))
+              } else {
+                new RowFilter(CompareFilter.CompareOp.GREATER, new BinaryPrefixComparator(row))
+              }
+            }
+          } else {
+            null
+          }
+          val endFilter: RowFilter = if (endKey.isDefined) {
+            val tail: (HBaseRawType, NativeType) =
+              (DataTypeUtils.dataToBytes(endKey.get, keyType), keyType)
+            val rowKeys = head :+ tail
+            val row = HBaseKVHelper.encodingRawKeyColumns(rowKeys)
+            if (cpr.prefix.size == keyColumns.size - 1) {
+              // full dimension of row key
+              if (endInclusive) {
+                new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(row))
+              } else {
+                new RowFilter(CompareFilter.CompareOp.LESS, new BinaryComparator(row))
+              }
+            }
+            else {
+              if (endInclusive) {
+                new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
+                  new BinaryPrefixComparator(row))
+              } else {
+                new RowFilter(CompareFilter.CompareOp.LESS, new BinaryPrefixComparator(row))
+              }
+            }
+          } else {
+            null
+          }
+          if (startKey.isDefined && endKey.isDefined) {
+            // both start and end filters exist
+            val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+            filterList.addFilter(startFilter)
+            filterList.addFilter(endFilter)
+            filterList
+          } else if (startKey.isDefined) {
+            // start filter exists only
+            startFilter
+          } else {
+            // end filter exists only
+            endFilter
+          }
+        }
+      }
+      cprAndPushableFilterList.addFilter(filter)
+      if (pushable.isDefined) {
+        cprAndPushableFilterList.addFilter(pushable.get)
+      }
+      cprFilterList.addFilter(cprAndPushableFilterList)
+    }
+
+    val orExpression = expressionList.reduceLeft((e1: Expression, e2: Expression) => Or(e1, e2))
+    //    if (projectionFilterList.isDefined) {
+    //      finalFilterList.addFilter(projectionFilterList.get)
+    //    }
+    if (cprFilterList.getFilters.size() == 1) {
+      finalFilterList.addFilter(cprFilterList.getFilters.get(0))
+    } else if (cprFilterList.getFilters.size() > 1) {
+      finalFilterList.addFilter(cprFilterList)
+    }
+    (Some(finalFilterList), Some(orExpression))
+  }
+
+  def buildProjectionFilterList(
+                                 projList: Seq[NamedExpression],
+                                 pred: Option[Expression]): Option[FilterList] = {
     var distinctProjList = projList.distinct
     if (pred.isDefined) {
       distinctProjList = distinctProjList.filterNot(_.references.subsetOf(pred.get.references))
     }
-    val projFilterList = if (distinctProjList.size == allColumns.size) {
+
+    if (distinctProjList.size == allColumns.size) {
       None
     } else {
       val filtersList: List[Filter] = nonKeyColumns.filter {
@@ -312,16 +504,38 @@ private[hbase] case class HBaseRelation(
           new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
       }.toList
 
-      Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
+      if (filtersList.size == 0) {
+        None
+      } else {
+        Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
+      }
     }
+  }
 
+  def buildCPRPushdownFilterList(predExp: Expression): (Option[FilterList], Option[Expression]) = {
+    // build pred pushdown filters:
+    // 1. push any NOT through AND/OR
+    val notPushedPred = NotPusher(predExp)
+    // 2. classify the transformed predicate into pushdownable and non-pushdownable predicates
+    val classier = new ScanPredClassifier(this) // Right now only on primary key dimension
+    val (pushdownFilterPred, otherPred) = classier(notPushedPred)
+    // 3. build a FilterList mirroring the pushdownable predicate
+    val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)
+    // 4. merge the above FilterList with the one from the projection
+    (predPushdownFilterList, otherPred)
+  }
+
+  def buildPushdownFilterList(
+                               pred: Option[Expression],
+                               projFilterList: Option[FilterList]):
+  (Option[FilterList], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
       // build pred pushdown filters:
       // 1. push any NOT through AND/OR
       val notPushedPred = NotPusher(predExp)
       // 2. classify the transformed predicate into pushdownable and non-pushdownable predicates
-      val classier = new ScanPredClassifier(this, 0) // Right now only on primary key dimension
+      val classier = new ScanPredClassifier(this) // Right now only on primary key dimension
       val (pushdownFilterPred, otherPred) = classier(notPushedPred)
       // 3. build a FilterList mirroring the pushdownable predicate
       val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)
@@ -330,6 +544,13 @@ private[hbase] case class HBaseRelation(
     } else {
       (projFilterList, None)
     }
+  }
+
+  def buildFilter(projList: Seq[NamedExpression],
+                  pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
+    val projFilterList = buildProjectionFilterList(projList, pred)
+
+    buildPushdownFilterList(pred, projFilterList)
   }
 
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
@@ -634,13 +855,11 @@ private[hbase] case class HBaseRelation(
     )
   }
 
-  def buildScan(
-                 split: Partition,
-                 filters: Option[FilterList],
-                 projList: Seq[NamedExpression]): Scan = {
-    val hbPartition = split.asInstanceOf[HBasePartition]
+  def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
+                filters: Option[FilterList],
+                projList: Seq[NamedExpression]): Scan = {
     val scan = {
-      (hbPartition.start, hbPartition.end) match {
+      (start, end) match {
         case (Some(lb), Some(ub)) => new Scan(lb, ub)
         case (Some(lb), None) => new Scan(lb)
         case (None, Some(ub)) => new Scan(Array[Byte](), ub)
@@ -650,6 +869,8 @@ private[hbase] case class HBaseRelation(
     if (filters.isDefined && !filters.get.getFilters.isEmpty) {
       scan.setFilter(filters.get)
     }
+
+    scan.setCaching(scannerFetchSize)
     // TODO: add Family to SCAN from projections
     scan
   }
@@ -667,18 +888,19 @@ private[hbase] case class HBaseRelation(
     assert(projections.size == row.length, "Projection size and row size mismatched")
     // TODO: replaced with the new Key method
     val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
-    projections.foreach { p =>
-      columnMap.get(p._1.name).get match {
-        case column: NonKeyColumn =>
-          val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
-          DataTypeUtils.setRowColumnFromHBaseRawType(
-            row, p._2, colValue, 0, colValue.length, column.dataType)
-        case ki =>
-          val keyIndex = ki.asInstanceOf[Int]
-          val (start, length) = rowKeys(keyIndex)
-          DataTypeUtils.setRowColumnFromHBaseRawType(
-            row, p._2, result.getRow, start, length, keyColumns(keyIndex).dataType)
-      }
+    projections.foreach {
+      p =>
+        columnMap.get(p._1.name).get match {
+          case column: NonKeyColumn =>
+            val colValue = result.getValue(column.familyRaw, column.qualifierRaw)
+            DataTypeUtils.setRowColumnFromHBaseRawType(
+              row, p._2, colValue, 0, colValue.length, column.dataType)
+          case ki =>
+            val keyIndex = ki.asInstanceOf[Int]
+            val (start, length) = rowKeys(keyIndex)
+            DataTypeUtils.setRowColumnFromHBaseRawType(
+              row, p._2, result.getRow, start, length, keyColumns(keyIndex).dataType)
+        }
     }
     row
   }

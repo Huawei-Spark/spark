@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
  * Classifies a predicate into a pair of (pushdownable, non-pushdownable) predicates
  * for a Scan; the logic relationship between the two components of the pair is AND
  */
-class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
+class ScanPredClassifier(relation: HBaseRelation) {
   def apply(pred: Expression): (Option[Expression], Option[Expression]) = {
     // post-order bottom-up traversal
     pred match {
@@ -101,23 +101,13 @@ class ScanPredClassifier(relation: HBaseRelation, keyIndex: Int) {
         if (relation.isNonKey(right.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
-          val keyIdx = relation.keyIndex(right.asInstanceOf[AttributeReference])
-          if (keyIdx == keyIndex) {
-            (Some(pred), None)
-          } else {
-            (None, Some(pred))
-          }
+          (None, Some(pred))
         }
       case (AttributeReference(_, _, _, _), Literal(_, _)) =>
         if (relation.isNonKey(left.asInstanceOf[AttributeReference])) {
           (Some(pred), None)
         } else {
-          val keyIdx = relation.keyIndex(left.asInstanceOf[AttributeReference])
-          if (keyIdx == keyIndex) {
-            (Some(pred), None)
-          } else {
-            (None, Some(pred))
-          }
+          (None, Some(pred))
         }
       case _ => (None, Some(pred))
     }
