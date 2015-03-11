@@ -485,6 +485,9 @@ private[hbase] case class HBaseRelation(
 
     if (distinctProjList.size == allColumns.size) {
       None
+    } else if (distinctProjList.size == 0) {
+      // empty projection: count only
+      Option(new FilterList(new FirstKeyOnlyFilter))
     } else {
       val filtersList: List[Filter] = nonKeyColumns.filter {
         case nkc => distinctProjList.exists(nkc.sqlName == _.name)
@@ -867,10 +870,12 @@ private[hbase] case class HBaseRelation(
       }
     }
     if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-      scan.setFilter(filters.get)
+      if (filters.get.getFilters.size() == 1) {
+        scan.setFilter(filters.get.getFilters.get(0))
+      } else {
+        scan.setFilter(filters.get)
+      }
     }
-
-    scan.setCaching(scannerFetchSize)
     // TODO: add Family to SCAN from projections
     scan
   }
