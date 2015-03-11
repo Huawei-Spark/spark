@@ -24,7 +24,7 @@ import org.apache.hadoop.hbase.filter._
 import org.apache.log4j.Logger
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
-
+import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
@@ -90,10 +90,10 @@ class HBaseSource extends RelationProvider {
  */
 @SerialVersionUID(15298736227428789L)
 private[hbase] case class HBaseRelation(
-     tableName: String,
-     hbaseNamespace: String,
-     hbaseTableName: String,
-     allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
+                             tableName: String,
+                             hbaseNamespace: String,
+                             hbaseTableName: String,
+                             allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -292,7 +292,6 @@ private[hbase] case class HBaseRelation(
                          cprs: Seq[MDCriticalPointRange[_]]):
   (Option[FilterList], Option[Expression]) = {
     val finalFilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-    //    val projectionFilterList = buildProjectionFilterList(output, filterPred)
     val cprFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
     var expressionList: List[Expression] = List[Expression]()
     for (cpr <- cprs) {
@@ -475,46 +474,6 @@ private[hbase] case class HBaseRelation(
     (Some(finalFilterList), Some(orExpression))
   }
 
-  def buildProjectionFilterList(
-                                 projList: Seq[NamedExpression],
-                                 pred: Option[Expression]): Option[FilterList] = {
-    var distinctProjList = projList.distinct
-    if (pred.isDefined) {
-      distinctProjList = distinctProjList.filterNot(_.references.subsetOf(pred.get.references))
-    }
-
-    if (distinctProjList.size == allColumns.size) {
-      None
-    } else if (distinctProjList.size == 0) {
-      // empty projection: count only
-      Option(new FilterList(new FirstKeyOnlyFilter))
-    } else {
-      val filtersList: List[Filter] = nonKeyColumns.filter {
-        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
-      }.map {
-        case nkc@NonKeyColumn(_, _, family, qualifier) =>
-          val columnFilters = new java.util.ArrayList[Filter]
-          columnFilters.add(
-            new FamilyFilter(
-              CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(nkc.familyRaw)
-            ))
-          columnFilters.add(
-            new QualifierFilter(
-              CompareFilter.CompareOp.EQUAL,
-              new BinaryComparator(nkc.qualifierRaw)
-            ))
-          new FilterList(FilterList.Operator.MUST_PASS_ALL, columnFilters)
-      }.toList
-
-      if (filtersList.size == 0) {
-        None
-      } else {
-        Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filtersList.asJava))
-      }
-    }
-  }
-
   def buildCPRPushdownFilterList(predExp: Expression): (Option[FilterList], Option[Expression]) = {
     // build pred pushdown filters:
     // 1. push any NOT through AND/OR
@@ -528,9 +487,7 @@ private[hbase] case class HBaseRelation(
     (predPushdownFilterList, otherPred)
   }
 
-  def buildPushdownFilterList(
-                               pred: Option[Expression],
-                               projFilterList: Option[FilterList]):
+  def buildPushdownFilterList(pred: Option[Expression]):
   (Option[FilterList], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
@@ -545,15 +502,8 @@ private[hbase] case class HBaseRelation(
       // 4. merge the above FilterList with the one from the projection
       (predPushdownFilterList, otherPred)
     } else {
-      (projFilterList, None)
+      (None, None)
     }
-  }
-
-  def buildFilter(projList: Seq[NamedExpression],
-                  pred: Option[Expression]): (Option[FilterList], Option[Expression]) = {
-    val projFilterList = buildProjectionFilterList(projList, pred)
-
-    buildPushdownFilterList(pred, projFilterList)
   }
 
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
@@ -798,11 +748,11 @@ private[hbase] case class HBaseRelation(
       sys.error("HBASE Table doesnot support INSERT OVERWRITE for now.")
     }
   }
-  
+
   def writeToHBase(context: TaskContext, iterator: Iterator[Row]) = {
     // TODO:make the BatchMaxSize configurable
     val BatchMaxSize = 100
-    
+
     var rowIndexInBatch = 0
     var colIndexInBatch = 0
 
@@ -842,8 +792,8 @@ private[hbase] case class HBaseRelation(
     }
     closeHTable()
   }
-  
-  
+
+
   def buildScan(requiredColumns: Seq[Attribute], filters: Seq[Expression]): RDD[Row] = {
     require(filters.size < 2, "Internal logical error: unexpected filter list size")
     val filterPredicate = if (filters.isEmpty) None
@@ -869,14 +819,47 @@ private[hbase] case class HBaseRelation(
         case _ => new Scan
       }
     }
-    if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-      if (filters.get.getFilters.size() == 1) {
-        scan.setFilter(filters.get.getFilters.get(0))
+
+    // add Family to SCAN from projections
+    addColumnFamiliesToScan(scan, filters, projList)
+  }
+
+  def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
+                              projList: Seq[NamedExpression]): Scan = {
+    var distinctProjList = projList.distinct
+    // filter out the key columns
+    distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p.name))
+
+    def addFirstKeyOnlyFilter(left: Filter): Filter = {
+      if (distinctProjList.size == 0) {
+        // empty projection: count only
+        val right = new FirstKeyOnlyFilter
+        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+        filterList.addFilter(left)
+        filterList.addFilter(right)
+        filterList
       } else {
-        scan.setFilter(filters.get)
+        left
       }
     }
-    // TODO: add Family to SCAN from projections
+
+    if (filters.isDefined && !filters.get.getFilters.isEmpty) {
+      val finalFilters = if (filters.get.getFilters.size() == 1) {
+        addFirstKeyOnlyFilter(filters.get.getFilters.get(0))
+      } else {
+        addFirstKeyOnlyFilter(filters.get)
+      }
+      scan.setFilter(finalFilters)
+    }
+
+    if (distinctProjList.size > 0) {
+      nonKeyColumns.filter {
+        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
+      }.map {
+        case nkc@NonKeyColumn(_, _, family, qualifier) =>
+          scan.addColumn(Bytes.toBytes(nkc.family), Bytes.toBytes(nkc.qualifier))
+      }
+    }
     scan
   }
 
