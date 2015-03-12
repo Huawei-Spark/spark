@@ -294,6 +294,7 @@ private[hbase] case class HBaseRelation(
     val finalFilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
     val cprFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
     var expressionList: List[Expression] = List[Expression]()
+    var anyNonpushable = false
     for (cpr <- cprs) {
       val cprAndPushableFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
       val startKey: Option[Any] = cpr.lastRange.start
@@ -372,6 +373,7 @@ private[hbase] case class HBaseRelation(
         (e1: Expression, e2: Expression) => And(e1, e2))
 
       if (nonPushable.isDefined) {
+        anyNonpushable = true
         andExpression = And(andExpression, nonPushable.get)
       }
       expressionList = expressionList :+ andExpression
@@ -462,16 +464,17 @@ private[hbase] case class HBaseRelation(
       cprFilterList.addFilter(cprAndPushableFilterList)
     }
 
-    val orExpression = expressionList.reduceLeft((e1: Expression, e2: Expression) => Or(e1, e2))
-    //    if (projectionFilterList.isDefined) {
-    //      finalFilterList.addFilter(projectionFilterList.get)
-    //    }
+    val orExpression = if (anyNonpushable) {
+      Some(expressionList.reduceLeft((e1: Expression, e2: Expression) => Or(e1, e2)))
+    } else {
+      None
+    }
     if (cprFilterList.getFilters.size() == 1) {
       finalFilterList.addFilter(cprFilterList.getFilters.get(0))
     } else if (cprFilterList.getFilters.size() > 1) {
       finalFilterList.addFilter(cprFilterList)
     }
-    (Some(finalFilterList), Some(orExpression))
+    (Some(finalFilterList), orExpression)
   }
 
   def buildCPRPushdownFilterList(predExp: Expression): (Option[FilterList], Option[Expression]) = {

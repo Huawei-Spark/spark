@@ -53,7 +53,7 @@ class HBaseSQLReaderRDD(
     }.toSeq
   }
 
-  def createIterator(context: TaskContext,
+  private def createIterator(context: TaskContext,
                      scanner: ResultScanner, otherFilters: Option[Expression]): Iterator[Row] = {
     val lBuffer = ListBuffer[HBaseRawType]()
     val aBuffer = ArrayBuffer[Byte]()
