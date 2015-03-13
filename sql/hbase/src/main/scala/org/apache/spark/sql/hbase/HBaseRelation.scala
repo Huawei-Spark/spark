@@ -544,7 +544,7 @@ private[hbase] case class HBaseRelation(
               }
             }
           }
-          result = Option(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
+          result = Some(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
         case Or(left, right) =>
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
@@ -574,156 +574,156 @@ private[hbase] case class HBaseRelation(
               }
             }
           }
-          result = Option(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
+          result = Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
         case GreaterThan(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
+          val keyColumn = keyColumns.find(_.sqlName == left.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case GreaterThan(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          val keyColumn = keyColumns.find(_.sqlName == right.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
+          val keyColumn = keyColumns.find(_.sqlName == left.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          val keyColumn = keyColumns.find(_.sqlName == right.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case EqualTo(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
+          val keyColumn = keyColumns.find(_.sqlName == left.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case EqualTo(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          val keyColumn = keyColumns.find(_.sqlName == right.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case LessThan(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
+          val keyColumn = keyColumns.find(_.sqlName == left.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case LessThan(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          val keyColumn = keyColumns.find(_.sqlName == right.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(left.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(left.name))
+          val keyColumn = keyColumns.find(_.sqlName == left.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find((p: KeyColumn) => p.sqlName.equals(right.name))
-          val nonKeyColumn = nonKeyColumns.find((p: NonKeyColumn) => p.sqlName.equals(right.name))
+          val keyColumn = keyColumns.find(_.sqlName == right.name)
+          val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
           if (keyColumn.isDefined) {
             val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
               new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           } else if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
-            result = Option(new FilterList(filter))
+            result = Some(new FilterList(filter))
           }
       }
     }
