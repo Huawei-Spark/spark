@@ -302,13 +302,9 @@ private[hbase] case class HBaseRelation(
       val startInclusive = cpr.lastRange.startInclusive
       val endInclusive = cpr.lastRange.endInclusive
       val keyType: NativeType = cpr.lastRange.dt
-      val predicate = cpr.lastRange.pred
+      val predicate = if (cpr.lastRange.pred == null) None else Some(cpr.lastRange.pred)
 
-      val (pushable, nonPushable) = if (predicate != null) {
-        buildCPRPushdownFilterList(predicate)
-      } else {
-        (None, None)
-      }
+      val (pushable, nonPushable) = buildPushdownFilterList(predicate)
 
       val items: Seq[(Any, NativeType)] = cpr.prefix
       val head: Seq[(HBaseRawType, NativeType)] = items.map {
@@ -477,21 +473,8 @@ private[hbase] case class HBaseRelation(
     (Some(finalFilterList), orExpression)
   }
 
-  def buildCPRPushdownFilterList(predExp: Expression): (Option[FilterList], Option[Expression]) = {
-    // build pred pushdown filters:
-    // 1. push any NOT through AND/OR
-    val notPushedPred = NotPusher(predExp)
-    // 2. classify the transformed predicate into pushdownable and non-pushdownable predicates
-    val classier = new ScanPredClassifier(this) // Right now only on primary key dimension
-    val (pushdownFilterPred, otherPred) = classier(notPushedPred)
-    // 3. build a FilterList mirroring the pushdownable predicate
-    val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)
-    // 4. merge the above FilterList with the one from the projection
-    (predPushdownFilterList, otherPred)
-  }
-
   def buildPushdownFilterList(pred: Option[Expression]):
-  (Option[FilterList], Option[Expression]) = {
+    (Option[FilterList], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
       // build pred pushdown filters:
@@ -501,7 +484,9 @@ private[hbase] case class HBaseRelation(
       val classier = new ScanPredClassifier(this) // Right now only on primary key dimension
       val (pushdownFilterPred, otherPred) = classier(notPushedPred)
       // 3. build a FilterList mirroring the pushdownable predicate
-      val predPushdownFilterList = buildFilterListFromPred(pushdownFilterPred)
+      val predPushdownFilterList = {
+        if (pushdownFilterPred.isEmpty) None else buildFilterListFromPred(pushdownFilterPred)
+      }
       // 4. merge the above FilterList with the one from the projection
       (predPushdownFilterList, otherPred)
     } else {
