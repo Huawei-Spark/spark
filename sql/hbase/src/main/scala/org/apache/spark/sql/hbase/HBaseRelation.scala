@@ -90,10 +90,10 @@ class HBaseSource extends RelationProvider {
  */
 @SerialVersionUID(15298736227428789L)
 private[hbase] case class HBaseRelation(
-                             tableName: String,
-                             hbaseNamespace: String,
-                             hbaseTableName: String,
-                             allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
+                               tableName: String,
+                               hbaseNamespace: String,
+                               hbaseTableName: String,
+                               allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -474,7 +474,7 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildPushdownFilterList(pred: Option[Expression]):
-    (Option[FilterList], Option[Expression]) = {
+  (Option[FilterList], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
       // build pred pushdown filters:
@@ -494,6 +494,20 @@ private[hbase] case class HBaseRelation(
     }
   }
 
+  private def addToFilterList(filters: java.util.ArrayList[Filter],
+                               filtersToBeAdded: Option[FilterList],
+                               operator: FilterList.Operator) = {
+    if (filtersToBeAdded.isDefined) {
+      val filterList = filtersToBeAdded.get
+      val size = filterList.getFilters.size
+      if (size == 1 || filterList.getOperator == operator) {
+        filterList.getFilters.map(p => filters.add(p))
+      } else {
+        filters.add(filterList)
+      }
+    }
+  }
+
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
     var result: Option[FilterList] = None
     val filters = new java.util.ArrayList[Filter]
@@ -503,61 +517,21 @@ private[hbase] case class HBaseRelation(
         case And(left, right) =>
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
-            if (leftFilterList.isDefined) {
-              val filterList = leftFilterList.get
-              val size = filterList.getFilters.size
-              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ALL) {
-                for (i <- 0 until size) {
-                  filters.add(filterList.getFilters.get(i))
-                }
-              } else {
-                filters.add(filterList)
-              }
-            }
+            addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ALL)
           }
           if (right != null) {
             val rightFilterList = buildFilterListFromPred(Some(right))
-            if (rightFilterList.isDefined) {
-              val filterList = rightFilterList.get
-              val size = filterList.getFilters.size
-              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ALL) {
-                for (i <- 0 until size) {
-                  filters.add(filterList.getFilters.get(i))
-                }
-              } else {
-                filters.add(filterList)
-              }
-            }
+            addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ALL)
           }
           result = Some(new FilterList(FilterList.Operator.MUST_PASS_ALL, filters))
         case Or(left, right) =>
           if (left != null) {
             val leftFilterList = buildFilterListFromPred(Some(left))
-            if (leftFilterList.isDefined) {
-              val filterList = leftFilterList.get
-              val size = filterList.getFilters.size
-              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ONE) {
-                for (i <- 0 until size) {
-                  filters.add(filterList.getFilters.get(i))
-                }
-              } else {
-                filters.add(filterList)
-              }
-            }
+            addToFilterList(filters, leftFilterList, FilterList.Operator.MUST_PASS_ONE)
           }
           if (right != null) {
             val rightFilterList = buildFilterListFromPred(Some(right))
-            if (rightFilterList.isDefined) {
-              val filterList = rightFilterList.get
-              val size = filterList.getFilters.size
-              if (size == 1 || filterList.getOperator == FilterList.Operator.MUST_PASS_ONE) {
-                for (i <- 0 until size) {
-                  filters.add(filterList.getFilters.get(i))
-                }
-              } else {
-                filters.add(filterList)
-              }
-            }
+            addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ONE)
           }
           result = Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
         case GreaterThan(left: AttributeReference, right: Literal) =>
