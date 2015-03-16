@@ -148,7 +148,7 @@ class HBaseSQLReaderRDD(
 
     if (expandedCPRs.isEmpty) {
       val (filters, otherFilters) = relation.buildPushdownFilterList(predicates)
-      val scan = relation.buildScan(partition.start, partition.end, filters, output)
+      val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters, output)
       val scanner = relation.htable.getScanner(scan)
       createIterator(context, scanner, otherFilters)
     } else {
@@ -232,7 +232,7 @@ class HBaseSQLReaderRDD(
         }
 
         val (filters, otherFilters) = relation.buildCPRFilterList(output, filterPred, expandedCPRs)
-        val scan = relation.buildScan(start, end, filters, output)
+        val scan = relation.buildScan(start, end, filters, otherFilters, output)
         val scanner = relation.htable.getScanner(scan)
         createIterator(context, scanner, otherFilters)
       }

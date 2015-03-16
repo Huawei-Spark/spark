@@ -91,7 +91,7 @@ private[hbase] trait HBaseStrategies {
         HBaseSQLTableScan(hbaseRelation, projectList.map(_.toAttribute),
           scanBuilder(requestedColumns, pushedFilters))
       } else {
-        val requestedColumns = (projectSet ++ filterSet).map(relation.attributeMap).toSeq
+        val requestedColumns = projectSet.map(relation.attributeMap).toSeq
         val scan = HBaseSQLTableScan(hbaseRelation, requestedColumns,
           scanBuilder(requestedColumns, pushedFilters))
         Project(projectList, scan)

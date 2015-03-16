@@ -771,7 +771,7 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
-                filters: Option[FilterList],
+                filters: Option[FilterList], otherFilters: Option[Expression],
                 projList: Seq[NamedExpression]): Scan = {
     val scan = {
       (start, end) match {
@@ -783,12 +783,16 @@ private[hbase] case class HBaseRelation(
     }
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, projList)
+    addColumnFamiliesToScan(scan, filters, otherFilters, projList)
   }
 
   def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
+                              otherFilters: Option[Expression],
                               projList: Seq[NamedExpression]): Scan = {
     var distinctProjList = projList.distinct
+    if (otherFilters.isDefined) {
+      distinctProjList = distinctProjList.union(otherFilters.get.references.toSeq)
+    }
     // filter out the key columns
     distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p.name))
 
@@ -826,9 +830,7 @@ private[hbase] case class HBaseRelation(
     if (finalFilters != null) scan.setFilter(finalFilters)
 
     if (distinctProjList.size > 0) {
-      nonKeyColumns.filter {
-        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
-      }.map {
+      nonKeyColumns.map {
         case nkc@NonKeyColumn(_, _, family, qualifier) =>
           scan.addColumn(Bytes.toBytes(nkc.family), Bytes.toBytes(nkc.qualifier))
       }
