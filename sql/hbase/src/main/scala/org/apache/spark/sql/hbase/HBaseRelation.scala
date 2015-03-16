@@ -495,8 +495,8 @@ private[hbase] case class HBaseRelation(
   }
 
   private def addToFilterList(filters: java.util.ArrayList[Filter],
-                               filtersToBeAdded: Option[FilterList],
-                               operator: FilterList.Operator) = {
+                              filtersToBeAdded: Option[FilterList],
+                              operator: FilterList.Operator) = {
     if (filtersToBeAdded.isDefined) {
       val filterList = filtersToBeAdded.get
       val size = filterList.getFilters.size
@@ -792,27 +792,38 @@ private[hbase] case class HBaseRelation(
     // filter out the key columns
     distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p.name))
 
-    def addFirstKeyOnlyFilter(left: Filter): Filter = {
-      if (distinctProjList.size == 0) {
-        // empty projection: count only
-        val right = new FirstKeyOnlyFilter
-        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-        filterList.addFilter(left)
-        filterList.addFilter(right)
-        filterList
+    val finalFilters = if (distinctProjList.size == 0) {
+      if (filters.isDefined && !filters.get.getFilters.isEmpty) {
+        if (filters.get.getFilters.size() == 1) {
+          val left = filters.get.getFilters.get(0)
+          val right = new FirstKeyOnlyFilter
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(left)
+          filterList.addFilter(right)
+          filterList
+        } else {
+          val left = filters.get
+          val right = new FirstKeyOnlyFilter
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(left)
+          filterList.addFilter(right)
+          filterList
+        }
       } else {
-        left
+        new FirstKeyOnlyFilter
+      }
+    } else {
+      if (filters.isDefined && !filters.get.getFilters.isEmpty) {
+        if (filters.get.getFilters.size() == 1) {
+          filters.get.getFilters.get(0)
+        } else {
+          filters.get
+        }
+      } else {
+        null
       }
     }
-
-    if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-      val finalFilters = if (filters.get.getFilters.size() == 1) {
-        addFirstKeyOnlyFilter(filters.get.getFilters.get(0))
-      } else {
-        addFirstKeyOnlyFilter(filters.get)
-      }
-      scan.setFilter(finalFilters)
-    }
+    if (finalFilters != null) scan.setFilter(finalFilters)
 
     if (distinctProjList.size > 0) {
       nonKeyColumns.filter {

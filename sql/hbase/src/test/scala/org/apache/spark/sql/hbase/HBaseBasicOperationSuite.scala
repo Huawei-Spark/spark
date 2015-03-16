@@ -71,6 +71,7 @@ class HBaseBasicOperationSuite extends HBaseIntegrationTestBase {
   }
 
   test("Count(*/1) and Non-Key Column Query") {
+    assert(sql( """SELECT count(*) FROM ta""").collect()(0).get(0) == 14)
     assert(sql( """SELECT count(*) FROM ta where col2 < 8""").collect()(0).get(0) == 7)
     assert(sql( """SELECT count(*) FROM ta where col4 < 0""").collect()(0).get(0) == 7)
     assert(sql( """SELECT count(1) FROM ta where col2 < 8""").collect()(0).get(0) == 7)
