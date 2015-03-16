@@ -57,8 +57,13 @@ class HBaseSQLReaderRDD(
                      scanner: ResultScanner, otherFilters: Option[Expression]): Iterator[Row] = {
     val lBuffer = ListBuffer[HBaseRawType]()
     val aBuffer = ArrayBuffer[Byte]()
-    val row = new GenericMutableRow(output.size)
-    val projections = output.zipWithIndex
+
+    var finalOutput = output.distinct
+    if (otherFilters.isDefined) {
+      finalOutput = finalOutput.union(otherFilters.get.references.toSeq)
+    }
+    val row = new GenericMutableRow(finalOutput.size)
+    val projections = finalOutput.zipWithIndex
 
     var finished: Boolean = false
     var gotNext: Boolean = false
@@ -66,9 +71,9 @@ class HBaseSQLReaderRDD(
 
     val otherFilter: (Row) => Boolean = if (otherFilters.isDefined) {
       if (codegenEnabled) {
-        GeneratePredicate(otherFilters.get, output)
+        GeneratePredicate(otherFilters.get, finalOutput)
       } else {
-        InterpretedPredicate(otherFilters.get, output)
+        InterpretedPredicate(otherFilters.get, finalOutput)
       }
     } else null
 
