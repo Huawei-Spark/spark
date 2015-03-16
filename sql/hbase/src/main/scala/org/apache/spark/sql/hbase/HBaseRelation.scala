@@ -316,7 +316,7 @@ private[hbase] case class HBaseRelation(
       val headExpression: Seq[Expression] = items.zipWithIndex.map { case (item, index) => {
         val keyCol = keyColumns.find(_.order == index).get
 
-        val left = output.find(_.name == keyCol.sqlName).get
+        val left = filterPred.get.references.find(_.name == keyCol.sqlName).get
         val right = Literal(item._1, item._2)
         EqualTo(left, right)
       }
@@ -325,7 +325,7 @@ private[hbase] case class HBaseRelation(
       val tailExpression: Expression = {
         val index = items.size
         val keyCol = keyColumns.find(_.order == index).get
-        val left = output.find(_.name == keyCol.sqlName).get
+        val left = filterPred.get.references.find(_.name == keyCol.sqlName).get
         val startInclusive = cpr.lastRange.startInclusive
         val endInclusinve = cpr.lastRange.endInclusive
         if (cpr.lastRange.isPoint) {
