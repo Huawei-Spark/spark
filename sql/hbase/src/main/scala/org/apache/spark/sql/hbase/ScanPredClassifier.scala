@@ -18,6 +18,7 @@
 package org.apache.spark.sql.hbase
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils}
 
 /**
  * Classifies a predicate into a pair of (pushdownable, non-pushdownable) predicates
@@ -88,12 +89,33 @@ class ScanPredClassifier(relation: HBaseRelation) {
       case LessThanOrEqual(left, right) => classifyBinary(left, right, pred)
       case GreaterThan(left, right) => classifyBinary(left, right, pred)
       case GreaterThanOrEqual(left, right) => classifyBinary(left, right, pred)
-      case In(value@AttributeReference(_,_,_,_), list) =>
+      case In(value@AttributeReference(_, _, _, _), list) =>
         if (relation.isNonKey(value) && list.filter(!_.isInstanceOf[Literal]).isEmpty) {
           (Some(pred), None)
         } else {
           (None, Some(pred))
         }
+      case InSet(value@AttributeReference(name, dataType, _, _), hset)
+        if relation.nonKeyColumns.exists(_.sqlName == name) => {
+        var errorOccurred = false
+        for (item <- hset if !errorOccurred) {
+          try {
+            /**
+             * Use try-catch to make sure data type conversion is proper, for example,
+             * Java throws casting exception while doing col2 in (1, 2, 3), if col2 data type
+             * if ByteType and 1, 2, 3 is Integer.
+              */
+            DataTypeUtils.getComparator(BytesUtils.create(dataType), Literal(item, dataType))
+          } catch {
+            case e: Exception => errorOccurred = true
+          }
+        }
+        if (errorOccurred) {
+          (None, Some(pred))
+        } else {
+          (Some(pred), None)
+        }
+      }
       // everything else are treated as non pushdownable
       case _ => (None, Some(pred))
     }

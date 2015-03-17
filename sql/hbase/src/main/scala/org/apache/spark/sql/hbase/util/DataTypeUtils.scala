@@ -120,6 +120,7 @@ object DataTypeUtils {
 
   def getComparator(bu: BytesUtils, expression: Literal): BinaryComparator = {
     expression.dataType match {
+      case ByteType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Byte]))
       case DoubleType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Double]))
       case FloatType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Float]))
       case IntegerType => new BinaryComparator(bu.toBytes(expression.value.asInstanceOf[Int]))

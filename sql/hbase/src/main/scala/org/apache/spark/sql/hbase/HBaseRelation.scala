@@ -34,6 +34,7 @@ import org.apache.spark.sql.hbase.types.PartitionRange
 import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
 import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation}
 import org.apache.spark.sql.sources.{RelationProvider, InsertableRelation}
+import org.apache.spark.sql.catalyst.expressions.AttributeReference
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -534,6 +535,20 @@ private[hbase] case class HBaseRelation(
             addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ONE)
           }
           result = Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
+        case InSet(value@AttributeReference(name, dataType, _, _), hset) => {
+          val column = nonKeyColumns.find(_.sqlName == name)
+          if (column.isDefined) {
+            val filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
+            for (item <- hset) {
+              val filter = new SingleColumnValueFilter(column.get.familyRaw,
+                column.get.qualifierRaw,
+                CompareFilter.CompareOp.EQUAL,
+                DataTypeUtils.getComparator(BytesUtils.create(dataType), Literal(item, dataType)))
+              filterList.addFilter(filter)
+            }
+            result = Some(filterList)
+          }
+        }
         case GreaterThan(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
