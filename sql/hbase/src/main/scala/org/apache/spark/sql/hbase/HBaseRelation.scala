@@ -562,6 +562,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case GreaterThan(left: Literal, right: AttributeReference) =>
@@ -577,6 +578,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
@@ -592,6 +594,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
@@ -607,6 +610,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.GREATER_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case EqualTo(left: AttributeReference, right: Literal) =>
@@ -622,6 +626,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case EqualTo(left: Literal, right: AttributeReference) =>
@@ -637,6 +642,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case LessThan(left: AttributeReference, right: Literal) =>
@@ -652,6 +658,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case LessThan(left: Literal, right: AttributeReference) =>
@@ -667,6 +674,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: AttributeReference, right: Literal) =>
@@ -682,6 +690,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(right.dataType), right))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: Literal, right: AttributeReference) =>
@@ -697,6 +706,7 @@ private[hbase] case class HBaseRelation(
               column.qualifierRaw,
               CompareFilter.CompareOp.LESS_OR_EQUAL,
               DataTypeUtils.getComparator(BytesUtils.create(left.dataType), left))
+            filter.setFilterIfMissing(true)
             result = Some(new FilterList(filter))
           }
       }
