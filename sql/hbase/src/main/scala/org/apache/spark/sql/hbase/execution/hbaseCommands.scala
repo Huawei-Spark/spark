@@ -234,8 +234,8 @@ case class BulkLoadIntoTableCommand(
             }
 
             for (i <- 0 until kv._2.size) {
-              val nkc = relation.nonKeyColumns(i)
-              if (kv._2(i) != null) {
+              if (!kv._2(i).isEmpty) {
+                val nkc = relation.nonKeyColumns(i)
                 bytesWritable.set(kv._1)
                 writer.write(bytesWritable, new KeyValue(kv._1, nkc.familyRaw,
                   nkc.qualifierRaw, kv._2(i)))
