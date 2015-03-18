@@ -101,4 +101,10 @@ class BytesUtilsSuite extends FunSuite with BeforeAndAfterAll with Logging {
     byteArray =  Array[Byte](0x02.toByte, 0xff.toByte)
     assert(Bytes.compareTo(BytesUtils.addOne(byteArray),  Array[Byte](0x03.toByte, 0x00.toByte)) == 0)
   }
+
+  test("float comparison") {
+    val f1 = BytesUtils.create(FloatType).toBytes(-1.23f)
+    val f2 = BytesUtils.create(FloatType).toBytes(100f)
+    assert(Bytes.compareTo(f1, f2) < 0)
+  }
 }

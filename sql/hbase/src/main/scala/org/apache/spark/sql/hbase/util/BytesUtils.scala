@@ -63,7 +63,7 @@ object BytesUtils {
   }
 
   def toFloat(input: HBaseRawType, offset: Int): Float = {
-    var i = toInt(input, offset)
+    var i = Bytes.toInt(input, offset)
     i = i - 1
     i ^= (~i >> Integer.SIZE - 1) | Integer.MIN_VALUE
     java.lang.Float.intBitsToFloat(i)
@@ -171,7 +171,8 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
   def toBytes(input: Float): HBaseRawType = {
     var i: Int = java.lang.Float.floatToIntBits(input)
     i = (i ^ ((i >> Integer.SIZE - 1) | Integer.MIN_VALUE)) + 1
-    toBytes(i)
+    Bytes.putInt(buffer, 0, i)
+    buffer
   }
 
   def toBytes(input: Int): HBaseRawType = {
