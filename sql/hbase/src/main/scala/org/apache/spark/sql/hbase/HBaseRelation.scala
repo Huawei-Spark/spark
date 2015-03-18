@@ -823,7 +823,21 @@ private[hbase] case class HBaseRelation(
 
     val finalFilters = if (distinctProjList.size == 0) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
-        filters.get
+        if (filters.get.getFilters.size() == 1) {
+          val left = filters.get.getFilters.get(0)
+          val right = new KeyOnlyFilter
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(left)
+          filterList.addFilter(right)
+          filterList
+        } else {
+          val left = filters.get
+          val right = new KeyOnlyFilter
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(left)
+          filterList.addFilter(right)
+          filterList
+        }
       } else {
         new FirstKeyOnlyFilter
       }
