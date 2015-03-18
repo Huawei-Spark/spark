@@ -17,18 +17,12 @@
 
 package org.apache.spark.sql.hbase.execution
 
-import org.apache.hadoop.hbase.client.Put
-import org.apache.spark.TaskContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.RangePartitioning
-import org.apache.spark.sql.execution.{LeafNode, SparkPlan, UnaryNode}
+import org.apache.spark.sql.execution.LeafNode
 import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper}
-
-import scala.collection.JavaConversions._
-import scala.collection.mutable.ListBuffer
 
 /**
  * :: DeveloperApi ::

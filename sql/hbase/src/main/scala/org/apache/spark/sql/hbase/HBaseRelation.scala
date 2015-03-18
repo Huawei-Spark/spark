@@ -309,18 +309,16 @@ private[hbase] case class HBaseRelation(
 
       val items: Seq[(Any, NativeType)] = cpr.prefix
       val head: Seq[(HBaseRawType, NativeType)] = items.map {
-        case (itemValue, itemType) => {
+        case (itemValue, itemType) =>
           (DataTypeUtils.dataToBytes(itemValue, itemType), itemType)
-        }
       }
 
-      val headExpression: Seq[Expression] = items.zipWithIndex.map { case (item, index) => {
+      val headExpression: Seq[Expression] = items.zipWithIndex.map { case (item, index) =>
         val keyCol = keyColumns.find(_.order == index).get
 
         val left = filterPred.get.references.find(_.name == keyCol.sqlName).get
         val right = Literal(item._1, item._2)
         EqualTo(left, right)
-      }
       }
 
       val tailExpression: Expression = {
@@ -535,7 +533,7 @@ private[hbase] case class HBaseRelation(
             addToFilterList(filters, rightFilterList, FilterList.Operator.MUST_PASS_ONE)
           }
           result = Some(new FilterList(FilterList.Operator.MUST_PASS_ONE, filters))
-        case InSet(value@AttributeReference(name, dataType, _, _), hset) => {
+        case InSet(value@AttributeReference(name, dataType, _, _), hset) =>
           val column = nonKeyColumns.find(_.sqlName == name)
           if (column.isDefined) {
             val filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
@@ -548,7 +546,6 @@ private[hbase] case class HBaseRelation(
             }
             result = Some(filterList)
           }
-        }
         case GreaterThan(left: AttributeReference, right: Literal) =>
           val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)

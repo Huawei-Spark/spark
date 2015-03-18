@@ -126,9 +126,8 @@ class HBaseSQLReaderRDD(
   private def constructRowKey(cpr: MDCriticalPointRange[_], isStart: Boolean): HBaseRawType = {
     val prefix = cpr.prefix
     val head: Seq[(HBaseRawType, NativeType)] = prefix.map {
-      case (itemValue, itemType) => {
+      case (itemValue, itemType) =>
         (DataTypeUtils.dataToBytes(itemValue, itemType), itemType)
-      }
     }
 
     val key = if (isStart) cpr.lastRange.start.get else cpr.lastRange.end.get

@@ -96,7 +96,7 @@ class ScanPredClassifier(relation: HBaseRelation) {
           (None, Some(pred))
         }
       case InSet(value@AttributeReference(name, dataType, _, _), hset)
-        if relation.nonKeyColumns.exists(_.sqlName == name) => {
+        if relation.nonKeyColumns.exists(_.sqlName == name) =>
         var errorOccurred = false
         for (item <- hset if !errorOccurred) {
           try {
@@ -115,7 +115,6 @@ class ScanPredClassifier(relation: HBaseRelation) {
         } else {
           (Some(pred), None)
         }
-      }
       // everything else are treated as non pushdownable
       case _ => (None, Some(pred))
     }
