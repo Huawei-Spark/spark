@@ -503,6 +503,11 @@ private[hbase] case class HBaseRelation(
     (Some(finalFilterList), orExpression, pushablePreds)
   }
 
+  /**
+   * create pushdown filter list based on predicate
+   * @param pred the predicate
+   * @return tuple(filter list, non-pushdownable expression, pushdown predicates)
+   */
   def buildPushdownFilterList(pred: Option[Expression]):
   (Option[FilterList], Option[Expression], Option[Expression]) = {
     if (pred.isDefined) {
@@ -524,6 +529,12 @@ private[hbase] case class HBaseRelation(
     }
   }
 
+  /**
+   * add the filter to the filter list
+   * @param filters the filter list
+   * @param filtersToBeAdded the filter to be added
+   * @param operator the operator of the filter to be added
+   */
   private def addToFilterList(filters: java.util.ArrayList[Filter],
                               filtersToBeAdded: Option[FilterList],
                               operator: FilterList.Operator) = {
@@ -538,6 +549,11 @@ private[hbase] case class HBaseRelation(
     }
   }
 
+  /**
+   * recursively create the filter list based on predicate
+   * @param pred the predicate
+   * @return the filter list, or None if predicate is not defined
+   */
   private def buildFilterListFromPred(pred: Option[Expression]): Option[FilterList] = {
     var result: Option[FilterList] = None
     val filters = new java.util.ArrayList[Filter]
@@ -775,7 +791,7 @@ private[hbase] case class HBaseRelation(
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
                 filters: Option[FilterList], otherFilters: Option[Expression],
-                pushdownPred: Seq[Expression],
+                pushdownPreds: Seq[Expression],
                 projList: Seq[NamedExpression]): Scan = {
     val scan = {
       (start, end) match {
@@ -787,19 +803,28 @@ private[hbase] case class HBaseRelation(
     }
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPred, projList)
+    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projList)
   }
 
+  /**
+   * add projection and column to the scan
+   * @param scan the current scan
+   * @param filters the filter list to be processed
+   * @param otherFilters the non-pushdownable predicates
+   * @param pushdownPreds the pushdownable predicates
+   * @param projectionList the projection list
+   * @return the proper scan
+   */
   def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
                               otherFilters: Option[Expression],
                               pushdownPreds: Seq[Expression],
-                              projList: Seq[NamedExpression]): Scan = {
-    var distinctProjList = projList.distinct
+                              projectionList: Seq[NamedExpression]): Scan = {
+    var distinctProjList = projectionList.map(_.name)
     if (otherFilters.isDefined) {
-      distinctProjList = distinctProjList.union(otherFilters.get.references.toSeq)
+      distinctProjList = distinctProjList.union(otherFilters.get.references.toSeq.map(_.name))
     }
     // filter out the key columns
-    distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p.name))
+    distinctProjList = distinctProjList.filterNot(p => keyColumns.exists(_.sqlName == p))
 
     val finalFilters = if (distinctProjList.size == 0) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
@@ -832,12 +857,13 @@ private[hbase] case class HBaseRelation(
     if (pushdownPreds.nonEmpty) {
       // If the pushed down predicate is present, use the columns as projections
       // to avoid a full projection
-      distinctProjList = distinctProjList.union(pushdownPreds.flatMap(_.references.toSeq))
-      distinctProjList = distinctProjList.distinct
+      distinctProjList = distinctProjList.union(
+        pushdownPreds.flatMap(_.references.toSeq).map(_.name))
     }
+    distinctProjList = distinctProjList.distinct
     if (distinctProjList.size > 0) {
       nonKeyColumns.filter {
-        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
+        case nkc => distinctProjList.contains(nkc.sqlName)
       }.map {
         case nkc@NonKeyColumn(_, _, _, _) =>
           scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)

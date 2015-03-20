@@ -151,9 +151,9 @@ class HBaseSQLReaderRDD(
         flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters, pushdownPred) = relation.buildPushdownFilterList(predicates)
-      val pushablePreds = if (pushdownPred.isDefined && pushdownPred.nonEmpty) {
-        ListBuffer[Expression](pushdownPred.get)
+      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicates)
+      val pushablePreds = if (pushdownPreds.isDefined) {
+        ListBuffer[Expression](pushdownPreds.get)
       } else {
         ListBuffer[Expression]()
       }
@@ -204,6 +204,7 @@ class HBaseSQLReaderRDD(
       }
       else {
         // isPointRanges is false
+        // calculate the range start
         val startKey: Option[Any] = expandedCPRs(0).lastRange.start
         val start = if (startKey.isDefined) {
           var rowKey = constructRowKey(expandedCPRs(0), isStart = true)
@@ -215,6 +216,7 @@ class HBaseSQLReaderRDD(
           partition.start
         }
 
+        // calculate the range end
         val size = expandedCPRs.size - 1
         val endKey: Option[Any] = expandedCPRs(size).lastRange.end
         val endInclusive: Boolean = expandedCPRs(size).lastRange.endInclusive
