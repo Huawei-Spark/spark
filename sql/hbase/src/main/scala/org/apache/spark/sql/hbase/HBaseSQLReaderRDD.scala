@@ -151,8 +151,14 @@ class HBaseSQLReaderRDD(
         flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters) = relation.buildPushdownFilterList(predicates)
-      val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters, output)
+      val (filters, otherFilters, pushdownPred) = relation.buildPushdownFilterList(predicates)
+      val pushablePreds = if (pushdownPred.isDefined && pushdownPred.nonEmpty) {
+        ListBuffer[Expression](pushdownPred.get)
+      } else {
+        ListBuffer[Expression]()
+      }
+      val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters,
+        pushablePreds, output)
       val scanner = relation.htable.getScanner(scan)
       createIterator(context, scanner, otherFilters)
     } else {
@@ -235,8 +241,9 @@ class HBaseSQLReaderRDD(
           partition.end
         }
 
-        val (filters, otherFilters) = relation.buildCPRFilterList(output, filterPred, expandedCPRs)
-        val scan = relation.buildScan(start, end, filters, otherFilters, output)
+        val (filters, otherFilters, preds) =
+          relation.buildCPRFilterList(output, filterPred, expandedCPRs)
+        val scan = relation.buildScan(start, end, filters, otherFilters, preds, output)
         val scanner = relation.htable.getScanner(scan)
         createIterator(context, scanner, otherFilters)
       }

@@ -291,11 +291,12 @@ private[hbase] case class HBaseRelation(
    */
   def buildCPRFilterList(output: Seq[Attribute], filterPred: Option[Expression],
                          cprs: Seq[MDCriticalPointRange[_]]):
-  (Option[FilterList], Option[Expression]) = {
+  (Option[FilterList], Option[Expression], Seq[Expression]) = {
     val finalFilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
     val cprFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ONE)
     var expressionList: List[Expression] = List[Expression]()
     var anyNonpushable = false
+    val pushablePreds = new ListBuffer[Expression]()
     for (cpr <- cprs) {
       val cprAndPushableFilterList: FilterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
       val startKey: Option[Any] = cpr.lastRange.start
@@ -305,7 +306,7 @@ private[hbase] case class HBaseRelation(
       val keyType: NativeType = cpr.lastRange.dt
       val predicate = if (cpr.lastRange.pred == null) None else Some(cpr.lastRange.pred)
 
-      val (pushable, nonPushable) = buildPushdownFilterList(predicate)
+      val (pushable, nonPushable, pushablePred) = buildPushdownFilterList(predicate)
 
       val items: Seq[(Any, NativeType)] = cpr.prefix
       val head: Seq[(HBaseRawType, NativeType)] = items.map {
@@ -425,8 +426,7 @@ private[hbase] case class HBaseRelation(
               } else {
                 new RowFilter(CompareFilter.CompareOp.LESS, new BinaryComparator(row))
               }
-            }
-            else {
+            } else {
               if (endInclusive) {
                 new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
                   new BinaryPrefixComparator(row))
@@ -437,23 +437,54 @@ private[hbase] case class HBaseRelation(
           } else {
             null
           }
+          /*
+          * create the filter, for example, k1 = 10, k2 < 5
+          * it will create 2 filters, first RowFilter = 10 (PrefixComparator),
+          * second, RowFilter < (10, 5) (PrefixComparator / Comparator)
+          */
+          val prefixFilter = if (head.size > 0) {
+            val row = HBaseKVHelper.encodingRawKeyColumns(head)
+            new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(row))
+          } else {
+            null
+          }
           if (startKey.isDefined && endKey.isDefined) {
             // both start and end filters exist
             val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+            if (prefixFilter != null) {
+              filterList.addFilter(prefixFilter)
+            }
             filterList.addFilter(startFilter)
             filterList.addFilter(endFilter)
             filterList
           } else if (startKey.isDefined) {
             // start filter exists only
-            startFilter
+            if (prefixFilter != null) {
+              val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+              filterList.addFilter(prefixFilter)
+              filterList.addFilter(startFilter)
+              filterList
+            } else {
+              startFilter
+            }
           } else {
             // end filter exists only
-            endFilter
+            if (prefixFilter != null) {
+              val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+              filterList.addFilter(prefixFilter)
+              filterList.addFilter(endFilter)
+              filterList
+            } else {
+              endFilter
+            }
           }
         }
       }
       cprAndPushableFilterList.addFilter(filter)
       if (pushable.isDefined) {
+        require(pushablePred.isDefined && pushablePred.nonEmpty,
+          "Interal logic error: nonempty pushable predicate expected")
+        pushablePreds += pushablePred.get
         cprAndPushableFilterList.addFilter(pushable.get)
       }
       cprFilterList.addFilter(cprAndPushableFilterList)
@@ -469,11 +500,11 @@ private[hbase] case class HBaseRelation(
     } else if (cprFilterList.getFilters.size() > 1) {
       finalFilterList.addFilter(cprFilterList)
     }
-    (Some(finalFilterList), orExpression)
+    (Some(finalFilterList), orExpression, pushablePreds)
   }
 
   def buildPushdownFilterList(pred: Option[Expression]):
-  (Option[FilterList], Option[Expression]) = {
+  (Option[FilterList], Option[Expression], Option[Expression]) = {
     if (pred.isDefined) {
       val predExp: Expression = pred.get
       // build pred pushdown filters:
@@ -487,9 +518,9 @@ private[hbase] case class HBaseRelation(
         if (pushdownFilterPred.isEmpty) None else buildFilterListFromPred(pushdownFilterPred)
       }
       // 4. merge the above FilterList with the one from the projection
-      (predPushdownFilterList, otherPred)
+      (predPushdownFilterList, otherPred, pushdownFilterPred)
     } else {
-      (None, None)
+      (None, None, None)
     }
   }
 
@@ -547,13 +578,8 @@ private[hbase] case class HBaseRelation(
             result = Some(filterList)
           }
         case GreaterThan(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -563,13 +589,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case GreaterThan(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find(_.sqlName == right.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.GREATER,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -579,13 +600,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -595,13 +611,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case GreaterThanOrEqual(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find(_.sqlName == right.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -611,13 +622,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case EqualTo(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+         if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -627,13 +633,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case EqualTo(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find(_.sqlName == right.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -643,13 +644,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case LessThan(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.LESS,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -659,13 +655,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case LessThan(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find(_.sqlName == right.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.LESS,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -675,13 +666,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: AttributeReference, right: Literal) =>
-          val keyColumn = keyColumns.find(_.sqlName == left.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == left.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(right.value, right.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -691,13 +677,8 @@ private[hbase] case class HBaseRelation(
             result = Some(new FilterList(filter))
           }
         case LessThanOrEqual(left: Literal, right: AttributeReference) =>
-          val keyColumn = keyColumns.find(_.sqlName == right.name)
           val nonKeyColumn = nonKeyColumns.find(_.sqlName == right.name)
-          if (keyColumn.isDefined) {
-            val filter = new RowFilter(CompareFilter.CompareOp.LESS_OR_EQUAL,
-              new BinaryPrefixComparator(DataTypeUtils.dataToBytes(left.value, left.dataType)))
-            result = Some(new FilterList(filter))
-          } else if (nonKeyColumn.isDefined) {
+          if (nonKeyColumn.isDefined) {
             val column = nonKeyColumn.get
             val filter = new SingleColumnValueFilter(column.familyRaw,
               column.qualifierRaw,
@@ -794,6 +775,7 @@ private[hbase] case class HBaseRelation(
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
                 filters: Option[FilterList], otherFilters: Option[Expression],
+                pushdownPred: Seq[Expression],
                 projList: Seq[NamedExpression]): Scan = {
     val scan = {
       (start, end) match {
@@ -805,11 +787,12 @@ private[hbase] case class HBaseRelation(
     }
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, projList)
+    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPred, projList)
   }
 
   def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
                               otherFilters: Option[Expression],
+                              pushdownPreds: Seq[Expression],
                               projList: Seq[NamedExpression]): Scan = {
     var distinctProjList = projList.distinct
     if (otherFilters.isDefined) {
@@ -821,22 +804,17 @@ private[hbase] case class HBaseRelation(
     val finalFilters = if (distinctProjList.size == 0) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
         if (filters.get.getFilters.size() == 1) {
-          val left = filters.get.getFilters.get(0)
-          val right = new KeyOnlyFilter
-          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-          filterList.addFilter(left)
-          filterList.addFilter(right)
-          filterList
+          filters.get.getFilters.get(0)
         } else {
-          val left = filters.get
-          val right = new KeyOnlyFilter
-          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-          filterList.addFilter(left)
-          filterList.addFilter(right)
-          filterList
+          filters.get
         }
       } else {
-        new FirstKeyOnlyFilter
+        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+        val left = new FirstKeyOnlyFilter
+        val right = new KeyOnlyFilter
+        filterList.addFilter(left)
+        filterList.addFilter(right)
+        filterList
       }
     } else {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
@@ -851,10 +829,18 @@ private[hbase] case class HBaseRelation(
     }
     if (finalFilters != null) scan.setFilter(finalFilters)
 
+    if (pushdownPreds.nonEmpty) {
+      // If the pushed down predicate is present, use the columns as projections
+      // to avoid a full projection
+      distinctProjList = distinctProjList.union(pushdownPreds.flatMap(_.references.toSeq))
+      distinctProjList = distinctProjList.distinct
+    }
     if (distinctProjList.size > 0) {
-      nonKeyColumns.map {
-        case nkc@NonKeyColumn(_, _, family, qualifier) =>
-          scan.addColumn(Bytes.toBytes(nkc.family), Bytes.toBytes(nkc.qualifier))
+      nonKeyColumns.filter {
+        case nkc => distinctProjList.exists(nkc.sqlName == _.name)
+      }.map {
+        case nkc@NonKeyColumn(_, _, _, _) =>
+          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
       }
     }
     scan

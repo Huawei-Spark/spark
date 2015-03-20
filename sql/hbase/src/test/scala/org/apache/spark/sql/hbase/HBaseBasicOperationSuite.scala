@@ -116,4 +116,23 @@ class HBaseBasicOperationSuite extends HBaseIntegrationTestBase {
     sql( """ALTER TABLE ta DROP col8""")
     assert(sql( """SELECT * FROM ta""").collect()(0).size == 7)
   }
+
+  test("filter test") {
+    sql("""CREATE TABLE store_sales (ss_item_sk INTEGER, ss_ticket_number INTEGER, ss_value INTEGER,
+          PRIMARY KEY(ss_item_sk, ss_ticket_number))
+          MAPPED BY (ht0, COLS=[ss_value=family1.qualifier1])""")
+
+    sql("""INSERT INTO store_sales VALUES (1, 994, 8)""")
+    sql("""INSERT INTO store_sales VALUES (1, 4151, 16)""")
+    sql("""INSERT INTO store_sales VALUES (1, 5021, 32)""")
+    sql("""INSERT INTO store_sales VALUES (1, 5314, 64)""")
+
+    sql("""INSERT INTO store_sales VALUES (10, 4687, 128)""")
+    sql("""INSERT INTO store_sales VALUES (10, 22616, 256)""")
+    sql("""INSERT INTO store_sales VALUES (10, 24815, 512)""")
+    sql("""INSERT INTO store_sales VALUES (10, 31391, 1024)""")
+
+    sql("""select ss_item_sk, ss_ticket_number from store_sales
+          |where ss_item_sk=10 and ss_ticket_number<994""".stripMargin).collect().foreach(println)
+  }
 }
