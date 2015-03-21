@@ -482,7 +482,7 @@ private[hbase] case class HBaseRelation(
       cprAndPushableFilterList.addFilter(filter)
       if (pushable.isDefined) {
         require(pushablePred.isDefined && pushablePred.nonEmpty,
-          "Interal logic error: nonempty pushable predicate expected")
+          "Internal logic error: non-empty pushable predicate expected")
         pushablePreds += pushablePred.get
         cprAndPushableFilterList.addFilter(pushable.get)
       }
@@ -785,21 +785,21 @@ private[hbase] case class HBaseRelation(
     }
     if (finalFilters != null) scan.setFilter(finalFilters)
 
-    if (pushdownPreds.nonEmpty) {
-      // If the pushed down predicate is present, use the columns as projections
-      // to avoid a full projection
-      distinctProjList = distinctProjList.union(
-        pushdownPreds.flatMap(_.references.toSeq).map(_.name))
-    }
-    distinctProjList = distinctProjList.distinct
-    if (distinctProjList.size > 0) {
-      nonKeyColumns.filter {
-        case nkc => distinctProjList.contains(nkc.sqlName)
-      }.map {
-        case nkc@NonKeyColumn(_, _, _, _) =>
-          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
-      }
-    }
+    //    if (pushdownPreds.nonEmpty) {
+    //      // If the pushed down predicate is present, use the columns as projections
+    //      // to avoid a full projection
+    //      distinctProjList = distinctProjList.union(
+    //        pushdownPreds.flatMap(_.references.toSeq).map(_.name))
+    //    }
+    //    distinctProjList = distinctProjList.distinct
+    //    if (distinctProjList.size > 0) {
+    //      nonKeyColumns.filter {
+    //        case nkc => distinctProjList.contains(nkc.sqlName)
+    //      }.map {
+    //        case nkc@NonKeyColumn(_, _, _, _) =>
+    //          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
+    //      }
+    //    }
     scan
   }
 
