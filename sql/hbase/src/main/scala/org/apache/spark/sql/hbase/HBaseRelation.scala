@@ -90,10 +90,11 @@ class HBaseSource extends RelationProvider {
  */
 @SerialVersionUID(15298736227428789L)
 private[hbase] case class HBaseRelation(
-                               tableName: String,
-                               hbaseNamespace: String,
-                               hbaseTableName: String,
-                               allColumns: Seq[AbstractColumn])(@transient var context: SQLContext)
+                                         tableName: String,
+                                         hbaseNamespace: String,
+                                         hbaseTableName: String,
+                                         allColumns: Seq[AbstractColumn])
+                                       (@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
   @transient lazy val logger = Logger.getLogger(getClass.getName)
 
@@ -785,21 +786,23 @@ private[hbase] case class HBaseRelation(
     }
     if (finalFilters != null) scan.setFilter(finalFilters)
 
-    //    if (pushdownPreds.nonEmpty) {
-    //      // If the pushed down predicate is present, use the columns as projections
-    //      // to avoid a full projection
-    //      distinctProjList = distinctProjList.union(
-    //        pushdownPreds.flatMap(_.references.toSeq).map(_.name))
-    //    }
-    //    distinctProjList = distinctProjList.distinct
-    //    if (distinctProjList.size > 0) {
-    //      nonKeyColumns.filter {
-    //        case nkc => distinctProjList.contains(nkc.sqlName)
-    //      }.map {
-    //        case nkc@NonKeyColumn(_, _, _, _) =>
-    //          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
-    //      }
-    //    }
+    if (pushdownPreds.nonEmpty) {
+      val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).toSet
+      if (distinctProjList.toSet.subsetOf(pushdownNameSet)) {
+        // If the pushed down predicate is present and the projection is a subset of the columns
+        // of the pushed filters, use the columns as projections
+        // to avoid a full projection
+        distinctProjList = pushdownNameSet.toSeq.distinct
+        if (distinctProjList.size > 0) {
+          nonKeyColumns.filter {
+            case nkc => distinctProjList.contains(nkc.sqlName)
+          }.map {
+            case nkc@NonKeyColumn(_, _, _, _) =>
+              scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
+          }
+        }
+      }
+    }
     scan
   }
 

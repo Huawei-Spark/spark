@@ -236,7 +236,7 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 14") {
     val sql = "select ss_customer_sk, count(*) from store_sales where ss_item_sk >= 4000 and ss_item_sk <= 5000 group by ss_customer_sk"
     val rows = TestHbase.sql(sql).collect()
-    assert(rows.size == 4)
+    assert(rows.size == 5)
   }
 
   test("Query 15") {
@@ -254,6 +254,6 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 17") {
     val sql = "select count(ss_customer_sk) as count_customer from store_sales where ss_customer_sk > 100"
     val rows = TestHbase.sql(sql).collect()
-    assert(rows(0).get(0) == 84)
+    assert(rows(0).get(0) == 83)
   }
 }
