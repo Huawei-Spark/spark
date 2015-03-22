@@ -787,17 +787,17 @@ private[hbase] case class HBaseRelation(
     if (finalFilters != null) scan.setFilter(finalFilters)
 
     if (pushdownPreds.nonEmpty) {
-      val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).toSet
+      val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).
+        filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
       if (distinctProjList.toSet.subsetOf(pushdownNameSet)) {
         // If the pushed down predicate is present and the projection is a subset of the columns
         // of the pushed filters, use the columns as projections
         // to avoid a full projection
         distinctProjList = pushdownNameSet.toSeq.distinct
-        if (distinctProjList.size > 0) {
-          nonKeyColumns.filter {
-            case nkc => distinctProjList.contains(nkc.sqlName)
-          }.map {
-            case nkc@NonKeyColumn(_, _, _, _) =>
+        if (distinctProjList.size > 0 && distinctProjList.size < nonKeyColumns.size) {
+          distinctProjList.map {
+            case p =>
+              val nkc = nonKeyColumns.find(_.sqlName == p).get
               scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
           }
         }
