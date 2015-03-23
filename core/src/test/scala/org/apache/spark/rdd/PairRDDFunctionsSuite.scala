@@ -180,7 +180,7 @@ class PairRDDFunctionsSuite extends FunSuite with SharedSparkContext {
     assert(sums(2) === 1)
   }
 
-  test("reduceByKey with many output partitons") {
+  test("reduceByKey with many output partitions") {
     val pairs = sc.parallelize(Array((1, 1), (1, 2), (1, 3), (1, 1), (2, 1)))
     val sums = pairs.reduceByKey(_+_, 10).collect()
     assert(sums.toSet === Set((1, 7), (2, 1)))

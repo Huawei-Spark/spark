@@ -44,7 +44,7 @@ private[spark] class PythonRDD(
     command: Array[Byte],
     envVars: JMap[String, String],
     pythonIncludes: JList[String],
-    preservePartitoning: Boolean,
+    preservePartitioning: Boolean,
     pythonExec: String,
     broadcastVars: JList[Broadcast[PythonBroadcast]],
     accumulator: Accumulator[JList[Array[Byte]]])
@@ -55,7 +55,7 @@ private[spark] class PythonRDD(
 
   override def getPartitions = firstParent.partitions
 
-  override val partitioner = if (preservePartitoning) firstParent.partitioner else None
+  override val partitioner = if (preservePartitioning) firstParent.partitioner else None
 
   override def compute(split: Partition, context: TaskContext): Iterator[Array[Byte]] = {
     val startTime = System.currentTimeMillis
