@@ -30,13 +30,24 @@ import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils
  * HBaseMainTest
  * create HbTestTable and metadata table, and insert some data
  */
-object HBaseMainTest extends HBaseIntegrationTestBase
+class HBaseMainTest extends HBaseIntegrationTestBase
 {
   val TableName_a: String = "ta"
   val TableName_b: String = "tb"
   val HbaseTableName: String = "ht"
   val Metadata_Table = "metadata"
   var alreadyInserted = false
+
+  override protected def beforeAll() = {
+    super.beforeAll()
+    setupData(useMultiplePartitions = true, needInsertData = true)
+    TestData
+  }
+
+  override protected def afterAll() = {
+    TestHbase.sql("DROP TABLE " + TableName_a)
+    TestHbase.sql("DROP TABLE " + TableName_b)
+  }
 
   def createTable(useMultiplePartitions: Boolean) = {
     try {
@@ -233,9 +244,5 @@ object HBaseMainTest extends HBaseIntegrationTestBase
       insertTestData()
       alreadyInserted = true
     }
-  }
-
-  def main(args: Array[String]) = {
-    setupData(useMultiplePartitions = true, needInsertData = true)
   }
 }
