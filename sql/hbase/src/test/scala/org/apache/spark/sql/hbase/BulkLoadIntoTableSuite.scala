@@ -26,7 +26,7 @@ import org.apache.spark.sql.hbase.execution._
 import org.apache.spark.sql.hbase.util.BytesUtils
 import org.apache.spark.sql.types.IntegerType
 
-class BulkLoadIntoTableSuite extends QueriesSuiteBase {
+class BulkLoadIntoTableSuite extends HBaseTestData {
   val sc: SparkContext = TestHbase.sparkContext
   val hbaseHome = {
     val loader = this.getClass.getClassLoader

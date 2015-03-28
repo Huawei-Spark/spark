@@ -4,6 +4,7 @@ import org.apache.hadoop.fs.{Path, FileSystem}
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{TableExistsException, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.spark.Logging
+import org.apache.spark.sql.SQLContext
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -26,7 +27,7 @@ import org.apache.spark.Logging
  * CreateTableAndLoadData
  *
  */
-trait CreateTableAndLoadData extends Logging {
+class HBaseTestData extends HBaseIntegrationTestBase {
   val DefaultStagingTableName = "StageTable"
   val DefaultTableName = "TestTable"
   val DefaultHbaseStagingTableName = s"Hb$DefaultStagingTableName"
@@ -44,15 +45,17 @@ trait CreateTableAndLoadData extends Logging {
   }
   private[hbase] val CsvPath = tpath(0)
 
-  def createTableAndLoadData(): Unit = {
+  override protected def beforeAll() = {
+    super.beforeAll()
     createTables(DefaultStagingTableName, DefaultTableName,
       DefaultHbaseStagingTableName, DefaultHbaseTabName)
     loadData(DefaultStagingTableName, DefaultTableName, s"$CsvPath/$DefaultLoadFile")
   }
 
-  def createTables(): Unit = {
-    createTables(DefaultStagingTableName, DefaultTableName,
-      DefaultHbaseStagingTableName, DefaultHbaseTabName)
+  override protected def afterAll() = {
+    super.afterAll()
+    TestHbase.sql("DROP TABLE " + DefaultStagingTableName)
+    TestHbase.sql("DROP TABLE " + DefaultTableName)
   }
 
   def createNativeHbaseTable(tableName: String, families: Seq[String]) = {
@@ -67,10 +70,8 @@ trait CreateTableAndLoadData extends Logging {
     }
   }
 
-  def createNativeHbaseTable(
-      tableName: String,
-      families: Seq[String],
-      splitKeys: Array[HBaseRawType]) = {
+  def createNativeHbaseTable(tableName: String, families: Seq[String],
+                             splitKeys: Array[HBaseRawType]) = {
     val hbaseAdmin = TestHbase.hbaseAdmin
     val hdesc = new HTableDescriptor(TableName.valueOf(tableName))
     families.foreach { f => hdesc.addFamily(new HColumnDescriptor(f))}
@@ -150,11 +151,6 @@ trait CreateTableAndLoadData extends Logging {
     }
   }
 
-  def runSql(sql: String) = {
-    logInfo(sql)
-    TestHbase.sql(sql).collect()
-  }
-
   def loadData(stagingTableName: String, tableName: String, loadFile: String) = {
     // then load data into table
     val loadSql = s"LOAD PARALL DATA LOCAL INPATH '$loadFile' INTO TABLE $tableName"
@@ -163,4 +159,14 @@ trait CreateTableAndLoadData extends Logging {
 
   def s2b(s: String) = Bytes.toBytes(s)
 
+  def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
+    val execQuery1 = sqlCtx.executeSql(sql)
+    val result1 = runSql(sql)
+    assert(result1.size == exparr.length, s"$testName failed on size")
+    verify(testName,
+      sql,
+      for (rx <- 0 until exparr.size)
+      yield result1(rx).toSeq, exparr
+    )
+  }
 }
