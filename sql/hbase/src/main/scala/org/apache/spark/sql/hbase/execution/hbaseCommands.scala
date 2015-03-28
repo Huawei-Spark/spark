@@ -22,7 +22,6 @@ import java.util.Date
 import org.apache.hadoop.conf.Configurable
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase._
-import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable
 import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
 import org.apache.hadoop.hbase.util.Bytes
@@ -36,12 +35,12 @@ import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.execution.RunnableCommand
 import org.apache.spark.sql.hbase.HBasePartitioner.HBaseRawOrdering
 import org.apache.spark.sql.hbase._
-import org.apache.spark.sql.hbase.util.{HBaseKVHelper, Util, DataTypeUtils}
+import org.apache.spark.sql.hbase.util.{Util, DataTypeUtils}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
 import org.apache.spark.{Logging, SerializableWritable, SparkEnv, TaskContext}
 
-import scala.collection.mutable.{ListBuffer, ArrayBuffer}
+import scala.collection.mutable.{ArrayBuffer}
 
 @DeveloperApi
 case class AlterDropColCommand(tableName: String, columnName: String) extends RunnableCommand {
