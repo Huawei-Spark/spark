@@ -208,7 +208,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
+    val sqlResult = TestHbase.sql("SELECT * FROM testNullColumnBulkload")
     val rows = sqlResult.collect()
     assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
@@ -243,7 +243,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""select * from testNullColumnBulkload"""
+      s"""SELECT * FROM testNullColumnBulkload"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -260,7 +260,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
+    val sqlResult = TestHbase.sql("SELECT * FROM testNullColumnBulkload")
     val rows = sqlResult.collect()
     assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
@@ -285,7 +285,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""select * from testblk limit 5"""
+      s"""SELECT * FROM testblk LIMIT 5"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -302,7 +302,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    checkAnswer(TestHbase.sql("select * from testblk"),
+    checkAnswer(TestHbase.sql("SELECT * FROM testblk"),
       Row("row4", "4", "8") ::
         Row("row5", "5", "10") ::
         Row("row6", "6", "12") :: Nil)
@@ -322,7 +322,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""select * from testblk limit 5"""
+      s"""SELECT * FROM testblk LIMIT 5"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -339,7 +339,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    checkAnswer(TestHbase.sql("select * from testblk"),
+    checkAnswer(TestHbase.sql("SELECT * FROM testblk"),
       Row("row4", "4", "8") ::
         Row("row5", "5", "10") ::
         Row("row6", "6", "12") :: Nil)
@@ -378,7 +378,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(runSql("select * from testblk").size == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -414,7 +414,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(runSql("select * from testblk").size == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
