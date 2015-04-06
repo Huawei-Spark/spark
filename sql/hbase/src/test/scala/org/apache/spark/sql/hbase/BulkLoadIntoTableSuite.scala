@@ -21,10 +21,11 @@ import java.io.File
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.execution._
-import org.apache.spark.sql.hbase.util.BytesUtils
-import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.hbase.util.{HBaseKVHelper, BytesUtils}
+import org.apache.spark.sql.types._
 
 class BulkLoadIntoTableSuite extends HBaseTestData {
   val sc: SparkContext = TestHbase.sparkContext
@@ -208,7 +209,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    val sqlResult = TestHbase.sql("SELECT * FROM testNullColumnBulkload")
+    val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
     val rows = sqlResult.collect()
     assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
@@ -218,7 +219,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       Row("row1", null, "8", "101") ::
         Row("row2", "2", null, "102") ::
         Row("row3", "3", "10", null) ::
-        Row("row4", null, null, null):: Nil)
+        Row("row4", null, null, null) :: Nil)
 
     // cleanup
     TestHbase.sql(drop)
@@ -243,7 +244,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""SELECT * FROM testNullColumnBulkload"""
+      s"""select * from testNullColumnBulkload"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -260,7 +261,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    val sqlResult = TestHbase.sql("SELECT * FROM testNullColumnBulkload")
+    val sqlResult = TestHbase.sql("select * from testNullColumnBulkload")
     val rows = sqlResult.collect()
     assert(rows.length == 4, s"load parall data with null column values into hbase")
     assert(rows(0)(1) == null, s"load parall data into hbase test failed to select empty-string col1 value")
@@ -270,7 +271,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       Row("row1", null, "8", "101") ::
         Row("row2", "2", null, "102") ::
         Row("row3", "3", "10", null) ::
-        Row("row4", null, null, null):: Nil)
+        Row("row4", null, null, null) :: Nil)
 
     // cleanup
     TestHbase.sql(drop)
@@ -285,7 +286,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""SELECT * FROM testblk LIMIT 5"""
+      s"""select * from testblk limit 5"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -302,7 +303,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    checkAnswer(TestHbase.sql("SELECT * FROM testblk"),
+    checkAnswer(TestHbase.sql("select * from testblk"),
       Row("row4", "4", "8") ::
         Row("row5", "5", "10") ::
         Row("row6", "6", "12") :: Nil)
@@ -322,7 +323,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
         .stripMargin
 
     val sql2 =
-      s"""SELECT * FROM testblk LIMIT 5"""
+      s"""select * from testblk limit 5"""
         .stripMargin
 
     val executeSql1 = TestHbase.executeSql(sql1)
@@ -339,7 +340,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    checkAnswer(TestHbase.sql("SELECT * FROM testblk"),
+    checkAnswer(TestHbase.sql("select * from testblk"),
       Row("row4", "4", "8") ::
         Row("row5", "5", "10") ::
         Row("row6", "6", "12") :: Nil)
@@ -378,7 +379,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(runSql("select * from testblk").size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().size == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -414,7 +415,56 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(runSql("select * from testblk").size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+
+    // cleanup
+    TestHbase.sql("drop table testblk")
+    dropNativeHbaseTable("presplit_table")
+  }
+
+  test("group test for presplit table") {
+    val types = Seq(IntegerType, StringType, IntegerType)
+
+    def generateRowKey(keys: Array[Any], length: Int = -1) = {
+      val completeRowKey = HBaseKVHelper.makeRowKey(new GenericRow(keys), types)
+      if (length < 0) completeRowKey
+      else completeRowKey.take(length)
+    }
+
+    val splitKeys: Array[HBaseRawType] = Array(
+      generateRowKey(Array(1024, "0b", 0), 3),
+      generateRowKey(Array(2048, "cc", 1024), 4),
+      generateRowKey(Array(4096, "0a", 0), 4) ++ Array[Byte](0x00),
+      generateRowKey(Array(4096, "0b", 1024), 7),
+      generateRowKey(Array(4096, "cc", 0), 7) ++ Array[Byte](0x00),
+      generateRowKey(Array(4096, "cc", 1000))
+    )
+    createNativeHbaseTable("presplit_table", Seq("cf"), splitKeys)
+
+    val sql1 =
+      s"""CREATE TABLE testblk(col1 INT, col2 STRING, col3 INT, col4 STRING,
+          PRIMARY KEY(col1, col2, col3))
+          MAPPED BY (presplit_table, COLS=[col4=cf.a])"""
+        .stripMargin
+
+    val executeSql1 = TestHbase.executeSql(sql1)
+    executeSql1.toRdd.collect()
+
+    val inputFile = "'" + hbaseHome + "/splitLoadData1.txt'"
+
+    // then load parall data into table
+    val loadSql = "LOAD PARALL DATA LOCAL INPATH " + inputFile + " INTO TABLE testblk"
+
+    val executeSql3 = TestHbase.executeSql(loadSql)
+    executeSql3.toRdd.collect()
+
+    assert(runSql("select col1,col2,col3 from testblk group by col1,col2,col3").size == 7)
+    assert(runSql("select col1,col2,col3,count(*) from testblk group by col1,col2,col3,col1+col3").size == 7)
+    assert(runSql("select count(*) from testblk group by col1+col3").size == 5)
+    assert(runSql("select col1,col2 from testblk where col1 < 4096 group by col1,col2").size == 3)
+    assert(runSql("select col1,col3 from testblk where col1 < 4096 group by col3,col1").size == 3)
+    assert(runSql("select col1,col2 from testblk where (col1 = 4096 and col2 < 'cc') group by col1,col2").size == 2)
+    assert(runSql("select col1 from testblk where col1 < 4096 group by col1").size == 3)
 
     // cleanup
     TestHbase.sql("drop table testblk")

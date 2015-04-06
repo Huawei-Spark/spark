@@ -17,14 +17,16 @@
 
 package org.apache.spark.sql.hbase.execution
 
+import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.catalyst.planning.{PartialAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.{Project, SparkPlan}
-import org.apache.spark.sql.hbase.HBaseRelation
+import org.apache.spark.sql.execution.{Aggregate, Project, SparkPlan}
+import org.apache.spark.sql.hbase.{HBasePartition, HBaseRawType, HBaseRelation, KeyColumn}
 import org.apache.spark.sql.sources.LogicalRelation
-import org.apache.spark.sql.{SQLContext, Strategy}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{SQLContext, Strategy, execution}
 
 /**
  * Retrieves data using a HBaseTableScan.  Partition pruning predicates are also detected and
@@ -36,6 +38,18 @@ private[hbase] trait HBaseStrategies {
   private[hbase] object HBaseDataSource extends Strategy {
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case PartialAggregation(
+      namedGroupingAttributes,
+      rewrittenAggregateExpressions,
+      groupingExpressions,
+      partialComputation,
+      child) => generateAggregation(
+        namedGroupingAttributes,
+        rewrittenAggregateExpressions,
+        groupingExpressions,
+        partialComputation,
+        child)
+
       case PhysicalOperation(projectList, inPredicates,
       l@LogicalRelation(relation: HBaseRelation)) =>
         pruneFilterProjectHBase(
@@ -47,13 +61,120 @@ private[hbase] trait HBaseStrategies {
       case _ => Nil
     }
 
+    /**
+     * Determined to do the aggregation for all directly or do with partial aggregation
+     */
+    protected def generateAggregation(namedGroupingAttributes: Seq[Attribute],
+                                      rewrittenAggregateExpressions: Seq[NamedExpression],
+                                      groupingExpressions: Seq[Expression],
+                                      partialComputation: Seq[NamedExpression],
+                                      child: LogicalPlan): List[Aggregate] = {
+      def findScanNode(physicalChild: SparkPlan): Option[HBaseSQLTableScan] = physicalChild match {
+        case chd: HBaseSQLTableScan => Some(chd)
+        case chd if chd.children.size != 1 => None
+        case chd => findScanNode(chd.children(0))
+      }
+
+      /**
+       * @param headEnd the HBaseRawType for the end of head partition
+       * @param tailStart the HBaseRawType for the start of tail partition
+       * @param keysForGroup the remaining key dimension for grouping
+       * @return whether these two partitions are distinguished or not in the given dimension
+       */
+      def distinguishedForGroupKeys(headEnd: HBaseRawType,
+                                    tailStart: HBaseRawType,
+                                    keysForGroup: Seq[KeyColumn]): Boolean = {
+        //Divide raw type into two parts, one is the raw type for current key dimension,
+        //the other is the raw type for the key dimensions left
+        def divideRawType(rawType: HBaseRawType, key: KeyColumn)
+        : (HBaseRawType, HBaseRawType) = key.dataType match {
+          case dt: StringType => rawType.splitAt(rawType.indexWhere(_ == 0x00) + 1)
+          case dt if dt.defaultSize >= rawType.size => (rawType, Array())
+          case dt => rawType.splitAt(dt.defaultSize)
+        }
+
+        if (keysForGroup.isEmpty) true
+        else {
+          val (curKey, keysLeft) = (keysForGroup.head, keysForGroup.tail)
+          val (headEndCurKey, headEndKeysLeft) = divideRawType(headEnd, curKey)
+          val (tailStartCurKey, tailStartKeysLeft) = divideRawType(tailStart, curKey)
+
+          if (headEndKeysLeft.isEmpty || tailStartKeysLeft.isEmpty) true
+          else if (Bytes.compareTo(tailStartCurKey, headEndCurKey) != 0) true
+          else if (keysLeft.nonEmpty) distinguishedForGroupKeys(
+            headEndKeysLeft, tailStartKeysLeft, keysLeft)
+          else if (headEndKeysLeft.forall(_ == 0x00) || tailStartCurKey.forall(_ == 0x00)) true
+          else false
+        }
+      }
+
+      val physicalChild = planLater(child)
+
+      def aggrWithPartial = execution.Aggregate(
+        partial = false,
+        namedGroupingAttributes,
+        rewrittenAggregateExpressions,
+        execution.Aggregate(
+          partial = true,
+          groupingExpressions,
+          partialComputation,
+          physicalChild)) :: Nil
+
+      def aggrForAll = execution.Aggregate(
+        partial = false,
+        groupingExpressions,
+        partialComputation,
+        physicalChild) :: Nil
+
+      findScanNode(physicalChild) match {
+        case None => aggrWithPartial
+        case Some(scanNode: HBaseSQLTableScan) =>
+          val hbaseRelation = scanNode.relation
+
+          //If there is only one partition in HBase,
+          //we don't need to do the partial aggregation
+          if (hbaseRelation.partitions.size == 1) aggrForAll
+          else {
+            val keysForGroup = hbaseRelation.keyColumns.takeWhile(key =>
+              groupingExpressions.exists {
+                case expr: AttributeReference => expr.name == key.sqlName
+                case _ => false
+              })
+
+            //If there exists some expressions in groupingExpressions are not keys
+            //or it missed some mid dimensions in the rowkey,
+            //that means we have to do it with the partial aggregation.
+            //
+            //If the groupingExpreesions are composed by all keys,
+            //that means it need to be grouped by rowkey in all dimensions,
+            //so we could do the aggregation for all directly.
+            if (keysForGroup.size != groupingExpressions.size) aggrWithPartial
+            else if (keysForGroup.size == hbaseRelation.keyColumns.size) aggrForAll
+            else {
+              val partitionsAfterFilter = scanNode.result.partitions
+              val eachPartionApart = (0 to partitionsAfterFilter.size - 2).forall { case i =>
+                val headEnd = partitionsAfterFilter(i).asInstanceOf[HBasePartition]
+                  .end.get.asInstanceOf[HBaseRawType]
+                val tailStart = partitionsAfterFilter(i + 1).asInstanceOf[HBasePartition]
+                  .start.get.asInstanceOf[HBaseRawType]
+                //If there exists any two partition are not distinguished from each other
+                // for the given rowkey dimensions, we could not do the aggregation for all.
+                distinguishedForGroupKeys(headEnd, tailStart, keysForGroup)
+              }
+              if (eachPartionApart) aggrForAll
+              else aggrWithPartial
+            }
+          }
+      }
+    }
+
     // Based on Catalyst expressions.
     // Almost identical to pruneFilterProjectRaw
-    protected def pruneFilterProjectHBase(
-                                  relation: LogicalRelation,
-                                  projectList: Seq[NamedExpression],
-                                  filterPredicates: Seq[Expression],
-                                  scanBuilder: (Seq[Attribute], Seq[Expression]) => RDD[Row]) = {
+    protected def pruneFilterProjectHBase(relation: LogicalRelation,
+                                          projectList: Seq[NamedExpression],
+                                          filterPredicates: Seq[Expression],
+                                          scanBuilder:
+                                          (Seq[Attribute], Seq[Expression]) => RDD[Row]) = {
 
       val projectSet = AttributeSet(projectList.flatMap(_.references))
       val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
@@ -98,4 +219,5 @@ private[hbase] trait HBaseStrategies {
       }
     }
   }
+
 }
