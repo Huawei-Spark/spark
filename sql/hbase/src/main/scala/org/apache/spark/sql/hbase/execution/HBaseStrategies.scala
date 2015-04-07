@@ -22,7 +22,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.{PartialAggregation, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.{Aggregate, Project, SparkPlan}
+import org.apache.spark.sql.execution.{Project, SparkPlan, UnaryNode}
 import org.apache.spark.sql.hbase.{HBasePartition, HBaseRawType, HBaseRelation, KeyColumn}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
@@ -43,12 +43,18 @@ private[hbase] trait HBaseStrategies {
       rewrittenAggregateExpressions,
       groupingExpressions,
       partialComputation,
-      child) => generateAggregation(
-        namedGroupingAttributes,
-        rewrittenAggregateExpressions,
-        groupingExpressions,
-        partialComputation,
-        child)
+      child) =>
+        val withCodeGen = canBeCodeGened(
+          allAggregates(partialComputation) ++
+            allAggregates(rewrittenAggregateExpressions)) &&
+          codegenEnabled
+        generateAggregation(
+          namedGroupingAttributes,
+          rewrittenAggregateExpressions,
+          groupingExpressions,
+          partialComputation,
+          child,
+          withCodeGen)
 
       case PhysicalOperation(projectList, inPredicates,
       l@LogicalRelation(relation: HBaseRelation)) =>
@@ -61,6 +67,17 @@ private[hbase] trait HBaseStrategies {
       case _ => Nil
     }
 
+    def canBeCodeGened(aggs: Seq[AggregateExpression]) = !aggs.exists {
+      case _: Sum | _: Count | _: Max | _: CombineSetsAndCount => false
+      // The generated set implementation is pretty limited ATM.
+      case CollectHashSet(exprs) if exprs.size == 1 &&
+        Seq(IntegerType, LongType).contains(exprs.head.dataType) => false
+      case _ => true
+    }
+
+    def allAggregates(exprs: Seq[Expression]) =
+      exprs.flatMap(_.collect { case a: AggregateExpression => a})
+
     /**
      * Determined to do the aggregation for all directly or do with partial aggregation
      */
@@ -68,7 +85,8 @@ private[hbase] trait HBaseStrategies {
                                       rewrittenAggregateExpressions: Seq[NamedExpression],
                                       groupingExpressions: Seq[Expression],
                                       partialComputation: Seq[NamedExpression],
-                                      child: LogicalPlan): List[Aggregate] = {
+                                      child: LogicalPlan,
+                                      withCodeGen: Boolean = false): List[UnaryNode] = {
       def findScanNode(physicalChild: SparkPlan): Option[HBaseSQLTableScan] = physicalChild match {
         case chd: HBaseSQLTableScan => Some(chd)
         case chd if chd.children.size != 1 => None
@@ -111,19 +129,30 @@ private[hbase] trait HBaseStrategies {
       val physicalChild = planLater(child)
 
 
-      def aggregation(partial:Boolean) = execution.Aggregate(
-        partial = false,
-        namedGroupingAttributes,
-        rewrittenAggregateExpressions,
-        execution.Aggregate(
-          partial = partial,
-          groupingExpressions,
-          partialComputation,
-          physicalChild)) :: Nil
+      def aggregation(partial: Boolean): List[UnaryNode] = {
+        if (withCodeGen) execution.GeneratedAggregate(
+          partial = false,
+          namedGroupingAttributes,
+          rewrittenAggregateExpressions,
+          execution.GeneratedAggregate(
+            partial = partial,
+            groupingExpressions,
+            partialComputation,
+            planLater(child))) :: Nil
+        else execution.Aggregate(
+          partial = false,
+          namedGroupingAttributes,
+          rewrittenAggregateExpressions,
+          execution.Aggregate(
+            partial = partial,
+            groupingExpressions,
+            partialComputation,
+            physicalChild)) :: Nil
+      }
 
-      def aggrWithPartial = aggregation(true)
+      def aggrWithPartial = {println("aggrWithPartial");aggregation(partial = true)}
 
-      def aggrForAll =  aggregation(false)
+      def aggrForAll = {println("aggrForAll");aggregation(partial = false)}
 
       findScanNode(physicalChild) match {
         case None => aggrWithPartial

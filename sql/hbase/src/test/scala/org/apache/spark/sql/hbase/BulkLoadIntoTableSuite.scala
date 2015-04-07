@@ -20,7 +20,7 @@ package org.apache.spark.sql.hbase
 import java.io.File
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{SQLConf, Row}
 import org.apache.spark.sql.catalyst.expressions.GenericRow
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hbase.execution._
@@ -423,6 +423,19 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
   }
 
   test("group test for presplit table") {
+    aggregationTest()
+  }
+
+  test("group test for presplit table with codegen") {
+    val originalValue = TestHbase.conf.codegenEnabled
+    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, "true")
+
+    aggregationTest()
+
+    TestHbase.setConf(SQLConf.CODEGEN_ENABLED, originalValue.toString)
+  }
+
+  def aggregationTest() = {
     val types = Seq(IntegerType, StringType, IntegerType)
 
     def generateRowKey(keys: Array[Any], length: Int = -1) = {
@@ -465,6 +478,16 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     assert(runSql("select col1,col3 from testblk where col1 < 4096 group by col3,col1").size == 3)
     assert(runSql("select col1,col2 from testblk where (col1 = 4096 and col2 < 'cc') group by col1,col2").size == 2)
     assert(runSql("select col1 from testblk where col1 < 4096 group by col1").size == 3)
+
+    val result = runSql("select avg(col3) from testblk where col1 < 4096 group by col1")
+    assert(result.size == 3)
+    val exparr = Array(Array(1024.0), Array(1024.0), Array(0.0))
+
+    val res = {
+      for (rx <- 0 until exparr.size)
+      yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
+    }.foldLeft(true) { case (res1, newres) => res1 && newres}
+    assert(res, "One or more rows did not match expected")
 
     // cleanup
     TestHbase.sql("drop table testblk")
