@@ -20,9 +20,10 @@ package org.apache.spark.sql.hbase.execution
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.{PartialAggregation, PhysicalOperation}
+import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.{Project, SparkPlan, UnaryNode}
+import org.apache.spark.sql.execution.{Project, SparkPlan}
 import org.apache.spark.sql.hbase.{HBasePartition, HBaseRawType, HBaseRelation, KeyColumn}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types._
@@ -38,23 +39,23 @@ private[hbase] trait HBaseStrategies {
   private[hbase] object HBaseDataSource extends Strategy {
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case PartialAggregation(
-      namedGroupingAttributes,
-      rewrittenAggregateExpressions,
-      groupingExpressions,
-      partialComputation,
-      child) =>
-        val withCodeGen = canBeCodeGened(
-          allAggregates(partialComputation) ++
-            allAggregates(rewrittenAggregateExpressions)) &&
-          codegenEnabled
-        generateAggregation(
-          namedGroupingAttributes,
-          rewrittenAggregateExpressions,
-          groupingExpressions,
-          partialComputation,
-          child,
-          withCodeGen)
+      case logical.Aggregate(groupingExpressions, aggregateExpressions, child) =>
+        val (canBeAggregated, physicalPlan) = {
+          canBeAggregatedForAll(groupingExpressions, aggregateExpressions, child)
+        }
+        if (canBeAggregated) {
+          val withCodeGen = canBeCodeGened(allAggregates(aggregateExpressions)) && codegenEnabled
+          if (withCodeGen) execution.GeneratedAggregate(
+            partial = false,
+            groupingExpressions,
+            aggregateExpressions,
+            physicalPlan) :: Nil
+          else execution.Aggregate(
+            partial = false,
+            groupingExpressions,
+            aggregateExpressions,
+            physicalPlan) :: Nil
+        } else Nil
 
       case PhysicalOperation(projectList, inPredicates,
       l@LogicalRelation(relation: HBaseRelation)) =>
@@ -81,12 +82,9 @@ private[hbase] trait HBaseStrategies {
     /**
      * Determined to do the aggregation for all directly or do with partial aggregation
      */
-    protected def generateAggregation(namedGroupingAttributes: Seq[Attribute],
-                                      rewrittenAggregateExpressions: Seq[NamedExpression],
-                                      groupingExpressions: Seq[Expression],
-                                      partialComputation: Seq[NamedExpression],
-                                      child: LogicalPlan,
-                                      withCodeGen: Boolean = false): List[UnaryNode] = {
+    protected def canBeAggregatedForAll(groupingExpressions: Seq[Expression],
+                                        aggregateExpressions: Seq[NamedExpression],
+                                        child: LogicalPlan): (Boolean, SparkPlan) = {
       def findScanNode(physicalChild: SparkPlan): Option[HBaseSQLTableScan] = physicalChild match {
         case chd: HBaseSQLTableScan => Some(chd)
         case chd if chd.children.size != 1 => None
@@ -127,32 +125,8 @@ private[hbase] trait HBaseStrategies {
       }
 
       val physicalChild = planLater(child)
-
-
-      def aggregation(partial: Boolean): List[UnaryNode] = {
-        if (withCodeGen) execution.GeneratedAggregate(
-          partial = false,
-          namedGroupingAttributes,
-          rewrittenAggregateExpressions,
-          execution.GeneratedAggregate(
-            partial = partial,
-            groupingExpressions,
-            partialComputation,
-            planLater(child))) :: Nil
-        else execution.Aggregate(
-          partial = false,
-          namedGroupingAttributes,
-          rewrittenAggregateExpressions,
-          execution.Aggregate(
-            partial = partial,
-            groupingExpressions,
-            partialComputation,
-            physicalChild)) :: Nil
-      }
-
-      def aggrWithPartial = {println("aggrWithPartial");aggregation(partial = true)}
-
-      def aggrForAll = {println("aggrForAll");aggregation(partial = false)}
+      def aggrWithPartial = (false, physicalChild)
+      def aggrForAll = (true, physicalChild)
 
       findScanNode(physicalChild) match {
         case None => aggrWithPartial
