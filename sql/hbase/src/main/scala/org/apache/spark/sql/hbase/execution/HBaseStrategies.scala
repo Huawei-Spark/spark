@@ -110,21 +110,20 @@ private[hbase] trait HBaseStrategies {
 
       val physicalChild = planLater(child)
 
-      def aggrWithPartial = execution.Aggregate(
+
+      def aggregation(partial:Boolean) = execution.Aggregate(
         partial = false,
         namedGroupingAttributes,
         rewrittenAggregateExpressions,
         execution.Aggregate(
-          partial = true,
+          partial = partial,
           groupingExpressions,
           partialComputation,
           physicalChild)) :: Nil
 
-      def aggrForAll = execution.Aggregate(
-        partial = false,
-        groupingExpressions,
-        partialComputation,
-        physicalChild) :: Nil
+      def aggrWithPartial = aggregation(true)
+
+      def aggrForAll =  aggregation(false)
 
       findScanNode(physicalChild) match {
         case None => aggrWithPartial
