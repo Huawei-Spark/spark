@@ -33,6 +33,7 @@ import org.apache.spark.scheduler.{AccumulableInfo, TaskInfo}
 /** Page showing statistics and task list for a given stage */
 private[ui] class StagePage(parent: StagesTab) extends WebUIPage("stage") {
   private val listener = parent.listener
+  private val pageSize = 1000
 
   def render(request: HttpServletRequest): Seq[Node] = {
     listener.synchronized {
@@ -44,6 +45,7 @@ private[ui] class StagePage(parent: StagesTab) extends WebUIPage("stage") {
 
       val stageId = parameterId.toInt
       val stageAttemptId = parameterAttempt.toInt
+      val requestedPage = Option(request.getParameter("page")).getOrElse("1").toInt
       val stageDataOption = listener.stageIdToData.get((stageId, stageAttemptId))
 
       if (stageDataOption.isEmpty || stageDataOption.get.taskData.isEmpty) {
@@ -58,6 +60,12 @@ private[ui] class StagePage(parent: StagesTab) extends WebUIPage("stage") {
 
       val stageData = stageDataOption.get
       val tasks = stageData.taskData.values.toSeq.sortBy(_.taskInfo.launchTime)
+
+      val requestedFirst = (requestedPage - 1) * pageSize
+      val pageCount = tasks.size / pageSize + (if (tasks.size % pageSize > 0) 1 else 0)
+      val actualFirst = if (requestedFirst < tasks.size) requestedFirst else 0
+      val actualPage = (actualFirst / pageSize) + 1
+      val showTasks = tasks.slice(actualFirst, Math.min(actualFirst + pageSize, tasks.size))
 
       val numCompleted = tasks.count(_.taskInfo.finished)
       val accumulables = listener.stageIdToData((stageId, stageAttemptId)).accumulables
@@ -212,7 +220,7 @@ private[ui] class StagePage(parent: StagesTab) extends WebUIPage("stage") {
         unzipped._1,
         taskRow(hasAccumulators, stageData.hasInput, stageData.hasOutput,
           stageData.hasShuffleRead, stageData.hasShuffleWrite, stageData.hasBytesSpilled),
-        tasks,
+        showTasks,
         headerClasses = unzipped._2)
       // Excludes tasks which failed and have incomplete metrics
       val validTasks = tasks.filter(t => t.taskInfo.status == "SUCCESS" && t.taskMetrics.isDefined)
@@ -438,7 +446,20 @@ private[ui] class StagePage(parent: StagesTab) extends WebUIPage("stage") {
         <div>{summaryTable.getOrElse("No tasks have reported metrics yet.")}</div> ++
         <h4>Aggregated Metrics by Executor</h4> ++ executorTable.toNodeSeq ++
         maybeAccumulableTable ++
-        <h4>Tasks</h4> ++ taskTable
+        <h4>Tasks
+          <span style="float: right">
+            {if (actualPage > 1) {
+              <a href={"?id=" + stageId +
+                "&attempt=" + stageAttemptId +
+                "&page=" + (actualPage - 1)}>&lt;
+              </a>}}
+            {if (actualPage < pageCount) {
+              <a href={"?id=" + stageId +
+                "&attempt=" + stageAttemptId +
+                "&page=" + (actualPage + 1)}>&gt;
+              </a>}}
+          </span>
+        </h4> ++ taskTable
 
       UIUtils.headerSparkPage("Details for Stage %d".format(stageId), content, parent)
     }
