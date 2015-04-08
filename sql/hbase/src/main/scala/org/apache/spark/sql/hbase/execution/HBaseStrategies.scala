@@ -39,23 +39,24 @@ private[hbase] trait HBaseStrategies {
   private[hbase] object HBaseDataSource extends Strategy {
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case logical.Aggregate(groupingExpressions, aggregateExpressions, child) =>
-        val (canBeAggregated, physicalPlan) = {
-          canBeAggregatedForAll(groupingExpressions, aggregateExpressions, child)
-        }
-        if (canBeAggregated) {
+      case logical.Aggregate(groupingExpressions, aggregateExpressions, child)
+        if groupingExpressions.nonEmpty &&
+          canBeAggregatedForAll(groupingExpressions, aggregateExpressions, child) =>
           val withCodeGen = canBeCodeGened(allAggregates(aggregateExpressions)) && codegenEnabled
           if (withCodeGen) execution.GeneratedAggregate(
-            partial = false,
+            // In this case, 'partial = true' doesn't mean it is partial, actually, it is not.
+            // We made it to true to avoid adding Exchange operation.
+            partial = true,
             groupingExpressions,
             aggregateExpressions,
-            physicalPlan) :: Nil
+            planLater(child)) :: Nil
           else execution.Aggregate(
-            partial = false,
+            // In this case, 'partial = true' doesn't mean it is partial, actually, it is not.
+            // We made it to true to avoid adding Exchange operation.
+            partial = true,
             groupingExpressions,
             aggregateExpressions,
-            physicalPlan) :: Nil
-        } else Nil
+            planLater(child)) :: Nil
 
       case PhysicalOperation(projectList, inPredicates,
       l@LogicalRelation(relation: HBaseRelation)) =>
@@ -84,7 +85,7 @@ private[hbase] trait HBaseStrategies {
      */
     protected def canBeAggregatedForAll(groupingExpressions: Seq[Expression],
                                         aggregateExpressions: Seq[NamedExpression],
-                                        child: LogicalPlan): (Boolean, SparkPlan) = {
+                                        child: LogicalPlan): Boolean = {
       def findScanNode(physicalChild: SparkPlan): Option[HBaseSQLTableScan] = physicalChild match {
         case chd: HBaseSQLTableScan => Some(chd)
         case chd if chd.children.size != 1 => None
@@ -125,8 +126,8 @@ private[hbase] trait HBaseStrategies {
       }
 
       val physicalChild = planLater(child)
-      def aggrWithPartial = (false, physicalChild)
-      def aggrForAll = (true, physicalChild)
+      def aggrWithPartial = false
+      def aggrForAll = true
 
       findScanNode(physicalChild) match {
         case None => aggrWithPartial
