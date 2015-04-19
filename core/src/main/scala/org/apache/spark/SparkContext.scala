@@ -961,6 +961,11 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     bc
   }
 
+  // second argument here to use string ok?
+  def registerExternalResource(name: String, externalResource: String): Unit = {
+
+  }
+
   /**
    * Add a file to be downloaded with this Spark job on every node.
    * The `path` passed can be either a local file, a file in HDFS (or other Hadoop-supported
