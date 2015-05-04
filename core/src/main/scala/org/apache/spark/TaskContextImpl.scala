@@ -42,6 +42,9 @@ private[spark] class TaskContextImpl(
   // For backwards-compatibility; this method is now deprecated as of 1.3.0.
   override def attemptId(): Long = taskAttemptId
 
+  override def getExtResource():
+    Option[ConcurrentHashMap[String, Pair[ExtResource[_], Long]]] = resources
+
   // List of callback functions to execute when the task completes.
   @transient private val onCompleteCallbacks = new ArrayBuffer[TaskCompletionListener]
 

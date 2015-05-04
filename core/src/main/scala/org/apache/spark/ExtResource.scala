@@ -21,9 +21,11 @@ package org.apache.spark
 
 
 import java.util.concurrent.ConcurrentHashMap
+import org.apache.spark.scheduler.ExecutorCacheTaskLocation
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
-import scala.collection.mutable
+import scala.collection.{Map, mutable}
 import scala.collection.mutable.{HashMap, ArrayBuffer, HashSet}
 
 case class ExtResourceInfo(slaveHostname: String, executorId: String,
@@ -58,6 +60,27 @@ object ExternalResourceManager {
   def addResource(taskId: Long, res: ExtResource[_]) = {
     taskToUsedResources.getOrElseUpdate(taskId, new HashSet[ExtResource[_]]()) += res
   }
+
+  def getExtRscInfo (sc: SparkContext): Map[String, ExtResourceInfo] = {
+    val exc = sc.getExecutorsAndLocations()
+    var res = Map[String, ExtResourceInfo]()
+    for (e <- exc) {
+      e match {
+        case tl: ExecutorCacheTaskLocation => {
+          println("location: " + tl.host + "\t\texecutorid: " + tl.executorId)
+          val resInfos = sc.getExtResourceInfo(tl.executorId).get
+          resInfos.foreach(e => {
+            println("++++ resource Name: " + e._1)
+            val resrc = e._2
+
+            println("++++ resourceInfo: " + e._2.toString)
+          } )
+          res ++= resInfos
+        }
+      }
+    }
+    res
+  }
 }
 
 /** record of number of uses of a shared resource instance per partition
@@ -70,9 +93,9 @@ class ResourceRefCountPerPartition[T] (var refCnt: Int = 0, val instance: T)
 case class ExtResource[T](
     name: String,
     shared: Boolean = false,
-    params: Seq[String],
-    init: (Int, Seq[String]) => T = null,  // Initialization function
-    term: (Int, T, Seq[String]) => Unit = null,  // Termination function
+    params: Seq[Any],
+    init: (Int, Seq[Any]) => T = null,  // Initialization function
+    term: (Int, T, Seq[Any]) => Unit = null,  // Termination function
     partitionAffined: Boolean = false, // partition speficication preferred 
     expiration: Int = -1       // optional expiration time, default to none; 
                                // 0 for one-time use
@@ -331,3 +354,4 @@ case class ExtResource[T](
     }
   }
 }
+

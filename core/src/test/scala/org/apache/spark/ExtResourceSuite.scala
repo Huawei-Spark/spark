@@ -44,21 +44,21 @@ class ExtResourceSuite extends FunSuite with LocalSparkContext {
     val eSrc1 = new ExtResource[String]("TestResource:String1", false, arr, myInit , myterm, true)
     sc.addOrReplaceResource(eSrc1)
     retrieveExtRsc(sc, 4)
-    val res1 = getExtRscInfo (sc)
+    val res1 = ExternalResourceManager.getExtRscInfo (sc)
     assert(res1.size === 1)
 
     //2. create external resource [shared : true, partitionAffined: true]
     val eSrc2 = new ExtResource[String]("TestResource:String2", true, arr, myInit , myterm, true)
     sc.addOrReplaceResource(eSrc2)
     retrieveExtRsc(sc, 4)
-    val res2 = getExtRscInfo (sc)
+    val res2 = ExternalResourceManager.getExtRscInfo (sc)
     assert(res2.size === 2)
 
     //3. create external resource [shared : false, partitionAffined: false]
     val eSrc3 = new ExtResource[String]("TestResource:String3", false, arr, myInit , myterm, false)
     sc.addOrReplaceResource(eSrc3)
     retrieveExtRsc(sc, 4)
-    val res3 = getExtRscInfo (sc)
+    val res3 = ExternalResourceManager.getExtRscInfo (sc)
     assert(res3.size === 3)
 
 
@@ -67,7 +67,7 @@ class ExtResourceSuite extends FunSuite with LocalSparkContext {
     sc.addOrReplaceResource(eSrc4)
 
     retrieveExtRsc(sc, 4)
-    val res4 = getExtRscInfo (sc)
+    val res4 = ExternalResourceManager.getExtRscInfo (sc)
     assert(res4.size === 4)
     //before cleanup
     assert(res4.get("TestResource:String1").get.instanceCount === 4)
@@ -76,7 +76,7 @@ class ExtResourceSuite extends FunSuite with LocalSparkContext {
     assert(res4.get("TestResource:String4").get.instanceCount === 1)
 
     cleanupExtRsc (sc, Option("TestResource:String1"))
-    val res5 = getExtRscInfo (sc)
+    val res5 = ExternalResourceManager.getExtRscInfo (sc)
     //after cleanup
     assert(res5.get("TestResource:String1").get.instanceCount === 0)
     assert(res5.get("TestResource:String2").get.instanceCount === 4)
@@ -84,8 +84,8 @@ class ExtResourceSuite extends FunSuite with LocalSparkContext {
     assert(res5.get("TestResource:String4").get.instanceCount === 1)
 
     cleanupExtRsc (sc)
-    getExtRscInfo (sc)
-    val res6 = getExtRscInfo (sc)
+    ExternalResourceManager.getExtRscInfo (sc)
+    val res6 = ExternalResourceManager.getExtRscInfo (sc)
     assert(res6.get("TestResource:String1").get.instanceCount === 0)
     assert(res6.get("TestResource:String2").get.instanceCount === 0)
     assert(res6.get("TestResource:String3").get.instanceCount === 0)
@@ -107,12 +107,12 @@ class ExtResourceSuite extends FunSuite with LocalSparkContext {
  *
  */
 private object ExtResourceSuite extends PrivateMethodTester {
-  val myInit = (split: Int, params: Seq[String]) => {
+  val myInit = (split: Int, params: Seq[Any]) => {
     println("++++ myInit success")
     "success"
   }
 
-  val myterm =  (split: Int, extRsc: String, params: Seq[String]) => {
+  val myterm =  (split: Int, extRsc: String, params: Seq[Any]) => {
     println("++++ myterm " +extRsc)
   }
 
@@ -120,25 +120,6 @@ private object ExtResourceSuite extends PrivateMethodTester {
     new MyTestRDD(sc, 4).collect()
   }
 
-
-  def getExtRscInfo (sc: SparkContext): Map[String, ExtResourceInfo] = {
-    val exc = sc.getExecutorsAndLocations()
-    var res = Map[String, ExtResourceInfo]()
-    for (e <- exc) {
-      e match {
-        case tl: ExecutorCacheTaskLocation => {
-          println("location: "+tl.host + "          executorid: "+tl.executorId)
-          val resInfos = sc.getExtResourceInfo(tl.executorId).get
-          resInfos.foreach(e => {
-            println("++++ resource Name: "+ e._1)
-            println("++++ resourceInfo: "+ e._2.toString)
-          } )
-          res ++= resInfos
-        }
-      }
-    }
-    res
-  }
 
   def cleanupExtRsc (sc: SparkContext, res: Option[String] = None) = {
     val exc = sc.getExecutorsAndLocations()
