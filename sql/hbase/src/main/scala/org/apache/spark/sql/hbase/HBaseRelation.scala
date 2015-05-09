@@ -732,6 +732,9 @@ private[hbase] case class HBaseRelation(
       }
     }
 
+    // set fetch size
+    scan.setCaching(scannerFetchSize)
+
     // add Family to SCAN from projections
     addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projectionList)
   }
