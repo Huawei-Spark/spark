@@ -19,7 +19,7 @@ package org.apache.spark.sql.hbase
 import org.apache.spark.{Logging, Partition}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
-import org.apache.spark.sql.hbase.types.{HBaseBytesType, PartitionRange, Range}
+import org.apache.spark.sql.hbase.types.{HBaseBytesType, Range}
 
 
 private[hbase] class HBasePartition(
@@ -40,6 +40,11 @@ private[hbase] class HBasePartition(
 
   @transient lazy val endNative: Seq[Any] = relation.nativeKeyConvert(end)
 
+  /** Compute predicate specific for this partition: performed by the Spark slaves
+   *
+   * @param relation The HBase relation
+   * @return the partition-specific predicate
+   */
   def computePredicate(relation: HBaseRelation): Option[Expression] = {
     val predicate = if (filterPredicates.isDefined &&
       filterPredicates.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
@@ -49,7 +54,7 @@ private[hbase] class HBasePartition(
       val row = new GenericMutableRow(predicateReferences.size)
       var rowIndex = 0
       var i = 0
-      var range: PartitionRange[_] = null
+      var range: Range[_] = null
       while (i < relation.keyColumns.size) {
         range = relation.generateRange(this, oriPredicate, i)
         if (range != null) {

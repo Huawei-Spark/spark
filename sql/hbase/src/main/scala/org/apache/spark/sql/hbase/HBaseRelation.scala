@@ -29,7 +29,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.catalyst.NotPusher
-import org.apache.spark.sql.hbase.types.PartitionRange
+import org.apache.spark.sql.hbase.types.Range
 import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
 import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation}
 import org.apache.spark.sql.sources.{RelationProvider, InsertableRelation}
@@ -48,8 +48,6 @@ class HBaseSource extends RelationProvider {
 
     val tableName = parameters("tableName")
     val rawNamespace = parameters("namespace")
-    val namespace: Option[String] = if (rawNamespace == null || rawNamespace.isEmpty) None
-    else Some(rawNamespace)
     val hbaseTable = parameters("hbaseTableName")
     val colsSeq = parameters("colsSeq").split(",")
     val keyCols = parameters("keyCols").split(";")
@@ -239,7 +237,7 @@ private[hbase] case class HBaseRelation(
   val scannerFetchSize = context.conf.asInstanceOf[HBaseSQLConf].scannerFetchSize
 
   private[hbase] def generateRange(partition: HBasePartition, pred: Expression,
-                                   index: Int): PartitionRange[_] = {
+                                   index: Int): Range[_] = {
     def getData(dt: NativeType,
                 bound: Option[HBaseRawType]): Option[Any] = {
       if (bound.isEmpty) {
@@ -261,7 +259,7 @@ private[hbase] case class HBaseRelation(
     val end = getData(dt, partition.end)
     val startInclusive = start.nonEmpty
     val endInclusive = end.nonEmpty && !isLastKeyIndex
-    new PartitionRange(start, startInclusive, end, endInclusive, partition.index, dt, pred)
+    new Range(start, startInclusive, end, endInclusive, dt)
   }
 
 

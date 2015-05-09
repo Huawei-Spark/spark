@@ -247,7 +247,7 @@ object PartialPredicateOperations {
             }
           }
         case If(predicate, trueE, falseE) =>
-          val (v, expression) = predicate.partialReduce(input, schema)
+          val (v, _) = predicate.partialReduce(input, schema)
           if (v == null) {
             (null, unboundAttributeReference(e, schema))
           } else if (v.asInstanceOf[Boolean]) {
@@ -272,14 +272,11 @@ object PartialPredicateOperations {
 
       dataType1 match {
         case nativeType: NativeType =>
-          val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType, null)
-          if (pdt == null) {
-            sys.error(s"Type $i does not have corresponding partial ordered type")
-          } else {
-            pdt.partialOrdering.tryCompare(
-              pdt.toPartiallyOrderingDataType(eval1, nativeType).asInstanceOf[pdt.JvmType],
-              pdt.toPartiallyOrderingDataType(eval2, nativeType).asInstanceOf[pdt.JvmType])
-          }
+          val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType,
+            sys.error(s"Type $i does not have corresponding partial ordered type"))
+          pdt.partialOrdering.tryCompare(
+            pdt.toPartiallyOrderingDataType(eval1, nativeType),
+            pdt.toPartiallyOrderingDataType(eval2, nativeType))
         case other => sys.error(s"Type $other does not support partially ordered operations")
       }
     }
