@@ -21,6 +21,7 @@ import org.apache.spark.sql.catalyst.errors.TreeNodeException
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.types._
+import org.apache.spark.sql.hbase.types.RangeType._
 
 object PartialPredicateOperations {
   // Partial reduction is nullness-based, i.e., uninterested columns are assigned nulls,
@@ -272,8 +273,7 @@ object PartialPredicateOperations {
 
       dataType1 match {
         case nativeType: NativeType =>
-          val pdt = RangeType.primitiveToPODataTypeMap.getOrElse(nativeType,
-            sys.error(s"Type $i does not have corresponding partial ordered type"))
+          val pdt: RangeType[nativeType.JvmType] = nativeType.toRangeType[nativeType.JvmType]
           pdt.partialOrdering.tryCompare(
             pdt.toPartiallyOrderingDataType(eval1, nativeType),
             pdt.toPartiallyOrderingDataType(eval2, nativeType))

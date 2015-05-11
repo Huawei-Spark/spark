@@ -16,12 +16,10 @@
  */
 package org.apache.spark.sql.hbase.types
 
-import java.sql.Timestamp
-
 import org.apache.spark.sql.catalyst.ScalaReflectionLock
 import org.apache.spark.sql.types._
 
-import scala.collection.immutable.HashMap
+import scala.collection.mutable
 import scala.language.implicitConversions
 import scala.math.PartialOrdering
 import scala.reflect.runtime.universe.typeTag
@@ -162,37 +160,12 @@ private[hbase] class RangeType[T] extends PartialOrderingDataType {
 }
 
 object RangeType {
+  import scala.reflect.runtime.universe.TypeTag
+  private val typeMap = new mutable.HashMap[TypeTag[_], RangeType[_]]
+    with mutable.SynchronizedMap[TypeTag[_], RangeType[_]]
 
-  object BooleanRangeType extends RangeType[Boolean]
-
-  object ByteRangeType extends RangeType[Byte]
-
-  object DecimalRangeType extends RangeType[BigDecimal]
-
-  object DoubleRangeType extends RangeType[Double]
-
-  object FloatRangeType extends RangeType[Float]
-
-  object IntegerRangeType extends RangeType[Int]
-
-  object LongRangeType extends RangeType[Long]
-
-  object ShortRangeType extends RangeType[Short]
-
-  object StringRangeType extends RangeType[String]
-
-  object TimestampRangeType extends RangeType[Timestamp]
-
-  val primitiveToPODataTypeMap: HashMap[NativeType, PartialOrderingDataType] =
-    HashMap(
-      BooleanType -> BooleanRangeType,
-      ByteType -> ByteRangeType,
-      DoubleType -> DoubleRangeType,
-      FloatType -> FloatRangeType,
-      IntegerType -> IntegerRangeType,
-      LongType -> LongRangeType,
-      ShortType -> ShortRangeType,
-      StringType -> StringRangeType,
-      TimestampType -> TimestampRangeType
-    )
+  implicit class partialOrdering(dt: NativeType) {
+    private[sql] def toRangeType[T]: RangeType[T] =
+      typeMap.getOrElseUpdate(dt.tag, new RangeType[T]).asInstanceOf[RangeType[T]]
+  }
 }
