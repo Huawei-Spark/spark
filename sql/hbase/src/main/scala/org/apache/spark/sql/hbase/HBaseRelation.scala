@@ -787,7 +787,21 @@ private[hbase] case class HBaseRelation(
         null
       }
     }
-    if (finalFilters != null) scan.setFilter(finalFilters)
+    if (finalFilters != null) {
+      if (otherFilters.isDefined) {
+        // add custom filter to handle other filters part
+        val skipFilter = new HBaseSkipScanFilter(this, otherFilters.get)
+        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+        filterList.addFilter(finalFilters)
+        filterList.addFilter(skipFilter)
+        scan.setFilter(filterList)
+      } else {
+        scan.setFilter(finalFilters)
+      }
+    } else if (otherFilters.isDefined) {
+      val skipFilter = new HBaseSkipScanFilter(this, otherFilters.get)
+      scan.setFilter(skipFilter)
+    }
 
     if (pushdownPreds.nonEmpty) {
       val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).

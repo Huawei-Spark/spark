@@ -195,4 +195,17 @@ class BytesUtils(var buffer: HBaseRawType, dt: DataType) {
     buffer(7) = input.asInstanceOf[Byte]
     buffer
   }
+
+  def toBytes(input: Any): HBaseRawType = {
+    input match {
+      case item: Boolean => toBytes(item)
+      case item: Byte => toBytes(item)
+      case item: Double => toBytes(item)
+      case item: Float => toBytes(item)
+      case item: Int => toBytes(item)
+      case item: Long => toBytes(item)
+      case item: Short => toBytes(item)
+      case item: String => toBytes(item)
+    }
+  }
 }
