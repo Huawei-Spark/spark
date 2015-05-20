@@ -285,7 +285,8 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
           // construct the next hint
           nextKeyValue = new KeyValue(result._2, CellUtil.cloneFamily(kv),
             Array[Byte](), Array[Byte]())
-        } else if (result._1 == ReturnCode.NEXT_ROW && currentDim == minimumDimension) {
+        } else if (result._1 == ReturnCode.NEXT_ROW && currentDim == minimumDimension
+          && minimumDimension != maximumDimension) {
           // if it is the minimum dimension and it is already skipped, which means we can
           // skip the remaining
           filterAllRemainingSetting = true
