@@ -150,13 +150,13 @@ abstract class RDD[T: ClassTag](
 
   def preRun:Unit = {
     if (!dependencies.isEmpty) {
-      dependencies.last.rdd.preRun
+      dependencies.foreach(_.rdd.preRun)
     }
   }
 
   def postRun:Unit = {
     if (!dependencies.isEmpty) {
-      dependencies.last.rdd.postRun
+      dependencies.foreach(_.rdd.postRun)
     }
   }
 
