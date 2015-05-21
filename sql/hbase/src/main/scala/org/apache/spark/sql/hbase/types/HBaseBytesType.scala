@@ -35,7 +35,7 @@ private[hbase] case object HBaseBytesType extends NativeType with PrimitiveType 
   @transient private[sql] lazy val tag =  ScalaReflectionLock.synchronized { typeTag[JvmType] }
   private[sql] val ordering = new Ordering[JvmType] {
     def compare(x: Array[Byte], y: Array[Byte]): Int = {
-      for (i <- 0 until x.length; if i < y.length) {
+      for (i <- x.indices if i < y.length) {
         val a: Int = x(i) & 0xff
         val b: Int = y(i) & 0xff
         val res = a - b

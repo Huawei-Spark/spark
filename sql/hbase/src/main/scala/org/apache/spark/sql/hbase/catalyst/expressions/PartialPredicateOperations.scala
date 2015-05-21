@@ -119,7 +119,7 @@ object PartialPredicateOperations {
             }
             if (foundInList) {
               (true, null)
-            } else if (newList.size == 0) {
+            } else if (newList.isEmpty) {
               (false, null)
             } else {
               (null, In(expr, newList))
@@ -142,7 +142,7 @@ object PartialPredicateOperations {
             }
             if (foundInSet) {
               (true, null)
-            } else if (newHset.size == 0) {
+            } else if (newHset.isEmpty) {
               (false, null)
             } else {
               (null, InSet(evaluatedValue._2, newHset))

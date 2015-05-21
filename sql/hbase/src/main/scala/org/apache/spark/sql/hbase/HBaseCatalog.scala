@@ -263,7 +263,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
 
   override def lookupRelation(tableIdentifier: Seq[String],
                      alias: Option[String] = None): LogicalPlan = {
-    val tableName = tableIdentifier(0)
+    val tableName = tableIdentifier.head
     val hbaseRelation = getTable(tableName)
     if (hbaseRelation.isEmpty) {
       sys.error(s"Table Not Found: $tableName")
@@ -333,7 +333,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
   }
 
   override def tableExists(tableIdentifier: Seq[String]): Boolean = {
-    val tableName = tableIdentifier(0)
+    val tableName = tableIdentifier.head
     checkLogicalTableExist(tableName)
   }
 

@@ -406,7 +406,7 @@ object RangeCriticalPoint {
    */
   private[hbase] def generateCriticalPointRanges(relation: HBaseRelation, pred: Option[Expression])
   : Seq[CriticalPointRange[_]] = {
-    if (!pred.isDefined) Nil
+    if (pred.isEmpty) Nil
     else {
       val predExpr = pred.get
       val predRefs = predExpr.references.toSeq

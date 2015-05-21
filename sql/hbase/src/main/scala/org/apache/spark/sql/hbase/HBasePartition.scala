@@ -47,7 +47,7 @@ private[hbase] class HBasePartition(
    */
   def computePredicate(relation: HBaseRelation): Option[Expression] = {
     val predicate = if (filterPredicates.isDefined &&
-      filterPredicates.get.references.exists(_.exprId == relation.partitionKeys(0).exprId)) {
+      filterPredicates.get.references.exists(_.exprId == relation.partitionKeys.head.exprId)) {
       val oriPredicate = filterPredicates.get
       val predicateReferences = oriPredicate.references.toSeq
       val boundReference = BindReferences.bindReference(oriPredicate, predicateReferences)

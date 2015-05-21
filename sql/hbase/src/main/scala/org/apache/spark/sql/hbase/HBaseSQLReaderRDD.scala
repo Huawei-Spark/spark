@@ -138,7 +138,7 @@ class HBaseSQLReaderRDD(
     } else {
       head
     }
-    if (list.size == 0) {
+    if (list.isEmpty) {
       null
     } else {
       HBaseKVHelper.encodingRawKeyColumns(list)
@@ -211,7 +211,7 @@ class HBaseSQLReaderRDD(
       else {
         // isPointRanges is false
         // calculate the range start
-        val startRowKey = constructRowKey(expandedCPRs(0), isStart = true)
+        val startRowKey = constructRowKey(expandedCPRs.head, isStart = true)
         val start = if (startRowKey != null) {
           if (partition.start.isDefined && Bytes.compareTo(partition.start.get, startRowKey) > 0) {
             Some(partition.start.get)

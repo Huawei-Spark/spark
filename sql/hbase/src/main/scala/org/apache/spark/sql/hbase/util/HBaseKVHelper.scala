@@ -96,7 +96,7 @@ object HBaseKVHelper {
       keyBytes(kc.order) = (string2Bytes(values(ordinal), lineBuffer(ordinal)),
         relation.output(ordinal).dataType)
     })
-    for (i <- 0 until relation.nonKeyColumns.size) {
+    for (i <- relation.nonKeyColumns.indices) {
       val nkc = relation.nonKeyColumns(i)
       val bytes =  {
         // we should not use the same buffer in bulk-loading otherwise it will lead to corrupted
