@@ -1540,10 +1540,12 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     if (conf.getBoolean("spark.logLineage", false)) {
       logInfo("RDD's recursive dependencies:\n" + rdd.toDebugString)
     }
+    rdd.preRun
     dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, allowLocal,
       resultHandler, localProperties.get)
     progressBar.foreach(_.finishAll())
     rdd.doCheckpoint()
+    rdd.postRun
   }
 
   /**

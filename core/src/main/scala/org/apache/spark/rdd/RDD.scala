@@ -148,6 +148,18 @@ abstract class RDD[T: ClassTag](
     this
   }
 
+  def preRun:Unit = {
+    if (!dependencies.isEmpty) {
+      dependencies.last.rdd.preRun
+    }
+  }
+
+  def postRun:Unit = {
+    if (!dependencies.isEmpty) {
+      dependencies.last.rdd.postRun
+    }
+  }
+
   /**
    * Set this RDD's storage level to persist its values across operations after the first time
    * it is computed. This can only be used to assign a new storage level if the RDD does not
