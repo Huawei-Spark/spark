@@ -176,37 +176,37 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 4") {
     val sql = "SELECT ss_item_sk, count(1) FROM store_sales GROUP BY ss_item_sk"
     val rows = runSql(sql)
-    assert(rows.size == 100)
+    assert(rows.length == 100)
   }
 
   test("Query 5") {
     val sql = "SELECT ss_item_sk, ss_ticket_number, count(1) FROM store_sales WHERE ss_item_sk > 4000 AND ss_item_sk < 5000 GROUP BY ss_item_sk, ss_ticket_number"
     val rows = runSql(sql)
-    assert(rows.size == 5)
+    assert(rows.length == 5)
   }
 
   test("Query 6") {
     val sql = "SELECT ss_item_sk, avg(ss_quantity) as avg_qty, count(ss_quantity) as cnt_qty FROM store_sales WHERE ss_item_sk = 2744 GROUP BY ss_item_sk"
     val rows = runSql(sql)
-    assert(rows.size == 1)
+    assert(rows.length == 1)
   }
 
   test("Query 7") {
     val sql = "SELECT ss_item_sk, ss_ticket_number, sum(ss_wholesale_cost) as sum_wholesale_cost FROM store_sales WHERE ss_item_sk > 4000 AND ss_item_sk <= 5000 GROUP BY ss_item_sk, ss_ticket_number"
     val rows = runSql(sql)
-    assert(rows.size == 5)
+    assert(rows.length == 5)
   }
 
   test("Query 8") {
     val sql = "SELECT ss_item_sk, ss_ticket_number, min(ss_wholesale_cost) as min_wholesale_cost, max(ss_wholesale_cost) as max_wholesale_cost, avg(ss_wholesale_cost) as avg_wholesale_cost FROM store_sales WHERE ss_item_sk > 4000 AND ss_item_sk <= 5000 GROUP BY ss_item_sk, ss_ticket_number"
     val rows = runSql(sql)
-    assert(rows.size == 5)
+    assert(rows.length == 5)
   }
 
   test("Query 9") {
     val sql = "SELECT ss_item_sk, count(ss_customer_sk) as count_ss_customer_sk FROM store_sales WHERE ss_item_sk > 4000 AND ss_item_sk <= 5000 GROUP BY ss_item_sk"
     val rows = runSql(sql)
-    assert(rows.size == 5)
+    assert(rows.length == 5)
   }
 
   test("Query 10") {
@@ -230,13 +230,13 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 13") {
     val sql = "SELECT * FROM store_sales limit 100"
     val rows = runSql(sql)
-    assert(rows.size == 100)
+    assert(rows.length == 100)
   }
 
   test("Query 14") {
     val sql = "SELECT ss_customer_sk, count(*) FROM store_sales WHERE ss_item_sk >= 4000 AND ss_item_sk <= 5000 GROUP BY ss_customer_sk"
     val rows = runSql(sql)
-    assert(rows.size == 5)
+    assert(rows.length == 5)
   }
 
   test("Query 15") {
@@ -260,18 +260,18 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 18") {
     val sql = "SELECT ss_item_sk, ss_ticket_number FROM store_sales WHERE (ss_item_sk = 186 AND ss_ticket_number > 0)"
     val rows = runSql(sql)
-    assert(rows.size == 1)
+    assert(rows.length == 1)
   }
 
   test("Query 19") {
     val sql = "SELECT * FROM store_sales WHERE ss_ticket_number > 6 and ss_sold_date_sk > 0"
     val rows = runSql(sql)
-    assert(rows.size == 21)
+    assert(rows.length == 21)
   }
 
   test("Query 20") {
     val sql = "SELECT * FROM store_sales WHERE ss_ticket_number = 7 and ss_sold_date_sk > 0"
     val rows = runSql(sql)
-    assert(rows.size == 12)
+    assert(rows.length == 12)
   }
 }

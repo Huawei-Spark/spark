@@ -380,7 +380,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().length == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -416,7 +416,7 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     val executeSql3 = TestHbase.executeSql(loadSql)
     executeSql3.toRdd.collect()
 
-    assert(TestHbase.sql("select * from testblk").collect().size == 16)
+    assert(TestHbase.sql("select * from testblk").collect().length == 16)
 
     // cleanup
     TestHbase.sql("drop table testblk")
@@ -494,11 +494,11 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
     checkResult(TestHbase.sql(sql), containExchange = false, 3)
 
     val result = runSql("select avg(col3) from testblk where col1 < 4096 group by col1")
-    assert(result.size == 3)
+    assert(result.length == 3)
     val exparr = Array(Array(1024.0), Array(0.0), Array(1024.0))
 
     val res = {
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield compareWithTol(result(rx).toSeq, exparr(rx), s"Row$rx failed")
     }.foldLeft(true) { case (res1, newres) => res1 && newres}
     assert(res, "One or more rows did not match expected")
@@ -515,6 +515,6 @@ class BulkLoadIntoTableSuite extends HBaseTestData {
       case a:org.apache.spark.sql.execution.GeneratedAggregate => 
         assert(a.child.isInstanceOf[Exchange] == containExchange)
     }
-    assert(df.collect().size == size)
+    assert(df.collect().length == size)
   }
 }

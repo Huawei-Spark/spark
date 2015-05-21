@@ -46,7 +46,7 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
     val groups = shuffled.mapPartitionsWithIndex { (idx, iter) =>
       iter.map(x => (x._2, idx))
     }.collect()
-    assert(groups.size == 40)
+    assert(groups.length == 40)
     assert(groups.map(_._2).toSet.size == 8)
     groups.foreach { r =>
       assert(r._1 > 5 * r._2 && r._1 <= 5 * (1 + r._2))
@@ -67,7 +67,7 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
       Seq(KeyColumn("col1", DoubleType, 0), KeyColumn("col2", StringType, 1),
         KeyColumn("col3", StringType, 2), KeyColumn("col4", IntegerType, 3)))
 
-    assert(BytesUtils.toDouble(rowkey, keys(0)._1) === 123.456)
+    assert(BytesUtils.toDouble(rowkey, keys.head._1) === 123.456)
     assert(BytesUtils.toString(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
     assert(BytesUtils.toString(rowkey, keys(2)._1, keys(2)._2) === "")
     assert(BytesUtils.toInt(rowkey, keys(3)._1) === 1234)
@@ -86,7 +86,7 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
       Seq(KeyColumn("col1", DoubleType, 0), KeyColumn("col2", StringType, 1),
         KeyColumn("col3", IntegerType, 2)))
 
-    assert(BytesUtils.toDouble(rowkey, keys(0)._1) === 123.456)
+    assert(BytesUtils.toDouble(rowkey, keys.head._1) === 123.456)
     assert(BytesUtils.toString(rowkey, keys(1)._1, keys(1)._2) === "abcdef")
     assert(BytesUtils.toInt(rowkey, keys(2)._1) === 1234)
   }
@@ -280,6 +280,6 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
 
     val result = RangeCriticalPoint.generateCriticalPointRanges(relation, pred)
 
-    assert(result.size == 0)
+    assert(result.isEmpty)
   }
 }

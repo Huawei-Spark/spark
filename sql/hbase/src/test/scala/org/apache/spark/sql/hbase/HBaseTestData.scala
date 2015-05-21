@@ -162,10 +162,10 @@ class HBaseTestData extends HBaseIntegrationTestBase {
   def run(sqlCtx: SQLContext, testName: String, sql: String, exparr: Seq[Seq[Any]]) = {
     val execQuery1 = sqlCtx.executeSql(sql)
     val result1 = runSql(sql)
-    assert(result1.size == exparr.length, s"$testName failed on size")
+    assert(result1.length == exparr.length, s"$testName failed on size")
     verify(testName,
       sql,
-      for (rx <- 0 until exparr.size)
+      for (rx <- exparr.indices)
       yield result1(rx).toSeq, exparr
     )
   }

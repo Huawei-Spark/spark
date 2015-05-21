@@ -166,7 +166,7 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
     maximumDimension = -1
     var count: Int = 0
     val map = predExpr.references.toSeq.map(a => a.name)
-    for (i <- 0 to relation.keyColumns.size - 1) {
+    for (i <- relation.keyColumns.indices) {
       val key = relation.keyColumns(i).sqlName
       if (map.contains(key)) {
         count = count + 1
@@ -228,7 +228,7 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
     for (i <- 0 to dimIndex) {
       val dataType = cprsCache(i).dt
       val value = BytesUtils.create(dataType).toBytes(cprsCache(i).currentValue)
-      list = list :+ (value, dataType)
+      list = list :+(value, dataType)
     }
     HBaseKVHelper.encodingRawKeyColumns(list.toSeq)
   }
@@ -285,11 +285,53 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
           // construct the next hint
           nextKeyValue = new KeyValue(result._2, CellUtil.cloneFamily(kv),
             Array[Byte](), Array[Byte]())
-        } else if (result._1 == ReturnCode.NEXT_ROW && currentDim == minimumDimension
-          && minimumDimension != maximumDimension) {
+        } else if (result._1 == ReturnCode.NEXT_ROW) {
           // if it is the minimum dimension and it is already skipped, which means we can
           // skip the remaining
-          filterAllRemainingSetting = true
+          if (currentDim == minimumDimension && minimumDimension != maximumDimension) {
+            filterAllRemainingSetting = true
+          } else if (currentDim > 0) {
+            // increase the value of previous dimension, if current dimension is great than 0
+            val previousDim = currentDim - 1
+            val dt: NativeType = cprsCache(previousDim).dt.asInstanceOf[NativeType]
+            if (cprsCache(previousDim).dt != StringType) {
+              // we only handle the non-string data type for now
+              // increase the value of previous dimension
+              val key = BytesUtils.addOne(
+                DataTypeUtils.dataToBytes(cprsCache(previousDim).currentValue, dt))
+              val value = DataTypeUtils.bytesToData(key, 0, key.length, dt).asInstanceOf[dt.JvmType]
+              cprsCache(previousDim).asInstanceOf[SearchRange[dt.JvmType]].currentValue = value
+              if (previousDim < minimumDimension) {
+                // if the previous dimension is full range
+                val start = cprsCache(currentDim).cprs.head.start
+                if (start.isEmpty) {
+                  // the start value of the current dimension is None, than only use previous
+                  // dimension value to construct row key
+                  val rowKey = buildRowKey(previousDim)
+                  nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
+                    Array[Byte](), Array[Byte]())
+                } else {
+                  // we will also use the current dimension start value to
+                  // construct row key
+                  val dt: NativeType = cprsCache(currentDim).dt.asInstanceOf[NativeType]
+                  cprsCache(currentDim).asInstanceOf[SearchRange[dt.JvmType]].currentValue =
+                    start.get.asInstanceOf[dt.JvmType]
+                  val rowKey = buildRowKey(currentDim)
+                  nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
+                    Array[Byte](), Array[Byte]())
+                }
+              } else {
+                // since the previous dimension has predicate, the current dimension needs
+                // re-calculate if the value of previous dimension is changed, so we will
+                // only use previous dimension to construct row key
+                val rowKey = buildRowKey(previousDim)
+                nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
+                  Array[Byte](), Array[Byte]())
+              }
+              // change the return code from NEXT_ROW to SEEK_NEXT_USING_HINT
+              nextReturnCode = ReturnCode.SEEK_NEXT_USING_HINT
+            }
+          }
         }
       }
       nextReturnCode
@@ -358,7 +400,7 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
 
       // handle the first dimension, the predicate is the input
       if (currentDim == 0) {
-        val keyDim = relation.partitionKeys(0)
+        val keyDim = relation.partitionKeys.head
         val criticalPoints: Seq[CriticalPoint[t]] = RangeCriticalPoint.collect(predExpr, keyDim)
         val predRefs = predExpr.references.toSeq
         val boundPred = BindReferences.bindReference(predExpr, predRefs)
@@ -368,7 +410,7 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
           // partial reduce
           val cpRanges: Seq[CriticalPointRange[t]] =
             RangeCriticalPoint.generateCriticalPointRange[t](criticalPoints, 0, dt)
-          val keyIndex = predRefs.indexWhere(_.exprId == relation.partitionKeys(0).exprId)
+          val keyIndex = predRefs.indexWhere(_.exprId == relation.partitionKeys.head.exprId)
           val qualifiedCPRanges = cpRanges.filter(cpr => {
             row.update(keyIndex, cpr)
             val prRes = boundPred.partialReduce(row, predRefs)
