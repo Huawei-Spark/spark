@@ -300,7 +300,8 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
               val key = BytesUtils.addOne(
                 DataTypeUtils.dataToBytes(cprsCache(previousDim).currentValue, dt))
               if (key != null) {
-                val value = DataTypeUtils.bytesToData(key, 0, key.length, dt).asInstanceOf[dt.JvmType]
+                val value =
+                  DataTypeUtils.bytesToData(key, 0, key.length, dt).asInstanceOf[dt.JvmType]
                 cprsCache(previousDim).asInstanceOf[SearchRange[dt.JvmType]].currentValue = value
               }
               if (previousDim < minimumDimension) {
