@@ -304,35 +304,35 @@ private[hbase] class HBaseSkipScanFilter extends FilterBase with Writable {
                   DataTypeUtils.bytesToData(key, 0, key.length, dt).asInstanceOf[dt.JvmType]
                 cprsCache(previousDim).asInstanceOf[SearchRange[dt.JvmType]].currentValue = value
               }
+              var rowKey: HBaseRawType = null
               if (previousDim < minimumDimension) {
                 // if the previous dimension is full range
                 val start = cprsCache(currentDim).cprs.head.start
                 if (start.isEmpty) {
                   // the start value of the current dimension is None, than only use previous
                   // dimension value to construct row key
-                  val rowKey = buildRowKey(previousDim)
-                  nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
-                    Array[Byte](), Array[Byte]())
+                  rowKey = buildRowKey(previousDim)
                 } else {
                   // we will also use the current dimension start value to
                   // construct row key
                   val dt: NativeType = cprsCache(currentDim).dt.asInstanceOf[NativeType]
                   cprsCache(currentDim).asInstanceOf[SearchRange[dt.JvmType]].currentValue =
                     start.get.asInstanceOf[dt.JvmType]
-                  val rowKey = buildRowKey(currentDim)
-                  nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
-                    Array[Byte](), Array[Byte]())
+                  rowKey = buildRowKey(currentDim)
                 }
               } else {
                 // since the previous dimension has predicate, the current dimension needs
                 // re-calculate if the value of previous dimension is changed, so we will
                 // only use previous dimension to construct row key
-                val rowKey = buildRowKey(previousDim)
+                rowKey = buildRowKey(previousDim)
+              }
+              if (Bytes.compareTo(rowKey, currentRowKey) > 0) {
                 nextKeyValue = new KeyValue(rowKey, CellUtil.cloneFamily(kv),
                   Array[Byte](), Array[Byte]())
+
+                // change the return code from NEXT_ROW to SEEK_NEXT_USING_HINT
+                nextReturnCode = ReturnCode.SEEK_NEXT_USING_HINT
               }
-              // change the return code from NEXT_ROW to SEEK_NEXT_USING_HINT
-              nextReturnCode = ReturnCode.SEEK_NEXT_USING_HINT
             }
           }
         }
