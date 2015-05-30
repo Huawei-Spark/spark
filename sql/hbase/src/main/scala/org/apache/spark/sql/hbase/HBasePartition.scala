@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.hbase
 
+import org.apache.hadoop.hbase.regionserver.RegionScanner
 import org.apache.spark.{Logging, Partition}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
@@ -28,7 +29,8 @@ private[hbase] class HBasePartition(
                                      end: Option[HBaseRawType] = None,
                                      val server: Option[String] = None,
                                      val filterPredicates: Option[Expression] = None,
-                                     @transient relation: HBaseRelation = null)
+                                     @transient relation: HBaseRelation = null,
+                                     @transient val newScanner:RegionScanner = null)
   extends Range[HBaseRawType](start, true, end, false, HBaseBytesType)
   with Partition with IndexMappable with Logging {
 

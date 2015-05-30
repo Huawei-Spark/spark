@@ -19,8 +19,10 @@ package org.apache.spark.sql.hbase
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.client.coprocessor.Batch
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
+import org.apache.hadoop.hbase.ipc.BlockingRpcCallback
 import org.apache.log4j.Logger
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
@@ -714,7 +716,6 @@ private[hbase] case class HBaseRelation(
       context.conf.codegenEnabled,
       requiredColumns,
       filterPredicate, // PartitionPred : Option[Expression]
-      None, // coprocSubPlan: SparkPlan
       context
     )
   }
@@ -826,6 +827,19 @@ private[hbase] case class HBaseRelation(
   def buildGet(projectionList: Seq[NamedExpression], rowKey: HBaseRawType) {
     new Get(rowKey)
     // TODO: add columns to the Get
+  }
+
+  def buildRowAfterCoprocessor(projections: Seq[(Attribute, Int)],
+                               result: Result,
+                               row: MutableRow): Row = {
+    assert(projections.size == row.length, "Projection size and row size mismatched")
+    projections.zipWithIndex.foreach { case (p, i) =>
+      val kv: Cell = result.rawCells()(i)
+      val colValue: HBaseRawType = CellUtil.cloneValue(kv)
+      DataTypeUtils.setRowColumnFromHBaseRawType(
+        row, p._2, colValue, 0, colValue.length, p._1.dataType)
+    }
+    row
   }
 
   def buildRow(projections: Seq[(Attribute, Int)],

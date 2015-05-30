@@ -21,16 +21,18 @@ import java.util.zip._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.client.coprocessor.Batch
 import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding
+import org.apache.hadoop.hbase.ipc.BlockingRpcCallback
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HColumnDescriptor, HTableDescriptor, TableName}
+import org.apache.hadoop.hbase.{Coprocessor, HColumnDescriptor, HTableDescriptor, TableName}
 import org.apache.log4j.Logger
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.analysis.{Catalog, OverrideCatalog}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Subquery}
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.hbase.HBaseCatalog._
+import org.apache.spark.sql.types._
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -90,22 +92,25 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
 
   val caseSensitive = true
 
-  private def createHBaseUserTable(tableName: String,
-                                   families: Set[String],
-                                   splitKeys: Array[Array[Byte]]): Unit = {
+  protected[hbase] def createHBaseUserTable(tableName: String,
+                                            families: Set[String],
+                                            splitKeys: Array[Array[Byte]],
+                                            withCoprocessor: Boolean = true): Unit = {
     val tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName))
     families.foreach(family => {
-        val colDsc = new HColumnDescriptor(family)
-        colDsc.setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
-        tableDescriptor.addFamily(colDsc)
+      val colDsc = new HColumnDescriptor(family)
+      colDsc.setDataBlockEncoding(DataBlockEncoding.FAST_DIFF)
+      tableDescriptor.addFamily(colDsc)
     })
 
+    if (deploySuccessfully.get && withCoprocessor) {
+      tableDescriptor.addCoprocessor(
+        "org.apache.spark.sql.hbase.SparkSqlRegionObserver",
+        null, Coprocessor.PRIORITY_USER, null)
+    }
+
     try {
-      if (splitKeys == null) {
-        admin.createTable(tableDescriptor)
-      } else {
-        admin.createTable(tableDescriptor, splitKeys)
-      }
+      admin.createTable(tableDescriptor, splitKeys)
     } catch {
       case e: Throwable =>
         admin = new HBaseAdmin(configuration)
@@ -113,9 +118,55 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
     }
   }
 
+  def hasCoprocessor(hbaseTableName: String): Boolean = {
+    val hTableDescriptor = admin.getTableDescriptor(TableName.valueOf(hbaseTableName))
+    hTableDescriptor.hasCoprocessor("org.apache.spark.sql.hbase.SparkSqlRegionObserver")
+  }
+
+  @transient var deploySuccessfully: Option[Boolean] = _
+
+  // When building the connection to the hbase table, we need to check
+  // whether the current directory in the regionserver is accessible or not.
+  // Or else it might crash the HBase regionserver!!!
+  // For details, please read the comment in CheckDirEndPointImpl.
+  @transient var pwdIsAccessible = false
+
   def createTable(tableName: String, hbaseNamespace: String, hbaseTableName: String,
                   allColumns: Seq[AbstractColumn], splitKeys: Array[Array[Byte]]): HBaseRelation = {
     val metadataTable = getMetadataTable
+
+    if (deploySuccessfully == null) {
+      // When building the connection to the hbase table, we need to check
+      // whether the current directory in the regionserver is accessible or not.
+      // Or else it might crash the HBase regionserver!!!
+      // For details, please read the comment in CheckDirEndPointImpl.
+      val request = CheckDirProtos.CheckRequest.getDefaultInstance
+      val batch = new Batch.Call[CheckDirProtos.CheckDirService, Boolean]() {
+        def call(counter: CheckDirProtos.CheckDirService): Boolean = {
+          val rpcCallback = new BlockingRpcCallback[CheckDirProtos.CheckResponse]
+          counter.getCheckResult(null, request, rpcCallback)
+          val response = rpcCallback.get
+          if (response != null && response.hasAccessible) {
+            response.getAccessible
+          } else false
+        }
+      }
+      val results = metadataTable.coprocessorService(
+        classOf[CheckDirProtos.CheckDirService], null, null, batch
+      )
+
+      deploySuccessfully = Some(!results.isEmpty)
+      if (!deploySuccessfully.get) {
+        logger.warn( """Not deplyed successfully""")
+      }
+
+      pwdIsAccessible = !results.containsValue(false)
+      if (!pwdIsAccessible) {
+        logger.warn(
+          """The directory of a certain regionserver is not accessible,
+            |please add 'cd ~' before 'start regionserver' in your regionserver start script.""")
+      }
+    }
 
     if (checkLogicalTableExist(tableName, metadataTable)) {
       throw new Exception(s"The logical table: $tableName already exists")
@@ -262,7 +313,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
   }
 
   override def lookupRelation(tableIdentifier: Seq[String],
-                     alias: Option[String] = None): LogicalPlan = {
+                              alias: Option[String] = None): LogicalPlan = {
     val tableName = tableIdentifier.head
     val hbaseRelation = getTable(tableName)
     if (hbaseRelation.isEmpty) {
@@ -278,14 +329,14 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
    * isTemporary is a Boolean value indicates if a table is a temporary or not.
    */
   override def getTables(databaseName: Option[String]): Seq[(String, Boolean)] = {
-     var tables = getAllTableName
-     tables.map((_, false))
+    val tables = getAllTableName
+    tables.map((_, false))
   }
 
   override def refreshTable(databaseName: String, tableName: String): Unit = {
-    
+
   }
-  
+
   def deleteTable(tableName: String): Unit = {
     val metadataTable = getMetadataTable
     if (!checkLogicalTableExist(tableName, metadataTable)) {
