@@ -35,6 +35,9 @@ object TestHbase
   val nDataNodes: Int = 1
   val nMasters: Int = 1
 
+  catalog.deploySuccessfully = Some(true)
+  catalog.pwdIsAccessible = true
+
   logDebug(s"Spin up hbase minicluster w/ $nMasters master, $nRegionServers RS, $nDataNodes dataNodes")
 
   @transient val cluster: MiniHBaseCluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
