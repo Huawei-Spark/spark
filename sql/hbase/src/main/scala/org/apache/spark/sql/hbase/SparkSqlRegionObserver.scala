@@ -133,6 +133,7 @@ abstract class BaseRegionScanner extends RegionScanner {
 
 class SparkSqlRegionObserver extends BaseRegionObserver {
   lazy val logger = Logger.getLogger(getClass.getName)
+  lazy val EmptyArray = Array[Byte]()
 
   override def postScannerOpen(e: ObserverContext[RegionCoprocessorEnvironment],
                                scan: Scan,
@@ -172,16 +173,16 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
         override def next(results: java.util.List[Cell]): Boolean = {
           val hasMore: Boolean = result.hasNext
           if (hasMore) {
-            val nextRow: Seq[Any] = result.next().toSeq
-            val nextRowWithDateType = nextRow zip outputDataType
-            val cellsInRow: Seq[Cell] = nextRowWithDateType.map {
-              case (data, dataType) =>
-                val dataOfBytes: HBaseRawType = {
-                  if (data == null) null else DataTypeUtils.dataToBytes(data, dataType)
-                }
-                new KeyValue(Array[Byte](), Array[Byte](), Array[Byte](), dataOfBytes)
+            val nextRow = result.next()
+            val numOfCells = outputDataType.length
+            for (i <- 0 until numOfCells) {
+              val data = nextRow(i)
+              val dataType = outputDataType(i)
+              val dataOfBytes: HBaseRawType = {
+                if (data == null) null else DataTypeUtils.dataToBytes(data, dataType)
+              }
+              results.add(new KeyValue(EmptyArray, EmptyArray, EmptyArray, dataOfBytes))
             }
-            results.addAll(cellsInRow)
           }
           hasMore
         }

@@ -825,12 +825,11 @@ private[hbase] case class HBaseRelation(
   def buildRowAfterCoprocessor(projections: Seq[(Attribute, Int)],
                                result: Result,
                                row: MutableRow): Row = {
-    assert(projections.size == row.length, "Projection size and row size mismatched")
-    projections.zipWithIndex.foreach { case (p, i) =>
+    for (i <- projections.indices) {
       val kv: Cell = result.rawCells()(i)
       val colValue: HBaseRawType = CellUtil.cloneValue(kv)
       DataTypeUtils.setRowColumnFromHBaseRawType(
-        row, p._2, colValue, 0, colValue.length, p._1.dataType)
+        row, projections(i)._2, colValue, 0, colValue.length, projections(i)._1.dataType)
     }
     row
   }
@@ -838,7 +837,6 @@ private[hbase] case class HBaseRelation(
   def buildRow(projections: Seq[(Attribute, Int)],
                result: Result,
                row: MutableRow): Row = {
-    assert(projections.size == row.length, "Projection size and row size mismatched")
     val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach {
       p =>
