@@ -123,19 +123,11 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
     hTableDescriptor.hasCoprocessor("org.apache.spark.sql.hbase.SparkSqlRegionObserver")
   }
 
-  @transient var deploySuccessfully: Option[Boolean] = _
+  @transient protected[hbase] var deploySuccessfully_internal: Option[Boolean] = null
 
-  // When building the connection to the hbase table, we need to check
-  // whether the current directory in the regionserver is accessible or not.
-  // Or else it might crash the HBase regionserver!!!
-  // For details, please read the comment in CheckDirEndPointImpl.
-  @transient var pwdIsAccessible = false
-
-  def createTable(tableName: String, hbaseNamespace: String, hbaseTableName: String,
-                  allColumns: Seq[AbstractColumn], splitKeys: Array[Array[Byte]]): HBaseRelation = {
-    val metadataTable = getMetadataTable
-
-    if (deploySuccessfully == null) {
+  def deploySuccessfully: Option[Boolean] = {
+    if (deploySuccessfully_internal == null) {
+      val metadataTable = getMetadataTable
       // When building the connection to the hbase table, we need to check
       // whether the current directory in the regionserver is accessible or not.
       // Or else it might crash the HBase regionserver!!!
@@ -155,8 +147,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
         classOf[CheckDirProtos.CheckDirService], null, null, batch
       )
 
-      deploySuccessfully = Some(!results.isEmpty)
-      if (!deploySuccessfully.get) {
+      deploySuccessfully_internal = Some(!results.isEmpty)
+      if (results.isEmpty) {
         logger.warn( """Not deplyed successfully""")
       }
 
@@ -167,6 +159,18 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
             |please add 'cd ~' before 'start regionserver' in your regionserver start script.""")
       }
     }
+    deploySuccessfully_internal
+  }
+
+  // When building the connection to the hbase table, we need to check
+  // whether the current directory in the regionserver is accessible or not.
+  // Or else it might crash the HBase regionserver!!!
+  // For details, please read the comment in CheckDirEndPointImpl.
+  @transient var pwdIsAccessible = false
+
+  def createTable(tableName: String, hbaseNamespace: String, hbaseTableName: String,
+                  allColumns: Seq[AbstractColumn], splitKeys: Array[Array[Byte]]): HBaseRelation = {
+    val metadataTable = getMetadataTable
 
     if (checkLogicalTableExist(tableName, metadataTable)) {
       throw new Exception(s"The logical table: $tableName already exists")
