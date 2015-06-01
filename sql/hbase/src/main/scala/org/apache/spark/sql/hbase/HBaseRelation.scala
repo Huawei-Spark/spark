@@ -19,10 +19,8 @@ package org.apache.spark.sql.hbase
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.hadoop.hbase.client.coprocessor.Batch
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
-import org.apache.hadoop.hbase.ipc.BlockingRpcCallback
 import org.apache.log4j.Logger
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
@@ -770,12 +768,7 @@ private[hbase] case class HBaseRelation(
           filters.get
         }
       } else {
-        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-        val left = new FirstKeyOnlyFilter
-        val right = new KeyOnlyFilter
-        filterList.addFilter(left)
-        filterList.addFilter(right)
-        filterList
+        new FirstKeyOnlyFilter
       }
     } else {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
