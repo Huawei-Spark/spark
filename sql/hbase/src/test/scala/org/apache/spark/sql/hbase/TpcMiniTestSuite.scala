@@ -274,4 +274,10 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
     val rows = runSql(sql)
     assert(rows.length == 12)
   }
+
+  test("Query 21") {
+    val sql = "SELECT * FROM store_sales WHERE ss_ticket_number + 0 = 3 and ss_sold_date_sk + 0 > 0"
+    val rows = runSql(sql)
+    assert(rows.length == 13)
+  }
 }

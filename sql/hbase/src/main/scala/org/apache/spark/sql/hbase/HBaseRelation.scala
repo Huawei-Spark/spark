@@ -790,17 +790,17 @@ private[hbase] case class HBaseRelation(
     if (finalFilters != null) {
       if (otherFilters.isDefined) {
         // add custom filter to handle other filters part
-        val skipFilter = new HBaseSkipScanFilter(this, otherFilters.get)
+        val customFilter = new HBaseCustomFilter(this, otherFilters.get)
         val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
         filterList.addFilter(finalFilters)
-        filterList.addFilter(skipFilter)
+        filterList.addFilter(customFilter)
         scan.setFilter(filterList)
       } else {
         scan.setFilter(finalFilters)
       }
     } else if (otherFilters.isDefined) {
-      val skipFilter = new HBaseSkipScanFilter(this, otherFilters.get)
-      scan.setFilter(skipFilter)
+      val customFilter = new HBaseCustomFilter(this, otherFilters.get)
+      scan.setFilter(customFilter)
     }
 
     if (pushdownPreds.nonEmpty) {

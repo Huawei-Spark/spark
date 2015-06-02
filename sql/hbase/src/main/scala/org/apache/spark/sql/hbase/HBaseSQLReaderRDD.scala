@@ -166,7 +166,9 @@ class HBaseSQLReaderRDD(
       val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters,
         pushablePreds, output)
       val scanner = relation.htable.getScanner(scan)
-      createIterator(context, scanner, otherFilters)
+
+      //      createIterator(context, scanner, otherFilters)
+      createIterator(context, scanner, None)
     } else {
       // expandedCPRs is not empty
       val isPointRanges = expandedCPRs.forall(
@@ -254,7 +256,8 @@ class HBaseSQLReaderRDD(
           relation.buildCPRFilterList(output, filterPred, expandedCPRs)
         val scan = relation.buildScan(start, end, filters, otherFilters, preds, output)
         val scanner = relation.htable.getScanner(scan)
-        createIterator(context, scanner, otherFilters)
+        // createIterator(context, scanner, otherFilters)
+        createIterator(context, scanner, None)
       }
     }
   }

@@ -36,7 +36,7 @@ object DataTypeUtils {
   def bytesToData(src: HBaseRawType, offset: Int, length: Int, dt: DataType): Any = {
     dt match {
       case BooleanType => BytesUtils.toBoolean(src, offset)
-      case ByteType => src(offset)
+      case ByteType => BytesUtils.toByte(src, offset)
       case DoubleType => BytesUtils.toDouble(src, offset)
       case FloatType => BytesUtils.toFloat(src, offset)
       case IntegerType => BytesUtils.toInt(src, offset)

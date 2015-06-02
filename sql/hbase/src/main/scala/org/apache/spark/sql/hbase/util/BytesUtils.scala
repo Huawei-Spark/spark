@@ -88,6 +88,19 @@ object BytesUtils {
   }
 
   /**
+   * append one to the byte array
+   * @param input the byte array
+   * @return the modified byte array
+   */
+  def addOneString(input: HBaseRawType): HBaseRawType = {
+    val len = input.length
+    val result = new HBaseRawType(len + 1)
+    Array.copy(input, 0, result, 0, len)
+    result(len) = 0x01
+    result
+  }
+
+  /**
    * add one to the unsigned byte array
    * @param input the unsigned byte array
    * @return null if the byte array is all 0xff, otherwise increase by 1
