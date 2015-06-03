@@ -819,12 +819,6 @@ private[hbase] case class HBaseRelation(
           }
         }
       }
-    } else if (otherFilters.isDefined) {
-      distinctProjectionList.foreach {
-        case p =>
-          val nkc = nonKeyColumns.find(_.sqlName == p).get
-          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
-      }
     }
     scan
   }
