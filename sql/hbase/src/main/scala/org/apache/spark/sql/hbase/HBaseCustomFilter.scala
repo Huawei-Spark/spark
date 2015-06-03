@@ -428,20 +428,30 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       currentNode = currentNode.parent
       if (currentNode == null) {
         (ReturnCode.SKIP, null)
-      }
-      val dt = currentNode.dt
-      val value = currentNode.currentValue
-      if (dt == StringType) {
-        val newString = BytesUtils.addOneString(BytesUtils.create(dt).toBytes(value))
-        val newValue = DataTypeUtils.bytesToData(newString, 0, newString.length, dt)
-        currentNode.currentValue = newValue
       } else {
-        val newArray = BytesUtils.addOne(BytesUtils.create(dt).toBytes(value))
-        val newValue = DataTypeUtils.bytesToData(newArray, 0, newArray.length, dt)
-        currentNode.currentValue = newValue
+        val dt = currentNode.dt
+        val value = currentNode.currentValue
+        var canAddOne: Boolean = true
+        if (dt == StringType) {
+          val newString = BytesUtils.addOneString(BytesUtils.create(dt).toBytes(value))
+          val newValue = DataTypeUtils.bytesToData(newString, 0, newString.length, dt)
+          currentNode.currentValue = newValue
+        } else {
+          val newArray = BytesUtils.addOne(BytesUtils.create(dt).toBytes(value))
+          if (newArray == null) {
+            canAddOne = false
+          } else {
+            val newValue = DataTypeUtils.bytesToData(newArray, 0, newArray.length, dt)
+            currentNode.currentValue = newValue
+          }
+        }
+        if (canAddOne) {
+          hasSeeked = true
+          findNextHint()
+        } else {
+          (ReturnCode.NEXT_ROW, nextRowKey)
+        }
       }
-      hasSeeked = true
-      findNextHint()
     }
   }
 
