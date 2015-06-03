@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.hbase
 
+import java.util.Arrays
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.HBaseConfiguration
@@ -830,6 +832,52 @@ private[hbase] case class HBaseRelation(
       val colValue: HBaseRawType = CellUtil.cloneValue(kv)
       DataTypeUtils.setRowColumnFromHBaseRawType(
         row, projections(i)._2, colValue, 0, colValue.length, projections(i)._1.dataType)
+//      if (kv == null || kv.getValueLength == 0) {
+//        DataTypeUtils.setRowColumnFromHBaseRawType(
+//          row, projections(i)._2, null, 0, 0, projections(i)._1.dataType)
+//      } else {
+//        DataTypeUtils.setRowColumnFromHBaseRawType(
+//          row, projections(i)._2, kv.getValueArray, kv.getValueOffset,
+//          kv.getValueLength, projections(i)._1.dataType)
+//      }
+    }
+    row
+  }
+
+  def buildRowInCoprocessor(projections: Seq[(Attribute, Int)],
+                            result: java.util.List[Cell],
+                            row: MutableRow): Row = {
+    def getColumnLatestCell(family: Array[Byte],
+                            qualifier: Array[Byte]): Cell = {
+      // Todo: binary search
+      if (result == null || result.isEmpty) null
+      else {
+        result.find(cell => {
+          val kv: KeyValue = KeyValueUtil.ensureKeyValue(cell)
+          kv.matchingColumn(family, qualifier)
+        }).orNull
+      }
+    }
+
+    lazy val rowKeys = HBaseKVHelper.decodingRawKeyColumns(
+      result.head.getRowArray, keyColumns, result.head.getRowOffset)
+    projections.foreach {
+      p =>
+        columnMap.get(p._1.name).get match {
+          case column: NonKeyColumn =>
+            val kv = getColumnLatestCell(column.familyRaw, column.qualifierRaw)
+            if (kv == null || kv.getValueLength == 0) {
+              DataTypeUtils.setRowColumnFromHBaseRawType(
+                row, p._2, null, 0, 0, column.dataType)
+            } else {
+              DataTypeUtils.setRowColumnFromHBaseRawType(
+                row, p._2, kv.getValueArray, kv.getValueOffset, kv.getValueLength, column.dataType)
+            }
+          case keyIndex: Int =>
+            val (start, length) = rowKeys(keyIndex)
+            DataTypeUtils.setRowColumnFromHBaseRawType(
+              row, p._2, result.head.getRowArray, start, length, keyColumns(keyIndex).dataType)
+        }
     }
     row
   }

@@ -60,7 +60,6 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
     var finished: Boolean = false
     var gotNext: Boolean = false
     val results: java.util.List[Cell] = new java.util.ArrayList[Cell]()
-    var result: Result = null
     val row = new GenericMutableRow(finalOutput.size)
 
     val iterator = new Iterator[Row] {
@@ -70,7 +69,6 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
             results.clear()
             scanner.nextRaw(results)
             finished = results.isEmpty
-            result = Result.create(results)
             gotNext = true
           }
         }
@@ -83,7 +81,7 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
       override def next(): Row = {
         if (hasNext) {
           gotNext = false
-          relation.buildRow(projections, result, row)
+          relation.buildRowInCoprocessor(projections, results, row)
         } else {
           null
         }
