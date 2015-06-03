@@ -59,7 +59,7 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
     val projections = finalOutput.zipWithIndex
     var finished: Boolean = false
     var gotNext: Boolean = false
-    val results: java.util.List[Cell] = new java.util.ArrayList[Cell]()
+    val results: java.util.ArrayList[Cell] = new java.util.ArrayList[Cell]()
     val row = new GenericMutableRow(finalOutput.size)
 
     val iterator = new Iterator[Row] {

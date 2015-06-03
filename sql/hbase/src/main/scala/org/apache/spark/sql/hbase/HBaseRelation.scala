@@ -16,26 +16,21 @@
  */
 package org.apache.spark.sql.hbase
 
-import java.util.Arrays
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase._
-import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.{HBaseConfiguration, _}
 import org.apache.hadoop.hbase.client.{Get, HTable, Put, Result, Scan}
 import org.apache.hadoop.hbase.filter._
 import org.apache.log4j.Logger
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, _}
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.types.Range
-import org.apache.spark.sql.hbase.util.{DataTypeUtils, HBaseKVHelper, BytesUtils, Util}
-import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, LogicalRelation}
-import org.apache.spark.sql.sources.{RelationProvider, InsertableRelation}
-import org.apache.spark.sql.catalyst.expressions.AttributeReference
+import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils, HBaseKVHelper, Util}
+import org.apache.spark.sql.sources.{BaseRelation, CatalystScan, InsertableRelation, LogicalRelation, RelationProvider}
+import org.apache.spark.sql.types._
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -832,30 +827,53 @@ private[hbase] case class HBaseRelation(
       val colValue: HBaseRawType = CellUtil.cloneValue(kv)
       DataTypeUtils.setRowColumnFromHBaseRawType(
         row, projections(i)._2, colValue, 0, colValue.length, projections(i)._1.dataType)
-//      if (kv == null || kv.getValueLength == 0) {
-//        DataTypeUtils.setRowColumnFromHBaseRawType(
-//          row, projections(i)._2, null, 0, 0, projections(i)._1.dataType)
-//      } else {
-//        DataTypeUtils.setRowColumnFromHBaseRawType(
-//          row, projections(i)._2, kv.getValueArray, kv.getValueOffset,
-//          kv.getValueLength, projections(i)._1.dataType)
-//      }
+      //      if (kv == null || kv.getValueLength == 0) {
+      //        DataTypeUtils.setRowColumnFromHBaseRawType(
+      //          row, projections(i)._2, null, 0, 0, projections(i)._1.dataType)
+      //      } else {
+      //        DataTypeUtils.setRowColumnFromHBaseRawType(
+      //          row, projections(i)._2, kv.getValueArray, kv.getValueOffset,
+      //          kv.getValueLength, projections(i)._1.dataType)
+      //      }
     }
     row
   }
 
   def buildRowInCoprocessor(projections: Seq[(Attribute, Int)],
-                            result: java.util.List[Cell],
+                            result: java.util.ArrayList[Cell],
                             row: MutableRow): Row = {
     def getColumnLatestCell(family: Array[Byte],
                             qualifier: Array[Byte]): Cell = {
-      // Todo: binary search
+      // 0 means equal, >0 means larger, <0 means smaller
+      def compareCellWithExpectedOne(cell: Cell): Int = {
+        val compare = Bytes.compareTo(
+          cell.getFamilyArray, cell.getFamilyOffset, cell.getFamilyLength,
+          family, 0, family.length)
+        if (compare != 0) compare
+        else {
+          Bytes.compareTo(
+            cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength,
+            qualifier, 0, qualifier.length)
+        }
+      }
+
+      def binarySearchTheArrayList(startIndex: Int, endIndex: Int): Cell = {
+        if (startIndex > endIndex) null
+        else {
+          val midIndex = (startIndex + endIndex) >>> 1
+          val cell = result.get(midIndex)
+          // 0 means equal, >0 means larger, <0 means smaller
+          compareCellWithExpectedOne(cell) match {
+            case 0 => cell
+            case i if i < 0 => binarySearchTheArrayList(midIndex + 1, endIndex)
+            case i if i > 0 => binarySearchTheArrayList(startIndex, midIndex - 1)
+          }
+        }
+      }
+
       if (result == null || result.isEmpty) null
       else {
-        result.find(cell => {
-          val kv: KeyValue = KeyValueUtil.ensureKeyValue(cell)
-          kv.matchingColumn(family, qualifier)
-        }).orNull
+        binarySearchTheArrayList(0, result.length - 1)
       }
     }
 
@@ -885,7 +903,7 @@ private[hbase] case class HBaseRelation(
   def buildRow(projections: Seq[(Attribute, Int)],
                result: Result,
                row: MutableRow): Row = {
-    val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
+    lazy val rowKeys = HBaseKVHelper.decodingRawKeyColumns(result.getRow, keyColumns)
     projections.foreach {
       p =>
         columnMap.get(p._1.name).get match {
