@@ -56,8 +56,10 @@ object HBaseKVHelper {
    * @param keyColumns the sequence of key columns
    * @return sequence of information in (offset, length) tuple
    */
-  def decodingRawKeyColumns(rowKey: HBaseRawType, keyColumns: Seq[KeyColumn]): Seq[(Int, Int)] = {
-    var index = 0
+  def decodingRawKeyColumns(rowKey: HBaseRawType,
+                            keyColumns: Seq[KeyColumn],
+                            startIndex: Int = 0): Seq[(Int, Int)] = {
+    var index = startIndex
     keyColumns.map {
       case c =>
         if (index >= rowKey.length) (-1, -1)
