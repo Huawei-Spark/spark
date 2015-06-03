@@ -755,7 +755,7 @@ private[hbase] case class HBaseRelation(
     var distinctProjectionList = projectionList.map(_.name)
     if (otherFilters.isDefined) {
       distinctProjectionList =
-        distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name))
+        distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name)).distinct
     }
     // filter out the key columns
     distinctProjectionList =
@@ -812,12 +812,18 @@ private[hbase] case class HBaseRelation(
         // to avoid a full projection
         distinctProjectionList = pushdownNameSet.toSeq.distinct
         if (distinctProjectionList.nonEmpty && distinctProjectionList.size < nonKeyColumns.size) {
-          distinctProjectionList.map {
+          distinctProjectionList.foreach {
             case p =>
               val nkc = nonKeyColumns.find(_.sqlName == p).get
               scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
           }
         }
+      }
+    } else if (otherFilters.isDefined) {
+      distinctProjectionList.foreach {
+        case p =>
+          val nkc = nonKeyColumns.find(_.sqlName == p).get
+          scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
       }
     }
     scan
