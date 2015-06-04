@@ -284,13 +284,13 @@ class TpcMiniTestSuite extends HBaseIntegrationTestBase {
   test("Query 22") {
     val sql = "SELECT ss_item_sk, ss_ticket_number, SUM(ss_wholesale_cost) AS sum_wholesale_cost FROM store_sales WHERE ss_ticket_number >= 3 AND ss_ticket_number <= 4 group by ss_item_sk, ss_ticket_number"
     val rows = runSql(sql)
-    assert(rows.length == 23)
+    assert(rows.length == 24)
   }
 
   test("Query 23") {
     val sql = "SELECT ss_item_sk, ss_ticket_number, min(ss_wholesale_cost) as min_wholesale_cost, max(ss_wholesale_cost) as max_wholesale_cost, avg(ss_wholesale_cost) as avg_wholesale_cost FROM store_sales WHERE ss_ticket_number >= 3 and ss_ticket_number <= 3 GROUP BY ss_item_sk, ss_ticket_number"
     val rows = runSql(sql)
-    assert(rows.length == 13)
+    assert(rows.length == 14)
   }
 
   test("Query 24") {
