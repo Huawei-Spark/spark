@@ -24,8 +24,10 @@ import org.apache.hadoop.hbase.filter._
 import org.apache.log4j.Logger
 import org.apache.spark.TaskContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, SQLContext}
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, _}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations.partialPredicateReducer
 import org.apache.spark.sql.hbase.catalyst.NotPusher
 import org.apache.spark.sql.hbase.types.Range
 import org.apache.spark.sql.hbase.util.{BytesUtils, DataTypeUtils, HBaseKVHelper, Util}
@@ -716,6 +718,7 @@ private[hbase] case class HBaseRelation(
   }
 
   def buildScan(start: Option[HBaseRawType], end: Option[HBaseRawType],
+                predicate: Option[Expression],
                 filters: Option[FilterList], otherFilters: Option[Expression],
                 pushdownPreds: Seq[Expression],
                 projectionList: Seq[NamedExpression]): Scan = {
@@ -732,7 +735,7 @@ private[hbase] case class HBaseRelation(
     scan.setCaching(scannerFetchSize)
 
     // add Family to SCAN from projections
-    addColumnFamiliesToScan(scan, filters, otherFilters, pushdownPreds, projectionList)
+    addColumnFamiliesToScan(scan, filters, predicate, otherFilters, pushdownPreds, projectionList)
   }
 
   /**
@@ -746,9 +749,11 @@ private[hbase] case class HBaseRelation(
    */
   def addColumnFamiliesToScan(scan: Scan, filters: Option[FilterList],
                               otherFilters: Option[Expression],
+                              predicate: Option[Expression],
                               pushdownPreds: Seq[Expression],
                               projectionList: Seq[NamedExpression]): Scan = {
     var distinctProjectionList = projectionList.map(_.name)
+    var keyOnlyFilterPresent = false
     if (otherFilters.isDefined) {
       distinctProjectionList =
         distinctProjectionList.union(otherFilters.get.references.toSeq.map(_.name)).distinct
@@ -757,7 +762,7 @@ private[hbase] case class HBaseRelation(
     distinctProjectionList =
       distinctProjectionList.filterNot(p => keyColumns.exists(_.sqlName == p))
 
-    val finalFilters = if (distinctProjectionList.isEmpty) {
+    var finalFilters = if (distinctProjectionList.isEmpty) {
       if (filters.isDefined && !filters.get.getFilters.isEmpty) {
         if (filters.get.getFilters.size() == 1) {
           filters.get.getFilters.get(0)
@@ -765,6 +770,7 @@ private[hbase] case class HBaseRelation(
           filters.get
         }
       } else {
+        keyOnlyFilterPresent = true
         new FirstKeyOnlyFilter
       }
     } else {
@@ -778,6 +784,57 @@ private[hbase] case class HBaseRelation(
         null
       }
     }
+
+    if (predicate.nonEmpty) {
+      val pred = predicate.get
+      val predRefs = pred.references.toSeq
+      val predicateNameSet = predRefs.map(_.name).
+        filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
+      val boundPred = BindReferences.bindReference(pred, predRefs)
+      val row = new GenericRow(predRefs.size)
+      val prRes = boundPred.partialReduce(row, predRefs, true)
+      if (distinctProjectionList.toSet.subsetOf(predicateNameSet)) {
+        // If the pushed down predicate is present and the projection is a subset of the columns
+        // of the pushed filters, use the columns as projections
+        // to avoid a full projection
+        distinctProjectionList = predicateNameSet.toSeq.distinct
+        val boundPred = BindReferences.bindReference(pred, predRefs)
+        val row = new GenericRow(predRefs.size)
+        val prRes = boundPred.partialReduce(row, predRefs, true)
+        val (addColumn, nkcols) = prRes match {
+          case (false, null) => (true, distinctProjectionList)
+          case (true, null) => (false, null)
+          case (null, reducedPred) => {
+            val nkRefs = reducedPred.references.filterNot(
+              p => keyColumns.exists(_.sqlName == p))
+            if (nkRefs.isEmpty) {
+              // Only key-related predicate is present, add FirstKeyOnlyFIlter
+              if (!keyOnlyFilterPresent) {
+                if (finalFilters == null) {
+                  finalFilters = new FirstKeyOnlyFilter
+                } else {
+                  val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+                  filterList.addFilter(new FirstKeyOnlyFilter)
+                  filterList.addFilter(finalFilters)
+                  finalFilters = filterList
+                }
+              }
+              (false, null)
+            } else {
+              (true, nkRefs.toSeq)
+            }
+          }
+        }
+        if (addColumn && nkcols.nonEmpty && nkcols.size < nonKeyColumns.size) {
+          nkcols.foreach {
+            case p =>
+              val nkc = nonKeyColumns.find(_.sqlName == p).get
+              scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
+          }
+        }
+      }
+    }
+
     if (finalFilters != null) {
       if (otherFilters.isDefined) {
         // add custom filter to handle other filters part
@@ -792,24 +849,6 @@ private[hbase] case class HBaseRelation(
     } else if (otherFilters.isDefined) {
       val customFilter = new HBaseCustomFilter(this, otherFilters.get)
       scan.setFilter(customFilter)
-    }
-
-    if (pushdownPreds.nonEmpty) {
-      val pushdownNameSet = pushdownPreds.flatMap(_.references).map(_.name).
-        filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
-      if (distinctProjectionList.toSet.subsetOf(pushdownNameSet)) {
-        // If the pushed down predicate is present and the projection is a subset of the columns
-        // of the pushed filters, use the columns as projections
-        // to avoid a full projection
-        distinctProjectionList = pushdownNameSet.toSeq.distinct
-        if (distinctProjectionList.nonEmpty && distinctProjectionList.size < nonKeyColumns.size) {
-          distinctProjectionList.foreach {
-            case p =>
-              val nkc = nonKeyColumns.find(_.sqlName == p).get
-              scan.addColumn(nkc.familyRaw, nkc.qualifierRaw)
-          }
-        }
-      }
     }
     scan
   }

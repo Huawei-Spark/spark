@@ -36,7 +36,8 @@ object PartialPredicateOperations {
       }
     }
 
-    def partialReduce(input: Row, schema: Seq[Attribute]): (Any, Expression) = {
+    def partialReduce(input: Row, schema: Seq[Attribute], checkNull: Boolean = false):
+      (Any, Expression) = {
       e match {
         case And(left, right) =>
           val l = left.partialReduce(input, schema)
@@ -157,7 +158,24 @@ object PartialPredicateOperations {
         case n: NamedExpression =>
           val res = n.eval(input)
           (res, n)
-        case IsNull(child) => (null, unboundAttributeReference(e, schema))
+        case IsNull(child) => if (checkNull) {
+            if (child == null) {
+              (true, null)
+            } else {
+              (false, null)
+            }
+          } else {
+            (null, unboundAttributeReference(e, schema))
+          }
+        case IsNotNull(child) => if (checkNull) {
+            if (child == null) {
+              (false, null)
+            } else {
+              (true, null)
+            }
+          } else {
+            (null, unboundAttributeReference(e, schema))
+          }
         // TODO: CAST/Arithmetic could be treated more nicely
         case Cast(_, _) => (null, unboundAttributeReference(e, schema))
         // case BinaryArithmetic => null

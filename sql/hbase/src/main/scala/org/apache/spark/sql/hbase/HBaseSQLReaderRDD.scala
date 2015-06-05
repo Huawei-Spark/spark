@@ -176,20 +176,20 @@ class HBasePostCoprocessorSQLReaderRDD(
   // filter predicate will be used
   override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
-    val predicates = partition.computePredicate(relation)
+    val predicate = partition.computePredicate(relation)
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      RangeCriticalPoint.generateCriticalPointRanges(relation, predicates).
+      RangeCriticalPoint.generateCriticalPointRanges(relation, predicate).
         flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicates)
+      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicate)
       val pushablePreds = if (pushdownPreds.isDefined) {
         ListBuffer[Expression](pushdownPreds.get)
       } else {
         ListBuffer[Expression]()
       }
-      val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters,
-        pushablePreds, output)
+      val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
+        otherFilters, pushablePreds, output)
       setCoprocessor(scan, otherFilters, split.index)
       val scanner = relation.htable.getScanner(scan)
       createIterator(context, scanner, otherFilters)
@@ -278,7 +278,7 @@ class HBasePostCoprocessorSQLReaderRDD(
 
         val (filters, otherFilters, preds) =
           relation.buildCPRFilterList(output, filterPred, expandedCPRs)
-        val scan = relation.buildScan(start, end, filters, otherFilters, preds, output)
+        val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
         setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
         createIterator(context, scanner, otherFilters)
@@ -290,10 +290,11 @@ class HBasePostCoprocessorSQLReaderRDD(
 /**
  * HBaseSQLReaderRDD
  */
-class HBaseSQLReaderRDD( val relation: HBaseRelation,
-                         val codegenEnabled: Boolean,
-                         val output: Seq[Attribute],
-                         val filterPred: Option[Expression],
+class HBaseSQLReaderRDD(
+                         relation: HBaseRelation,
+                         codegenEnabled: Boolean,
+                         output: Seq[Attribute],
+                         @transient filterPred: Option[Expression],
                          @transient sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
 
@@ -405,20 +406,21 @@ class HBaseSQLReaderRDD( val relation: HBaseRelation,
   // filter predicate will be used
   override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
     val partition = split.asInstanceOf[HBasePartition]
-    val predicates = partition.computePredicate(relation)
+    // partition-specific predicate
+    val predicate = partition.computePredicate(relation)
     val expandedCPRs: Seq[MDCriticalPointRange[_]] =
-      RangeCriticalPoint.generateCriticalPointRanges(relation, predicates).
+      RangeCriticalPoint.generateCriticalPointRanges(relation, predicate).
         flatMap(_.flatten(new ArrayBuffer[(Any, NativeType)](relation.dimSize)))
 
     if (expandedCPRs.isEmpty) {
-      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicates)
+      val (filters, otherFilters, pushdownPreds) = relation.buildPushdownFilterList(predicate)
       val pushablePreds = if (pushdownPreds.isDefined) {
         ListBuffer[Expression](pushdownPreds.get)
       } else {
         ListBuffer[Expression]()
       }
-      val scan = relation.buildScan(partition.start, partition.end, filters, otherFilters,
-        pushablePreds, output)
+      val scan = relation.buildScan(partition.start, partition.end, predicate, filters,
+        otherFilters, pushablePreds, output)
       val scanner = relation.htable.getScanner(scan)
 
       //      createIterator(context, scanner, otherFilters)
@@ -507,8 +509,8 @@ class HBaseSQLReaderRDD( val relation: HBaseRelation,
 
 
         val (filters, otherFilters, preds) =
-          relation.buildCPRFilterList(output, filterPred, expandedCPRs)
-        val scan = relation.buildScan(start, end, filters, otherFilters, preds, output)
+          relation.buildCPRFilterList(output, predicate, expandedCPRs)
+        val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
         val scanner = relation.htable.getScanner(scan)
         // createIterator(context, scanner, otherFilters)
         createIterator(context, scanner, None)
