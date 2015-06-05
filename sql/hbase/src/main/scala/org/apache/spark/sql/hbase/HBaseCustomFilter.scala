@@ -192,17 +192,49 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   }
 
   /**
+   * reset the current value and current index of each level
+   * @param level the start level, it will also reset its children
+   * @param dim the level to start to reset
+   * @param start the current level, used by this recursive call
+   */
+  def resetEachLevel(level: Node, dim: Int, start: Int): Unit = {
+    if (start >= dim) {
+      level.currentNodeIndex = 0
+      level.currentValue = null
+    }
+    if (level.children != null) {
+      for (item <- level.children) {
+        resetEachLevel(item, dim, start + 1)
+      }
+    }
+  }
+
+  /**
    * Given the input kv (cell), filter it out, or keep it, or give the next hint
    * the decision is based on input predicate
    */
   override def filterKeyValue(kv: Cell): ReturnCode = {
     if (!nextColFlag) {
+      // reset the index of each level
+      currentRowKey = CellUtil.cloneRow(kv)
+      val inputValues = relation.nativeKeyConvert(Some(currentRowKey))
+      if (currentValues == null) {
+        resetEachLevel(root, 0, 0)
+      } else {
+        var dim = -1
+        for (i <- inputValues.indices if dim >= 0) {
+          if (inputValues(i) != currentValues(i)) {
+            dim = i
+          }
+        }
+        resetEachLevel(root, dim, 0)
+      }
+
       nextColFlag = true
 
       hasSeeked = false
       currentNode = root
-      currentRowKey = CellUtil.cloneRow(kv)
-      currentValues = relation.nativeKeyConvert(Some(currentRowKey))
+      currentValues = inputValues
       currentNode.currentValue = currentValues.head
 
       val result = findNextHint()
@@ -623,7 +655,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       }
     }
 
-    val result  =
+    val result =
       BindReferences.bindReference(remainingPredicate, predReferences).eval(workingRow)
     if (result != null && result.asInstanceOf[Boolean]) {
       filterRowFlag = false
