@@ -136,16 +136,13 @@ class SparkSqlRegionObserver extends BaseRegionObserver {
   override def postScannerOpen(e: ObserverContext[RegionCoprocessorEnvironment],
                                scan: Scan,
                                s: RegionScanner) = {
-    if (scan.getAttributesMap.isEmpty) {
-      println("Work without coprocessor")
+    val serializedPartitionIndex = scan.getAttribute(CoprocessorConstants.COINDEX)
+    if(serializedPartitionIndex == null) {
       logger.debug("Work without coprocessor")
       super.postScannerOpen(e, scan, s)
     } else {
-      println("Work with coprocessor")
       logger.debug("Work with coprocessor")
-      val serializedPartitionIndex = scan.getAttribute(CoprocessorConstants.COINDEX)
       val partitionIndex: Int = Bytes.toInt(serializedPartitionIndex)
-
       val serializedOutputDataType = scan.getAttribute(CoprocessorConstants.COTYPE)
       val outputDataType: Seq[DataType] = SparkSqlSerializer
         .deserialize[Seq[DataType]](serializedOutputDataType)
