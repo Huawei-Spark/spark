@@ -48,13 +48,13 @@ class HBasePostCoprocessorSQLReaderRDD(
                                         @transient sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
   // Since HBase doesn't hold all information,
-  // we need to exeute the subplan in SparkSql first
-  // and then send the excuted subplanRDD to HBase
+  // we need to execute the subplan in SparkSql first
+  // and then send the executed subplanRDD to HBase
   val newSubplanRDD: RDD[Row] = subplan.execute()
   initDependencies(newSubplanRDD)
 
-  // Since the dependecies of RDD is a lazy val,
-  // we need to initialize all its dependenies before sending it to HBase coprocessor
+  // Since the dependencies of RDD is a lazy val,
+  // we need to initialize all its dependencies before sending it to HBase coprocessor
   def initDependencies(rdd: RDD[Row]): Unit = {
     if (rdd.dependencies.nonEmpty) initDependencies(rdd.firstParent[Row])
   }
