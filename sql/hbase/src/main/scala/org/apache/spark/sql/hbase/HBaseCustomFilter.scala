@@ -301,6 +301,11 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       val start: Option[T] = cprs(result).start
       val startInclusive: Boolean = cprs(result).startInclusive
       node.currentNodeIndex = result
+      if (currentNode == root && currentNode.currentNodeIndex > 0) {
+        for (i <- 0 to root.currentNodeIndex - 1) {
+          root.children(i) == null
+        }
+      }
       if (start.isEmpty ||
         (startInclusive && ordering.gteq(input.asInstanceOf[t], start.get.asInstanceOf[t])) ||
         (!startInclusive && ordering.gt(input.asInstanceOf[t], start.get.asInstanceOf[t]))) {
