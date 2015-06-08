@@ -37,8 +37,8 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       if (needToReduce) Project(distinctOutput, origPlan) else origPlan
     }
 
-    // If any current directory of regionserver is not accessible,
-    // we could not use codegen, or else it will lead to crashing the HBase regionserver!!!
+    // If any current directory of region server is not accessible,
+    // we could not use codegen, or else it will lead to crashing the HBase region server!!!
     // For details, please read the comment in CheckDirEndPointImpl.
     var oldScan: HBaseSQLTableScan = null
     lazy val codegenEnabled = catalog.pwdIsAccessible && oldScan.codegenEnabled
@@ -68,7 +68,7 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       // If the plan is tableScan directly, we don't need to use coprocessor
       case HBaseSQLTableScan(_, _, _) => plan
       case Filter(_, child: HBaseSQLTableScan) => plan
-      case _ => {
+      case _ =>
         val result = plan.transformUp {
           case scan: HBaseSQLTableScan if coprocessorIsAvailable(scan.relation) =>
             createSubplanLeft = createSubplan
@@ -76,7 +76,7 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
             scan
 
           // If subplan is needed then we need coprocessor plans for both children
-          case binaryNode: BinaryNode if (createSubplanLeft || createSubplan) =>
+          case binaryNode: BinaryNode if createSubplanLeft || createSubplan =>
             val leftPlan: SparkPlan = if (createSubplanLeft) {
               createSubplanLeft = false
               generateNewSubplan(binaryNode.left)
@@ -102,10 +102,8 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
             val newPlan = generateNewSubplan(limit.child)
             limit.withNewChildren(Seq(newPlan))
         }
-        // Use coprocessor even without shufffling
-        if (createSubplan) generateNewSubplan(result)
-        else result
-      }
+        // Use coprocessor even without shuffling
+        if (createSubplan) generateNewSubplan(result) else result
     }
   }
 }
