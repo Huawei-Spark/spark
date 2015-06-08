@@ -92,7 +92,7 @@ class HBasePostCoprocessorSQLReaderRDD(
     } else {
       head
     }
-    if (list.size == 0) {
+    if (list.isEmpty) {
       null
     } else {
       HBaseKVHelper.encodingRawKeyColumns(list)
@@ -237,7 +237,7 @@ class HBasePostCoprocessorSQLReaderRDD(
       else {
         // isPointRanges is false
         // calculate the range start
-        val startRowKey = constructRowKey(expandedCPRs(0), isStart = true)
+        val startRowKey = constructRowKey(expandedCPRs.head, isStart = true)
         val start = if (startRowKey != null) {
           if (partition.start.isDefined && Bytes.compareTo(partition.start.get, startRowKey) > 0) {
             Some(partition.start.get)
@@ -291,11 +291,11 @@ class HBasePostCoprocessorSQLReaderRDD(
  * HBaseSQLReaderRDD
  */
 class HBaseSQLReaderRDD(
-                         relation: HBaseRelation,
-                         codegenEnabled: Boolean,
-                         output: Seq[Attribute],
-                         @transient filterPred: Option[Expression],
-                         @transient sqlContext: SQLContext)
+                         val relation: HBaseRelation,
+                         val codegenEnabled: Boolean,
+                         val output: Seq[Attribute],
+                         @transient val filterPred: Option[Expression],
+                         @transient val sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
 
   override def getPartitions: Array[Partition] = {

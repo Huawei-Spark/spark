@@ -792,7 +792,7 @@ private[hbase] case class HBaseRelation(
         filterNot(p => keyColumns.exists(_.sqlName == p)).toSet
       val boundPred = BindReferences.bindReference(pred, predRefs)
       val row = new GenericRow(predRefs.size)
-      val prRes = boundPred.partialReduce(row, predRefs, true)
+      val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
       if (distinctProjectionList.toSet.subsetOf(predicateNameSet)) {
         // If the pushed down predicate is present and the projection is a subset of the columns
         // of the pushed filters, use the columns as projections
@@ -800,15 +800,15 @@ private[hbase] case class HBaseRelation(
         distinctProjectionList = predicateNameSet.toSeq.distinct
         val boundPred = BindReferences.bindReference(pred, predRefs)
         val row = new GenericRow(predRefs.size)
-        val prRes = boundPred.partialReduce(row, predRefs, true)
+        val prRes = boundPred.partialReduce(row, predRefs, checkNull = true)
         val (addColumn, nkcols) = prRes match {
-          case (false, null) => (true, distinctProjectionList)
-          case (true, null) => (false, null)
-          case (null, reducedPred) => {
-            val nkRefs = reducedPred.references.filterNot(
+          case (false, _) => (true, distinctProjectionList)
+          case (true, _) => (false, null)
+          case (null, reducedPred) =>
+            val nkRefs = reducedPred.references.map(_.name).filterNot(
               p => keyColumns.exists(_.sqlName == p))
             if (nkRefs.isEmpty) {
-              // Only key-related predicate is present, add FirstKeyOnlyFIlter
+              // Only key-related predicate is present, add FirstKeyOnlyFilter
               if (!keyOnlyFilterPresent) {
                 if (finalFilters == null) {
                   finalFilters = new FirstKeyOnlyFilter
@@ -823,7 +823,6 @@ private[hbase] case class HBaseRelation(
             } else {
               (true, nkRefs.toSeq)
             }
-          }
         }
         if (addColumn && nkcols.nonEmpty && nkcols.size < nonKeyColumns.size) {
           nkcols.foreach {
