@@ -106,7 +106,8 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(hbaseContext)
 
     val lll = relation.output.find(_.name == "column2").get
     val llr = Literal(8, IntegerType)
@@ -232,7 +233,8 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(hbaseContext)
 
     val lll = relation.output.find(_.name == "column1").get
     val llr = Literal(8, IntegerType)
@@ -265,7 +267,8 @@ class HBasePartitionerSuite extends HBaseIntegrationTestBase {
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(hbaseContext)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(hbaseContext)
 
     val lll = relation.output.find(_.name == "column1").get
     val llr = Literal(8, IntegerType)

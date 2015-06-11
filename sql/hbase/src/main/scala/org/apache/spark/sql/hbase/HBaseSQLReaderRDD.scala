@@ -294,6 +294,7 @@ class HBaseSQLReaderRDD(
                          val relation: HBaseRelation,
                          val codegenEnabled: Boolean,
                          val output: Seq[Attribute],
+                         val deploySuccessfully: Option[Boolean],
                          @transient val filterPred: Option[Expression],
                          @transient val sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
@@ -423,8 +424,11 @@ class HBaseSQLReaderRDD(
         otherFilters, pushablePreds, output)
       val scanner = relation.htable.getScanner(scan)
 
-      //      createIterator(context, scanner, otherFilters)
-      createIterator(context, scanner, None)
+      if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+        createIterator(context, scanner, None)
+      } else {
+        createIterator(context, scanner, otherFilters)
+      }
     } else {
       // expandedCPRs is not empty
       val isPointRanges = expandedCPRs.forall(
@@ -512,8 +516,11 @@ class HBaseSQLReaderRDD(
           relation.buildCPRFilterList(output, predicate, expandedCPRs)
         val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
         val scanner = relation.htable.getScanner(scan)
-        // createIterator(context, scanner, otherFilters)
-        createIterator(context, scanner, None)
+        if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+          createIterator(context, scanner, None)
+        } else {
+          createIterator(context, scanner, otherFilters)
+        }
       }
     }
   }

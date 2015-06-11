@@ -90,7 +90,8 @@ private[hbase] case class HBaseRelation(
                                          tableName: String,
                                          hbaseNamespace: String,
                                          hbaseTableName: String,
-                                         allColumns: Seq[AbstractColumn])
+                                         allColumns: Seq[AbstractColumn],
+                                         deploySuccessfully: Option[Boolean])
                                        (@transient var context: SQLContext)
   extends BaseRelation with CatalystScan with InsertableRelation with Serializable {
   @transient lazy val logger = Logger.getLogger(getClass.getName)
@@ -712,6 +713,7 @@ private[hbase] case class HBaseRelation(
       this,
       context.conf.codegenEnabled,
       requiredColumns,
+      deploySuccessfully,
       filterPredicate, // PartitionPred : Option[Expression]
       context
     )
@@ -834,20 +836,24 @@ private[hbase] case class HBaseRelation(
       }
     }
 
-    if (finalFilters != null) {
-      if (otherFilters.isDefined) {
-        // add custom filter to handle other filters part
+    if (deploySuccessfully.isDefined && deploySuccessfully.get) {
+      if (finalFilters != null) {
+        if (otherFilters.isDefined) {
+          // add custom filter to handle other filters part
+          val customFilter = new HBaseCustomFilter(this, otherFilters.get)
+          val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
+          filterList.addFilter(finalFilters)
+          filterList.addFilter(customFilter)
+          scan.setFilter(filterList)
+        } else {
+          scan.setFilter(finalFilters)
+        }
+      } else if (otherFilters.isDefined) {
         val customFilter = new HBaseCustomFilter(this, otherFilters.get)
-        val filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL)
-        filterList.addFilter(finalFilters)
-        filterList.addFilter(customFilter)
-        scan.setFilter(filterList)
-      } else {
-        scan.setFilter(finalFilters)
+        scan.setFilter(customFilter)
       }
-    } else if (otherFilters.isDefined) {
-      val customFilter = new HBaseCustomFilter(this, otherFilters.get)
-      scan.setFilter(customFilter)
+    } else {
+      if (finalFilters != null) scan.setFilter(finalFilters)
     }
     scan
   }

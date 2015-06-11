@@ -198,7 +198,7 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
       throw new Exception(s"row key $tableName exists")
     } else {
       val hbaseRelation = HBaseRelation(tableName, hbaseNamespace, hbaseTableName,
-        allColumns)(hbaseContext)
+        allColumns, deploySuccessfully)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation, metadataTable)
@@ -218,7 +218,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
       val relation = result.get
       val allColumns = relation.allColumns.filter(_.sqlName != columnName)
       val hbaseRelation = HBaseRelation(relation.tableName,
-        relation.hbaseNamespace, relation.hbaseTableName, allColumns)(hbaseContext)
+        relation.hbaseNamespace, relation.hbaseTableName,
+        allColumns, deploySuccessfully)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation, metadataTable)
@@ -235,7 +236,8 @@ private[hbase] class HBaseCatalog(@transient hbaseContext: SQLContext,
       val relation = result.get
       val allColumns = relation.allColumns :+ column
       val hbaseRelation = HBaseRelation(relation.tableName,
-        relation.hbaseNamespace, relation.hbaseTableName, allColumns)(hbaseContext)
+        relation.hbaseNamespace, relation.hbaseTableName,
+        allColumns, deploySuccessfully)(hbaseContext)
       hbaseRelation.setConfig(configuration)
 
       writeObjectToTable(hbaseRelation, metadataTable)

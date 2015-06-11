@@ -43,7 +43,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     var allColumns = List[AbstractColumn]()
     allColumns = allColumns :+ KeyColumn("column1", IntegerType, 0)
     allColumns = allColumns :+ NonKeyColumn("column2", BooleanType, family1, "qualifier1")
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace,
+      hbaseTableName, allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
     val llr = Literal(1023, IntegerType)
@@ -84,7 +85,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ KeyColumn("column1", LongType, 0)
     allColumns = allColumns :+ NonKeyColumn("column2", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
     val llr = Literal(1023L, LongType)
@@ -120,7 +122,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ KeyColumn("column1", StringType, 0)
     allColumns = allColumns :+ NonKeyColumn("column2", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column1").get
     val llr = Literal("aaa", StringType)
@@ -154,7 +157,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column3").get
     val llr = Literal(8.toShort, ShortType)
@@ -215,7 +219,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
     val llr = Literal(8, IntegerType)
@@ -280,7 +285,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
     val llr = Literal(8, IntegerType)
@@ -360,7 +366,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
     val llr = Literal(8, IntegerType)
@@ -451,7 +458,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column3", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column4", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column2").get
     val llr = Literal(8, IntegerType)
@@ -541,7 +549,8 @@ class CriticalPointsTestSuite extends FunSuite with BeforeAndAfterAll with Loggi
     allColumns = allColumns :+ NonKeyColumn("column4", FloatType, family2, "qualifier2")
     allColumns = allColumns :+ NonKeyColumn("column5", BooleanType, family1, "qualifier1")
 
-    val relation = HBaseRelation(tableName, namespace, hbaseTableName, allColumns)(TestHbase)
+    val relation = HBaseRelation(tableName, namespace, hbaseTableName,
+      allColumns, Some(true))(TestHbase)
 
     val lll = relation.output.find(_.name == "column3").get
     val llr = Literal(32, IntegerType)
