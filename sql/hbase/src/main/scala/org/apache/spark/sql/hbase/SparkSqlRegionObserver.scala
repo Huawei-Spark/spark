@@ -48,13 +48,19 @@ class HBaseCoprocessorSQLReaderRDD(var relation: HBaseRelation,
   @transient var scanner: RegionScanner = _
 
   private def createIterator(context: TaskContext): Iterator[Row] = {
-    val otherFilter: (Row) => Boolean = if (otherFilters.isDefined) {
-      if (codegenEnabled) {
-        GeneratePredicate(otherFilters.get, finalOutput)
-      } else {
-        InterpretedPredicate(otherFilters.get, finalOutput)
-      }
-    } else null
+    val otherFilter: (Row) => Boolean = {
+      if (otherFilters.isDefined) {
+        if (relation.deploySuccessfully.isDefined && relation.deploySuccessfully.get) {
+          null
+        } else {
+          if (codegenEnabled) {
+            GeneratePredicate(otherFilters.get, finalOutput)
+          } else {
+            InterpretedPredicate(otherFilters.get, finalOutput)
+          }
+        }
+      } else null
+    }
 
     val projections = finalOutput.zipWithIndex
     var finished: Boolean = false
