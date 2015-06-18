@@ -272,48 +272,40 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
 
     var low: Int = node.currentNodeIndex
     var high: Int = cprs.size - 1
+    var middle: Int = 0
     // the flag to exit the while loop
-    var breakFlag: Boolean = false
-    var result: Int = -1
-    while (high >= low && !breakFlag) {
-      val middle: Int = (low + high) / 2
+    var found: Boolean = false
+    while (high >= low && !found) {
+      middle = (low + high) / 2
       // get the compare result
-      val compare: Int = compareWithinRange(dt, input, cprs, middle)
+      val compare: Int = compareWithinRange(dt, input, cprs(middle))
       if (compare == 0) {
         // find the value in the range
-        result = middle
-        breakFlag = true
-      } else if (low != high) {
-        if (compare == 1) {
-          // increase the low value
-          low = middle + 1
-        } else if (compare == -1) {
-          // decrease the high value
-          high = middle - 1
-        }
-      } else {
-        // if high equals low, means we have to stop search with no result
-        breakFlag = true
+        found = true
+      } else if (compare == 1) {
+        // increase the low value
+        low = middle + 1
+      } else if (compare == -1) {
+        // decrease the high value
+        high = middle - 1
       }
     }
-    if (result == -1) {
-      // no position found in the range
-      (null, input)
-    } else {
-      val start: Option[T] = cprs(result).start
-      val startInclusive: Boolean = cprs(result).startInclusive
-      node.currentNodeIndex = result
-      if (currentNode == root && currentNode.currentNodeIndex > 0) {
-        for (i <- 0 to root.currentNodeIndex - 1) {
-          root.children(i) == null
-        }
-      }
-      if (start.isEmpty ||
-        (startInclusive && ordering.gteq(input.asInstanceOf[t], start.get.asInstanceOf[t])) ||
-        (!startInclusive && ordering.gt(input.asInstanceOf[t], start.get.asInstanceOf[t]))) {
-        // the input is within the range, does not have to adjust
-        (ReturnCode.INCLUDE, input)
+
+    if (!found) {
+      if (low > cprs.size - 1) {
+        // no position found in the range
+        (null, input)
       } else {
+        val start: Option[T] = cprs(low).start
+        val startInclusive: Boolean = cprs(low).startInclusive
+        node.currentNodeIndex = low
+
+        if (currentNode == root && currentNode.currentNodeIndex > 0) {
+          for (i <- 0 to root.currentNodeIndex - 1) {
+            root.children(i) == null
+          }
+        }
+
         if (dt == StringType || startInclusive) {
           // have to adjust the input to the beginning of the range
           // for string, it will always be the beginning, even startInclusive is false
@@ -328,6 +320,10 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
           (ReturnCode.SEEK_NEXT_USING_HINT, value)
         }
       }
+    } else {
+      // the input is within the range, does not have to adjust
+      node.currentNodeIndex = middle
+      (ReturnCode.INCLUDE, input)
     }
   }
 
@@ -335,52 +331,30 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * compare the input with a range [(previousRange.end, range.start)]
    * @param dt the data type
    * @param input the input value
-   * @param cprs the sequence of the ranges
-   * @param index the indexed range to be compared
+   * @param cpr the critical point range to be tested
    * @tparam T the type template
    * @return 0 within the range, -1 less than the range, 1 great than the range
    */
   private def compareWithinRange[T](dt: NativeType, input: T,
-                                    cprs: Seq[CriticalPointRange[T]], index: Int): Int = {
+                                    cpr: CriticalPointRange[T]): Int = {
     val ordering = dt.ordering
     type t = dt.JvmType
 
-    // make the range continuous, by calculating the start and startInclusive using
-    // the previous cpr information
-    val start: Option[T] = {
-      if (index == 0) {
-        None
-      } else {
-        cprs(index - 1).end
-      }
-    }
-    val end: Option[T] = cprs(index).end
-    val startInclusive: Boolean = {
-      if (index == 0) {
-        false
-      } else {
-        !cprs(index - 1).endInclusive
-      }
-    }
-    val endInclusive: Boolean = cprs(index).endInclusive
+    val start = cpr.start
+    val startInclusive = cpr.startInclusive
+    val end = cpr.end
+    val endInclusive = cpr.endInclusive
 
-    if (end.isEmpty) {
-      // always in the range, [(Any, None)
-      0
-    } else if ((endInclusive && ordering.gt(input.asInstanceOf[t], end.get.asInstanceOf[t]))
-      || (!endInclusive && ordering.gteq(input.asInstanceOf[t], end.get.asInstanceOf[t]))) {
-      // (Any, _) where input > Any; or [Any, _] where input >= Any
-      1
-    } else if (start.isEmpty) {
-      // always in the range (None, Any)], where input < or <= Any
-      0
-    } else if ((startInclusive && ordering.gteq(input.asInstanceOf[t], start.get.asInstanceOf[t]))
-      || (!startInclusive && ordering.gt(input.asInstanceOf[t], start.get.asInstanceOf[t]))) {
-      // [Any, _) where input >= Any; or (Any, _) where input > Any, in the range
-      0
-    } else {
-      // all other cases, input < range
+    if (start.isDefined &&
+      ((startInclusive && ordering.lt(input.asInstanceOf[t], start.get.asInstanceOf[t])) ||
+        (!startInclusive && ordering.lteq(input.asInstanceOf[t], start.get.asInstanceOf[t])))) {
       -1
+    } else if (end.isDefined &&
+      ((endInclusive && ordering.gt(input.asInstanceOf[t], end.get.asInstanceOf[t])) ||
+        (!endInclusive && ordering.gteq(input.asInstanceOf[t], end.get.asInstanceOf[t])))) {
+      1
+    } else {
+      0
     }
   }
 
