@@ -224,7 +224,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
         resetEachLevel(root, 0, 0)
       } else {
         var dim = -1
-        for (i <- inputValues.indices if dim >= 0) {
+        for (i <- inputValues.indices if dim < 0) {
           if (inputValues(i) != currentValues(i)) {
             dim = i
           }
