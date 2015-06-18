@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.hbase.util.{HBaseKVHelper, DataTypeUtils, BytesUtils}
 import org.apache.spark.sql.types.{DataType, NativeType, StringType}
 import org.apache.spark.sql.hbase.catalyst.expressions.PartialPredicateOperations._
+import scala.collection.mutable.Map
 
 /**
  * the serializer to serialize / de-serialize the objects,
@@ -93,6 +94,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   private var predReferences: Seq[Attribute] = null
   private var boundPredicate: Expression = null
   private var predicateMap: Seq[(String, Int)] = null
+  private val cellMap: Map[NonKeyColumn, Any] = Map[NonKeyColumn, Any]()
 
   // the root node reference
   private var root: Node = null
@@ -630,17 +632,16 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    */
   def fullEvalution(kvs: java.util.List[Cell]) = {
     resetRow(workingRow)
-
-    var cellMap: Map[NonKeyColumn, Any] = Map[NonKeyColumn, Any]()
+    cellMap.clear()
     for (i <- 0 to kvs.size() - 1) {
       val item = kvs.get(i)
-      val family = CellUtil.cloneFamily(item)
-      val qualifier = CellUtil.cloneQualifier(item)
       val data = CellUtil.cloneValue(item)
-      val nkc = relation.nonKeyColumns.find(a =>
-        Bytes.compareTo(a.familyRaw, family) == 0 &&
-          Bytes.compareTo(a.qualifierRaw, qualifier) == 0).get
       if (data.nonEmpty) {
+        val family = CellUtil.cloneFamily(item)
+        val qualifier = CellUtil.cloneQualifier(item)
+        val nkc = relation.nonKeyColumns.find(a =>
+          Bytes.compareTo(a.familyRaw, family) == 0 &&
+          Bytes.compareTo(a.qualifierRaw, qualifier) == 0).get
         val value = DataTypeUtils.bytesToData(data, 0, data.length, nkc.dataType)
         cellMap += (nkc -> value)
       }
@@ -675,7 +676,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     }
   }
 
-  override def hasFilterRow(): Boolean = {
+  override def hasFilterRow: Boolean = {
     if (remainingPredicate != null) true else false
   }
 
