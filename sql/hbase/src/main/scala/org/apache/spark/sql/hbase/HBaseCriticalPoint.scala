@@ -82,7 +82,7 @@ private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boo
     } else {
       prefix += ((start.get, dt))
       require(isPoint, "Internal Logical Error: point range expected")
-      nextDimCriticalPointRanges.map(_.flatten(prefix)).reduceLeft(_ ++ _)
+      nextDimCriticalPointRanges.map(_.flatten(prefix.clone())).reduceLeft(_ ++ _)
     }
   }
 

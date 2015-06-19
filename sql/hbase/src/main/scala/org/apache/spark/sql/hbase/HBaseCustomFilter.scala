@@ -265,7 +265,6 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    */
   private def findPositionInRanges[T](input: T, node: Node): (ReturnCode, T) = {
     val dt: NativeType = node.dt
-    val ordering = dt.ordering
     type t = dt.JvmType
     val cprs: Seq[CriticalPointRange[T]] =
       node.children.map(item => item.cpr.asInstanceOf[CriticalPointRange[T]])
