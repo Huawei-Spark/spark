@@ -63,7 +63,7 @@ case class CriticalPoint[T](value: T, ctype: CriticalPointType.CriticalPointType
  * @tparam T the native data type of the critical point range
  *
  */
-private[hbase] class CriticalPointRange[T](start: Option[T], startInclusive: Boolean,
+private[hbase] class CriticalPointRange[+T](start: Option[T], startInclusive: Boolean,
                                            end: Option[T], endInclusive: Boolean,
                                            dt: NativeType, var pred: Expression)
   extends Range[T](start, startInclusive, end, endInclusive, dt) {

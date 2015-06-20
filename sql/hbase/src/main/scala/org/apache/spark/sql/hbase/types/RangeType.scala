@@ -24,7 +24,7 @@ import scala.language.implicitConversions
 import scala.math.PartialOrdering
 import scala.reflect.runtime.universe.typeTag
 
-class Range[T](val start: Option[T], // None for open ends
+class Range[+T](val start: Option[T], // None for open ends
                val startInclusive: Boolean,
                val end: Option[T], // None for open ends
                val endInclusive: Boolean,
