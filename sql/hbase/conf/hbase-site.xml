@@ -1,0 +1,15 @@
+<configuration>
+  <!--<property>-->
+    <!--<name>hbase.cluster.distributed</name>-->
+    <!--<value>true</value>-->
+  <!--</property>-->
+  <!--<property>-->
+    <!--<name>hbase.zookeeper.quorum</name>-->
+    <!--<value>localhost:2181</value>-->
+    <!--<final>true</final>-->
+  <!--</property>-->
+  <property>
+    <name>hbase.coprocessor.user.region.classes</name>
+    <value>org.apache.spark.sql.hbase.CheckDirEndPointImpl</value>
+  </property>
+</configuration>

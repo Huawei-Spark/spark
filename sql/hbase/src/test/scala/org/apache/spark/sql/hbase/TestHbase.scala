@@ -35,9 +35,6 @@ object TestHbase
   val nDataNodes: Int = 1
   val nMasters: Int = 1
 
-  catalog.deploySuccessfully_internal = Some(true)
-  catalog.pwdIsAccessible = true
-
   logDebug(s"Spin up hbase minicluster w/ $nMasters master, $nRegionServers RS, $nDataNodes dataNodes")
 
   @transient val cluster: MiniHBaseCluster = testUtil.startMiniCluster(nMasters, nRegionServers, nDataNodes)
@@ -47,4 +44,9 @@ object TestHbase
     + s"${sparkContext.hadoopConfiguration.get("hbase.zookeeper.property.clientPort")}")
 
   @transient lazy val hbaseAdmin: HBaseAdmin = new HBaseAdmin(sparkContext.hadoopConfiguration)
+
+  // The following operation will initialize the HBaseCatalog.
+  // And it should be done after starting MiniHBaseCluster
+  catalog.deploySuccessfully_internal = Some(true)
+  catalog.pwdIsAccessible = true
 }
