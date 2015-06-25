@@ -1003,6 +1003,15 @@
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
+    <resources>
+      <resource>
+        <directory>${basedir}/conf</directory>
+        <filtering>false</filtering>
+        <includes>
+          <include>hbase-site.xml</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <!-- 
 	Avoid infinite loop in maven build due to explicit dependency on hbase-server-tests module:
