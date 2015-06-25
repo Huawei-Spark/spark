@@ -46,7 +46,7 @@ private[hbase] case class AddCoprocessor(sqlContext: SQLContext) extends Rule[Sp
       case subplanScan: HBaseSQLTableScan =>
         oldScan = subplanScan
         val rdd = new HBaseCoprocessorSQLReaderRDD(
-          null, codegenEnabled, oldScan.output, null, sqlContext)
+          null, codegenEnabled, oldScan.output, None, sqlContext)
         HBaseSQLTableScan(oldScan.relation, oldScan.output, rdd)
     }
 

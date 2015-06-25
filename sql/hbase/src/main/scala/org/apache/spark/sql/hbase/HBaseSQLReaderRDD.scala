@@ -43,7 +43,7 @@ class HBasePostCoprocessorSQLReaderRDD(
                                         val relation: HBaseRelation,
                                         val codegenEnabled: Boolean,
                                         val output: Seq[Attribute],
-                                        val filterPred: Option[Expression],
+                                        @transient val filterPred: Option[Expression],
                                         val subplan: SparkPlan,
                                         @transient sqlContext: SQLContext)
   extends RDD[Row](sqlContext.sparkContext, Nil) with Logging {
@@ -152,7 +152,7 @@ class HBasePostCoprocessorSQLReaderRDD(
       case s: HBaseSQLTableScan =>
         val rdd = s.result.asInstanceOf[HBaseCoprocessorSQLReaderRDD]
         rdd.relation = relation
-        rdd.otherFilters = otherFilters
+        rdd.otherFilters = None
         rdd.finalOutput = rdd.finalOutput.distinct
         if (otherFilters.isDefined) {
           rdd.finalOutput = rdd.finalOutput.union(otherFilters.get.references.toSeq)
@@ -192,7 +192,7 @@ class HBasePostCoprocessorSQLReaderRDD(
         otherFilters, pushablePreds, output)
       setCoprocessor(scan, otherFilters, split.index)
       val scanner = relation.htable.getScanner(scan)
-      createIterator(context, scanner, otherFilters)
+      createIterator(context, scanner, None)
     } else {
       // expandedCPRs is not empty
       val isPointRanges = expandedCPRs.forall(
@@ -277,11 +277,11 @@ class HBasePostCoprocessorSQLReaderRDD(
 
 
         val (filters, otherFilters, preds) =
-          relation.buildCPRFilterList(output, filterPred, expandedCPRs)
+          relation.buildCPRFilterList(output, predicate, expandedCPRs)
         val scan = relation.buildScan(start, end, predicate, filters, otherFilters, preds, output)
         setCoprocessor(scan, otherFilters, split.index)
         val scanner = relation.htable.getScanner(scan)
-        createIterator(context, scanner, otherFilters)
+        createIterator(context, scanner, None)
       }
     }
   }
