@@ -60,8 +60,14 @@ private[hbase] object Serializer {
 }
 
 /**
- * the custom filter, it will skip the scan to the proper next position based on predicate
+ * The custom filter, it will skip the scan to the proper next position based on predicate
  * this filter will only deal with the predicate which has key columns inside
+ *
+ * The skip is multiple-dimensional on non-leading dimension keys in precense of the predicate's
+ * range expressions; other types of expressions in the predicate will be eventually evaluated
+ *
+ * The processing is stateful in that various info related to the previous processing is cahched
+ * for maximum reuse
  */
 private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
 
@@ -184,19 +190,30 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   }
 
   /**
+   *
+   * @param node the node to reset children on
+   * @return
+   */
+  def resetNode(node: Node) = {
+    if (node != null && node.cpr != null) {
+      node.currentValue = node.cpr.start.getOrElse(null)
+      if (node.currentValue != null && !node.cpr.startInclusive) {
+        // if ths start is open-ended, try to add one
+        addOne(node)
+      }
+    }
+  }
+
+  /**
    * recursively reset the index of the current child and the value in the child's CPR
    * @param node the start level, it will also reset its children
    */
-  private def resetChildren(node: Node): Unit = {
-    node.currentChildIndex = 0
-    node.currentValue = node.cpr.start.getOrElse(null)
-    if (node.currentValue != null && !node.cpr.startInclusive) {
-      // if ths start is open-ended, try to add one
-      addOne(node)
-    }
+  private def resetDecendents(node: Node): Unit = {
     if (node.children != null) {
+      node.currentChildIndex = 0
       for (child <- node.children) {
-        resetChildren(child)
+        resetNode(child)
+        resetDecendents(child)
       }
     }
   }
@@ -252,12 +269,13 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       remainingPredicate = null
       remainingPredicateBoundRef = null
       currentValues = inputValues
+      resetDecendents(node)
       val result = findNextHint(node)
       nextReturnCode = result._1
       if (nextReturnCode == ReturnCode.SEEK_NEXT_USING_HINT) {
         nextRowKey = result._2
         nextKeyValue = new KeyValue(nextRowKey, CellUtil.cloneFamily(kv),
-          Array[Byte](), Array[Byte]())
+          HBaseCustomFilter.empty, HBaseCustomFilter.empty)
       } else if (nextReturnCode == ReturnCode.SKIP) {
         filterAllRemainingSetting = true
       }
@@ -278,6 +296,9 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
   private def findPositionInRanges(node: Node): (Boolean, Int) = {
     require(node.children != null, "Internal logic error: children expected")
     val children = node.children
+    if (children.isEmpty) {
+      return (false, -1)
+    }
     val dt: NativeType = children.head.dt
     type t = dt.JvmType
     val value = currentValues(node.dimension + 1)
@@ -358,17 +379,19 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
       if (node.currentChildIndex != childIndex)
       {
         require(childIndex >= node.currentChildIndex)
-        for (i <- node.currentChildIndex until childIndex) {
-          // reset passed children to release the memory
-          node.children(i).children = null
+        for (i <- node.currentChildIndex until childIndex if node.dimension == -1) {
+          // reset passed children to release the memory: only for the children
+          // of the most significant dimension; higher dimensions' children are reusable
+          if (i >= 0 ) {
+            node.children(i).children = null
+          }
         }
         node.currentChildIndex = childIndex
       }
-      resetChildren(node)
       val child = node.children(childIndex)
-      child.currentValue = currentValues(childIndex)
+      child.currentValue = currentValues(child.dimension)
       if (node.dimension == relation.dimSize - 2) {
-        nextRowKey = buildRowKey(child)
+        nextRowKey = buildRowKey
         if (child.cpr != null && child.cpr.pred != null) {
           remainingPredicate = child.cpr.pred.references.toSeq
           remainingPredicateBoundRef = BindReferences.bindReference(child.cpr.pred,
@@ -384,28 +407,65 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
         // a root
         (ReturnCode.SKIP, null)
       } else {
-        val canAddOne = addOne(node)
-        if (canAddOne) {
-          resetChildren(node)
-          findNextHint(node)
-        } else {
-          // if can increment this dimension, let the scanner give next hint
-          (ReturnCode.NEXT_ROW, null)
-        }
+        increment(node)
       }
     } else {
       // cannot find a containing child but there is a larger child
       node.currentChildIndex = childIndex
       val child = node.children(childIndex)
-      resetChildren(child)
-      (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey(child))
+      resetDecendents(child)
+      if (child.cpr != null) {
+        child.currentValue = child.cpr.start.getOrElse(null)
+        if (child.currentValue != null && !child.cpr.startInclusive) {
+          // if ths start is open-ended, try to add one
+          addOne(child)
+        }
+      }
+      (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
     }
   }
 
   /**
+   * upward increment a value in a dimension's CPR
+   * @param node the node to start with
+   * @return (return code, the row key after successful increment)
+   */
+  def increment(node: Node): (ReturnCode, HBaseRawType) = {
+    var currentNode:Node = node
+    while (currentNode.parent !=  null) {
+      if (addOne(currentNode)) {
+        val cmp = compareWithinRange(currentNode.cpr.dt, currentNode.currentValue, currentNode.cpr)
+        if (cmp == 0) {
+          resetDecendents(currentNode)
+          return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
+        } else {
+          require(cmp > 0, "Internal logical error: unexpected ordering of row key")
+          if (currentNode.parent.currentChildIndex < currentNode.parent.children.size -1) {
+            // get to the start of the next sibling CPR
+            val childIndex = currentNode.parent.currentChildIndex + 1
+            if (currentNode.dimension == 0)  {
+              // no look back: release the memory
+              currentNode.children = null
+            }
+            resetDecendents(currentNode.parent)
+            currentNode.parent.currentChildIndex = childIndex
+            return (ReturnCode.SEEK_NEXT_USING_HINT, buildRowKey)
+          } else {
+            // beyond CPR's range of this dimension,
+            // increment the next (more significant) dimension
+            currentNode = currentNode.parent
+          }
+        }
+      } else {
+        return (ReturnCode.NEXT_ROW, null)
+      }
+    }
+    return (ReturnCode.SKIP, null)
+  }
+  /**
    *
    * @param node the node to add 1 to
-   * @return
+   * @return whether the addition can be made within the value domain
    */
   def addOne(node: Node): Boolean = {
     val dt = node.dt
@@ -447,15 +507,21 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
    * construct the row key based on the current currentValue of each dimension,
    * from dimension 0 to the dimIndex
    */
-  private def buildRowKey(node: Node): HBaseRawType = {
+  private def buildRowKey(): HBaseRawType = {
     var list: List[(HBaseRawType, DataType)] = List[(HBaseRawType, DataType)]()
-    var levelNode: Node = node
-    do {
+    var node = root
+    while (node.currentChildIndex != -1 && node.children.nonEmpty &&
+      node.children(node.currentChildIndex) != null &&
+      node.children(node.currentChildIndex).currentValue != null) {
+      val levelNode: Node = node.children(node.currentChildIndex)
       val dt = levelNode.dt
       val value = BytesUtils.create(dt).toBytes(levelNode.currentValue)
-      list = (value, dt) +: list
-      levelNode = levelNode.parent
-    } while (levelNode != null)
+      list = list :+ (value, dt)
+      if (levelNode.dimension < relation.dimSize - 1) {
+        generateCPRs(levelNode)
+      }
+      node = levelNode
+    }
     HBaseKVHelper.encodingRawKeyColumns(list.toSeq)
   }
 
@@ -467,6 +533,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     require(node.dimension < relation.dimSize - 1,
       "Internal logical error: node of invalid dimension")
     if (node.children != null) {
+      // if already computed, just return
       return
     }
     val dimIndex = node.dimension + 1
@@ -477,46 +544,53 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
     val predExpr = if (node.dimension == -1) {
       // this is the root: use the scan's predicate
       this.predExpr
+    } else if (node.cpr == null) {
+      null
     } else {
       node.cpr.pred
     }
 
-    val criticalPoints: Seq[CriticalPoint[t]] = RangeCriticalPoint.collect(predExpr, keyDim)
-    val predRefs = predExpr.references.toSeq
-    val boundPred = BindReferences.bindReference(predExpr, predRefs)
+    if (predExpr != null) {
+      val criticalPoints: Seq[CriticalPoint[t]] = RangeCriticalPoint.collect(predExpr, keyDim)
+      val predRefs = predExpr.references.toSeq
+      val boundPred = BindReferences.bindReference(predExpr, predRefs)
 
-    resetRow(workingRow)
+      resetRow(workingRow)
 
-    val qualifiedCPRanges = if (criticalPoints.nonEmpty) {
-      // partial reduce
-      val cpRanges: Seq[CriticalPointRange[t]] =
-        RangeCriticalPoint.generateCriticalPointRange(criticalPoints, dimIndex, dt)
+      val qualifiedCPRanges = if (criticalPoints.nonEmpty) {
+        // partial reduce
+        val cpRanges: Seq[CriticalPointRange[t]] =
+          RangeCriticalPoint.generateCriticalPointRange(criticalPoints, dimIndex, dt)
 
-      // set values for all more significant dimensions
-      var parent: Node = node
-      while (parent.dimension > 0) {
-        val newKeyIndex = predRefs.indexWhere(_.exprId ==
-        relation.partitionKeys(parent.dimension-1).exprId)
-        if (newKeyIndex != -1) {
-          workingRow.update(newKeyIndex, parent.currentValue)
+        // set values for all more significant dimensions
+        var parent: Node = node
+        while (parent.dimension >= 0) {
+          val newKeyIndex = predRefs.indexWhere(_.exprId ==
+            relation.partitionKeys(parent.dimension).exprId)
+          if (newKeyIndex != -1) {
+            workingRow.update(newKeyIndex, parent.currentValue)
+          }
+          parent = parent.parent
         }
-        parent = parent.parent
-      }
 
-      val keyIndex = predRefs.indexWhere(_.exprId == relation.partitionKeys(dimIndex).exprId)
-      workingRow.update(keyIndex, node.cpr)
-      cpRanges.filter(cpr => {
-        val prRes = boundPred.partialReduce(workingRow, predRefs)
-        if (prRes._1 == null) cpr.pred = prRes._2
-        prRes._1 == null || prRes._1.asInstanceOf[Boolean]
+        val keyIndex = predRefs.indexWhere(_.exprId == relation.partitionKeys(dimIndex).exprId)
+        cpRanges.filter(cpr => {
+          workingRow.update(keyIndex, cpr)
+          val prRes = boundPred.partialReduce(workingRow, predRefs)
+          if (prRes._1 == null) cpr.pred = prRes._2
+          prRes._1 == null || prRes._1.asInstanceOf[Boolean]
+        })
+      } else {
+        Seq(new CriticalPointRange[t](None, false, None, false, dt, predExpr))
+      }
+      node.children = qualifiedCPRanges.map(range => {
+          Node(dt, dimIndex, node, cpr = range)
       })
     } else {
-      Seq(new CriticalPointRange[t](None, false, None, false, dt, node.cpr.pred))
+      node.children = Seq(Node(dt, dimIndex, node,
+        cpr = new CriticalPointRange[t](None, false, None, false, dt, null)))
     }
-    node.children = qualifiedCPRanges.map(range => {
-        val nextDimKeyIndex = dimIndex + 1
-        Node(dt, nextDimKeyIndex, node, cpr = range)
-    })
+    resetDecendents(node)
   }
 
   /**
@@ -595,6 +669,7 @@ private[hbase] class HBaseCustomFilter extends FilterBase with Writable {
 }
 
 object HBaseCustomFilter {
+  val empty = Array[Byte]()
   def parseFrom(pbBytes: Array[Byte]): HBaseCustomFilter = {
     try {
       Writables.getWritable(pbBytes, new HBaseCustomFilter()).asInstanceOf[HBaseCustomFilter]
