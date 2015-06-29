@@ -71,5 +71,5 @@ from pyspark.sql.window import Window, WindowSpec
 __all__ = [
     'SQLContext', 'HiveContext', 'DataFrame', 'GroupedData', 'Column', 'Row',
     'DataFrameNaFunctions', 'DataFrameStatFunctions', 'Window', 'WindowSpec',
-    'DataFrameReader', 'DataFrameWriter'
+    'DataFrameReader', 'DataFrameWriter', 'HbaseSQLContext'
 ]

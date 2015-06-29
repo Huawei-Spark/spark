@@ -45,7 +45,7 @@ private[spark] class PythonRDD(
     command: Array[Byte],
     envVars: JMap[String, String],
     pythonIncludes: JList[String],
-    preservePartitoning: Boolean,
+    preservePartitioning: Boolean,
     pythonExec: String,
     pythonVer: String,
     broadcastVars: JList[Broadcast[PythonBroadcast]],
