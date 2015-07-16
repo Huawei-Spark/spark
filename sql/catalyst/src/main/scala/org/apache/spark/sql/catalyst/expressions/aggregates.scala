@@ -177,6 +177,7 @@ case class CountDistinctFunction(
   }
   override def eval(input: InternalRow): Any = seen.size.toLong
 }
+<<<<<<< HEAD
 case class CollectHashSet(expressions: Seq[Expression]) extends AggregateExpression {
   def this() = this(null)
   override def children: Seq[Expression] = expressions
@@ -189,6 +190,25 @@ case class CollectHashSet(expressions: Seq[Expression]) extends AggregateExpress
 case class CollectHashSetFunction(
                                    @transient expr: Seq[Expression],
                                    @transient base: AggregateExpression)
+=======
+
+case class Last(child: Expression) extends PartialAggregate with trees.UnaryNode[Expression] {
+  override def references = child.references
+  override def nullable = true
+  override def dataType = child.dataType
+  override def toString = s"LAST($child)"
+
+  override def asPartial: SplitEvaluation = {
+    val partialLast = Alias(Last(child), "PartialLast")()
+    SplitEvaluation(
+      Last(partialLast.toAttribute),
+      partialLast :: Nil)
+  }
+  override def newInstance() = new LastFunction(child, this)
+}
+
+case class AverageFunction(expr: Expression, base: AggregateExpression)
+>>>>>>> e7ba77ffdaeca7292c3255ad2addf56a7f5f6ea1
   extends AggregateFunction {
   def this() = this(null, null) // Required for serialization.
   val seen = new OpenHashSet[Any]()
@@ -578,6 +598,7 @@ case class FirstFunction(expr: Expression, base: AggregateExpression) extends Ag
   }
   override def eval(input: InternalRow): Any = result
 }
+<<<<<<< HEAD
 case class Last(child: Expression) extends UnaryExpression with PartialAggregate {
   override def references: AttributeSet = child.references
   override def nullable: Boolean = true
@@ -600,4 +621,17 @@ case class LastFunction(expr: Expression, base: AggregateExpression) extends Agg
   override def eval(input: InternalRow): Any = {
     if (result != null) expr.eval(result.asInstanceOf[InternalRow]) else null
   }
+=======
+
+case class LastFunction(expr: Expression, base: AggregateExpression) extends AggregateFunction {
+  def this() = this(null, null) // Required for serialization.
+
+  var result: Any = null
+
+  override def update(input: Row): Unit = {
+    result = input
+  }
+
+  override def eval(input: Row): Any = if (result != null) expr.eval(result.asInstanceOf[Row]) else null
+>>>>>>> e7ba77ffdaeca7292c3255ad2addf56a7f5f6ea1
 }
